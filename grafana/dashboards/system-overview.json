@@ -1,0 +1,16 @@
+{
+  "uid": "empm-system-overview",
+  "title": "EMPM | System Overview",
+  "tags": ["empm", "demo", "overview"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    { "id": 1, "type": "stat", "title": "Current site load", "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 }, "datasource": { "type": "testdata", "uid": "empm-demo-telemetry" }, "targets": [{ "refId": "A", "scenarioId": "random_walk", "startValue": 428, "spread": 18, "noise": 2 }], "fieldConfig": { "defaults": { "unit": "kw", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 650 }, { "color": "red", "value": 800 }] } }, "overrides": [] }, "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "colorMode": "value", "graphMode": "area" } },
+    { "id": 2, "type": "stat", "title": "Generators available", "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 }, "datasource": { "type": "testdata", "uid": "empm-demo-telemetry" }, "targets": [{ "refId": "A", "scenarioId": "csv_content", "csvContent": "Time,available\n2024-01-01,12" }], "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] }, "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" } },
+    { "id": 3, "type": "timeseries", "title": "Fleet load trend", "gridPos": { "x": 0, "y": 5, "w": 16, "h": 10 }, "datasource": { "type": "testdata", "uid": "empm-demo-telemetry" }, "targets": [{ "refId": "A", "scenarioId": "random_walk", "seriesCount": 3, "startValue": 350, "spread": 45, "noise": 4 }], "fieldConfig": { "defaults": { "unit": "kw" }, "overrides": [] }, "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } } },
+    { "id": 4, "type": "gauge", "title": "Power quality score", "gridPos": { "x": 16, "y": 5, "w": 8, "h": 10 }, "datasource": { "type": "testdata", "uid": "empm-demo-telemetry" }, "targets": [{ "refId": "A", "scenarioId": "random_walk", "startValue": 96, "spread": 2, "noise": 0.5 }], "fieldConfig": { "defaults": { "min": 0, "max": 100, "unit": "percent", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 80 }, { "color": "green", "value": 92 }] } }, "overrides": [] }, "options": { "showThresholdLabels": false, "showThresholdMarkers": true } }
+  ]
+}

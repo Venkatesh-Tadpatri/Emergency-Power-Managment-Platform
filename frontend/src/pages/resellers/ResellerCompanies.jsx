@@ -1,0 +1,64 @@
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "react-oidc-context";
+import { InfoCard } from "../../components/common/StatCard";
+import { IconBuilding } from "../../components/common/Icons";
+import { Modal } from "../../components/common/Modal";
+import { usePageHeader } from "../../components/layout/HeaderContext";
+import { useArchiveCompany, useCompanies, useCreateCompany, useUpdateCompany, } from "../../queries/companies";
+import { useMe } from "../../queries/me";
+import { useReseller } from "../../queries/resellers";
+import { useSystems } from "../../queries/systems";
+export function ResellerCompanies() {
+    const { resellerId } = useParams();
+    const navigate = useNavigate();
+    const auth = useAuth();
+    const { data: me } = useMe(auth.isAuthenticated);
+    const { data: reseller } = useReseller(resellerId);
+    const { data: companies } = useCompanies(resellerId);
+    const { data: systems } = useSystems();
+    const createCompany = useCreateCompany();
+    const updateCompany = useUpdateCompany();
+    const archiveCompany = useArchiveCompany();
+    const [editing, setEditing] = useState(null);
+    const [form, setForm] = useState({ name: "", address: "" });
+    usePageHeader("Companies", [
+        { label: "Resellers", onClick: () => navigate("/resellers") },
+        { label: reseller?.name || "", onClick: () => navigate(`/resellers/${resellerId}`) },
+    ]);
+    const canManage = !!me?.permissions.create_company;
+    const openNew = () => {
+        setForm({ name: "", address: "" });
+        setEditing("new");
+    };
+    const openEdit = (c, e) => {
+        e.stopPropagation();
+        setForm({ name: c.name, address: c.address || "" });
+        setEditing(c);
+    };
+    const submit = (e) => {
+        e.preventDefault();
+        if (!form.name.trim() || !resellerId)
+            return;
+        if (editing === "new") {
+            createCompany.mutate({ name: form.name, address: form.address, reseller_id: resellerId });
+        }
+        else if (editing) {
+            updateCompany.mutate({ id: editing.id, data: { name: form.name, address: form.address } });
+        }
+        setEditing(null);
+    };
+    return (_jsxs(_Fragment, { children: [canManage && (_jsxs("div", { className: "section-header", children: [_jsx("div", {}), _jsx("button", { className: "header-btn primary", onClick: openNew, children: "+ New Company" })] })), _jsx("div", { className: "card-grid", children: (companies || []).map((c) => {
+                    const cSystems = (systems || []).filter((s) => s.company_id === c.id);
+                    const cNormal = cSystems.filter((s) => s.status === "normal").length;
+                    return (_jsxs("div", { className: "reseller-company-card-shell", children: [_jsx(InfoCard, { title: c.name, status: c.status, subtitle: c.address, icon: IconBuilding, stats: [
+                                    { label: "Systems", value: cSystems.length, color: "var(--cyan)" },
+                                    { label: "Normal", value: cNormal, color: "var(--green)" },
+                                    { label: "Events", value: cSystems.length - cNormal, color: "var(--red)" },
+                                ], onClick: () => navigate(`/companies/${c.id}`) }), canManage && (_jsxs("div", { style: { position: "absolute", top: 10, right: 10, display: "flex", gap: 4 }, children: [_jsx("button", { className: "header-btn", onClick: (e) => openEdit(c, e), children: "Edit" }), c.status !== "archived" && (_jsx("button", { className: "header-btn", onClick: (e) => {
+                                            e.stopPropagation();
+                                            archiveCompany.mutate(c.id);
+                                        }, children: "Archive" }))] }))] }, c.id));
+                }) }), editing && (_jsx(Modal, { title: editing === "new" ? "New Company" : "Edit Company", onClose: () => setEditing(null), children: _jsxs("form", { onSubmit: submit, children: [_jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Company Name *" }), _jsx("input", { required: true, minLength: 2, maxLength: 120, value: form.name, onChange: (e) => setForm({ ...form, name: e.target.value }), placeholder: "e.g. Riverside Medical Center", autoFocus: true })] }), _jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Address / City" }), _jsx("input", { value: form.address, onChange: (e) => setForm({ ...form, address: e.target.value }), placeholder: "e.g. 200 Main St, Springfield" })] }), _jsxs("div", { className: "modal-actions", children: [_jsx("button", { type: "button", className: "header-btn", onClick: () => setEditing(null), children: "Cancel" }), _jsx("button", { type: "submit", className: "header-btn primary", children: "Save" })] })] }) }))] }));
+}

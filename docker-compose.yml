@@ -1,0 +1,136 @@
+services:
+  mysql:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  zitadel-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zitadel
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: ${ZITADEL_DB_PASSWORD}
+    volumes:
+      - zitadel_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.63.0
+    restart: unless-stopped
+    command: start-from-init --masterkey "${ZITADEL_MASTERKEY}" --tlsMode disabled
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${ZITADEL_DB_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      # This must be the same host name/IP used by web and mobile clients.
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_EXTERNAL_DOMAIN:-localhost}
+      ZITADEL_EXTERNALPORT: 8080
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: EMPM
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_ADMIN_USERNAME}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_ADDRESS: ${ZITADEL_ADMIN_EMAIL}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED: "true"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+      # Only applied during first-instance init on a brand-new database — see
+      # README's "SMTP for Zitadel" section for activating it on an existing instance.
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_SMTP_HOST: "${ZITADEL_SMTP_HOST}:${ZITADEL_SMTP_PORT}"
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_SMTP_USER: ${ZITADEL_SMTP_USER}
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_SMTP_PASSWORD: ${ZITADEL_SMTP_PASSWORD}
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_TLS: "true"
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_FROM: ${ZITADEL_SMTP_FROM}
+      ZITADEL_DEFAULTINSTANCE_SMTPCONFIGURATION_FROMNAME: ${ZITADEL_SMTP_FROM_NAME}
+    ports:
+      - "8080:8080"
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      ZITADEL_ISSUER: ${ZITADEL_ISSUER}
+      ZITADEL_CLIENT_ID: ${ZITADEL_CLIENT_ID}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      SEED_ON_START: ${SEED_ON_START}
+      SUPERADMIN_ZITADEL_SUB: ${SUPERADMIN_ZITADEL_SUB}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE}
+      VITE_ZITADEL_AUTHORITY: ${VITE_ZITADEL_AUTHORITY}
+      VITE_ZITADEL_CLIENT_ID: ${VITE_ZITADEL_CLIENT_ID}
+      VITE_GRAFANA_URL: ${VITE_GRAFANA_URL:-http://localhost:3000}
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+  # Demo analytics workspace.  It uses Grafana's built-in TestData source, so
+  # it runs without a telemetry pipeline and can be demonstrated immediately.
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      # Demo-only: production must use Zitadel/OIDC and disable anonymous access.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: light
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  mysql_data:
+  zitadel_pg_data:
+  frontend_node_modules:
