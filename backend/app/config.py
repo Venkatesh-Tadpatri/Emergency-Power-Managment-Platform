@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "mysql+pymysql://empm:empm_dev_pw@localhost:3306/empm"
+    database_url: str = "mysql+pymysql://cpc:cpc_dev_pw@localhost:3306/cpc"
     # The `iss` claim inside tokens — must match what the browser used (external/host address).
     zitadel_issuer: str = "http://localhost:8080"
     # Where the backend itself reaches Zitadel over the Docker network — "localhost" from
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     seed_on_start: bool = True
     superadmin_zitadel_sub: str = ""
-    superadmin_email: str = "admin@empm.local"
+    superadmin_email: str = "admin@cpc.local"
 
     @property
     def cors_origin_list(self) -> list[str]:

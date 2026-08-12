@@ -1,7 +1,7 @@
 {
   "uid": "empm-system-overview",
-  "title": "EMPM | System Overview",
-  "tags": ["empm", "demo", "overview"],
+  "title": "CPC | System Overview",
+  "tags": ["cpc", "demo", "overview"],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,

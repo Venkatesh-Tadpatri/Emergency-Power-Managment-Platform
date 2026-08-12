@@ -193,7 +193,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       </div>
 
       {atsEditing && (
-        <Modal title={atsEditing === "new" ? "Add ATS" : "Edit ATS"} onClose={() => setAtsEditing(null)}>
+        <Modal title={atsEditing === "new" ? "Add ATS" : "Edit ATS"} onClose={() => setAtsEditing(null)} className="modal-ats">
           <form onSubmit={submitAts}>
             <div className="form-row">
               <label>Name *</label>
@@ -205,7 +205,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
                 {BRANCHES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
               </select>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="form-grid-2">
               <div className="form-row">
                 <label>Rated Amps</label>
                 <input type="number" min={0} step={1} value={atsForm.rated_amps} onChange={(e) => setAtsForm({ ...atsForm, rated_amps: e.target.value })} />
@@ -238,13 +238,13 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       )}
 
       {genEditing && (
-        <Modal title={genEditing === "new" ? "Add Generator" : "Edit Generator"} onClose={() => setGenEditing(null)}>
+        <Modal title={genEditing === "new" ? "Add Generator" : "Edit Generator"} onClose={() => setGenEditing(null)} className="modal-gen">
           <form onSubmit={submitGen}>
             <div className="form-row">
               <label>Name *</label>
               <input required minLength={2} maxLength={80} value={genForm.name} onChange={(e) => setGenForm({ ...genForm, name: e.target.value })} placeholder="e.g. GEN-1" autoFocus />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="form-grid-2">
               <div className="form-row">
                 <label>Make</label>
                 <input value={genForm.make} onChange={(e) => setGenForm({ ...genForm, make: e.target.value })} />
@@ -258,7 +258,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
               <label>Serial Number</label>
               <input value={genForm.serial_number} onChange={(e) => setGenForm({ ...genForm, serial_number: e.target.value })} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div className="form-grid-3">
               <div className="form-row">
                 <label>Rated kW</label>
                 <input type="number" min={0} step={1} value={genForm.rated_kw} onChange={(e) => setGenForm({ ...genForm, rated_kw: e.target.value })} />

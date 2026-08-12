@@ -1,17 +1,56 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api/client";
-import type { ATS, Generator, Panel, System } from "../types/entities";
+import type { ATS, Generator, Panel, Site, System } from "../types/entities";
 
-export function useSystems(companyId?: string) {
+export function useSystems(companyId?: string, siteId?: string) {
   return useQuery({
-    queryKey: ["systems", { companyId }],
+    queryKey: ["systems", { companyId, siteId }],
     queryFn: async () =>
       (
         await api.get<System[]>("/api/systems", {
-          params: companyId ? { company_id: companyId } : {},
+          params: { ...(companyId ? { company_id: companyId } : {}), ...(siteId ? { site_id: siteId } : {}) },
         })
       ).data,
+  });
+}
+
+export function useSites(customerId?: string) {
+  return useQuery({
+    queryKey: ["sites", { customerId }],
+    queryFn: async () => (await api.get<Site[]>("/api/sites", { params: customerId ? { customer_id: customerId } : {} })).data,
+  });
+}
+
+export function useSite(id?: string) {
+  return useQuery({
+    queryKey: ["sites", id],
+    queryFn: async () => (await api.get<Site>(`/api/sites/${id}`)).data,
+    enabled: !!id,
+  });
+}
+
+export function useCreateSite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<Site>) => (await api.post<Site>("/api/sites", data)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sites"] }),
+  });
+}
+
+export function useUpdateSite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Site> }) => (await api.patch<Site>(`/api/sites/${id}`, data)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sites"] }),
+  });
+}
+
+export function useArchiveSite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete<Site>(`/api/sites/${id}`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sites"] }),
   });
 }
 

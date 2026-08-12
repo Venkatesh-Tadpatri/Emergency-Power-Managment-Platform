@@ -26,6 +26,8 @@ import { ResellerMap } from "./pages/resellers/ResellerMap";
 import { ResellerUsers } from "./pages/resellers/ResellerUsers";
 import { ResellersList } from "./pages/resellers/ResellersList";
 import { Settings } from "./pages/settings/Settings";
+import { CustomerSites } from "./pages/sites/CustomerSites";
+import { SiteSystems } from "./pages/sites/SiteSystems";
 import { SystemDetail } from "./pages/systems/SystemDetail";
 
 export function App() {
@@ -70,7 +72,8 @@ function Gate() {
         <Route path="resellers/:resellerId/map" element={<ResellerMap />} />
 
         <Route path="companies" element={<CompaniesList />} />
-        <Route path="companies/:companyId" element={<CompanyDashboard />} />
+        <Route path="companies/:companyId" element={<CustomerSites />} />
+        <Route path="companies/:companyId/sites/:siteId" element={<SiteSystems />} />
         <Route path="companies/:companyId/map" element={<CompanyMap />} />
         <Route path="companies/:companyId/alarms" element={<CompanyAlarms />} />
         <Route path="companies/:companyId/users" element={<CompanyUsers />} />

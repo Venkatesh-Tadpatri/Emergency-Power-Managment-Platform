@@ -13,11 +13,12 @@ from app.routers import (
     panels,
     reports,
     resellers,
+    sites,
     systems,
     users,
 )
 
-app = FastAPI(title="EMPM API", version="0.1.0")
+app = FastAPI(title="CPC API — Critical Power Command", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,6 +30,7 @@ app.add_middleware(
 
 app.include_router(resellers.router)
 app.include_router(companies.router)
+app.include_router(sites.router)
 app.include_router(systems.router)
 app.include_router(panels.router)
 app.include_router(ats.router)

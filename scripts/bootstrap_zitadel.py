@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-time setup script: creates the "EMPM" Zitadel project and a public/PKCE
+"""One-time setup script: creates the "CPC" Zitadel project and a public/PKCE
 OIDC application for the React frontend, then prints the values to drop into
 .env (VITE_ZITADEL_CLIENT_ID / ZITADEL_CLIENT_ID).
 
@@ -63,8 +63,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pat", required=True, help="Personal Access Token from the Zitadel Console")
     parser.add_argument("--issuer", default="http://localhost:8080")
-    parser.add_argument("--project-name", default="EMPM")
-    parser.add_argument("--app-name", default="EMPM Web")
+    parser.add_argument("--project-name", default="CPC")
+    parser.add_argument("--app-name", default="CPC Web")
     args = parser.parse_args()
 
     print("Creating project...")

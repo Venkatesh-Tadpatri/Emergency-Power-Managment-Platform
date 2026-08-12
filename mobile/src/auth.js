@@ -1,8 +1,8 @@
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 
-const TOKEN_KEY = "empm_access_token";
-export const redirectUri = AuthSession.makeRedirectUri({ scheme: "empm", path: "auth" });
+const TOKEN_KEY = "cpc_access_token";
+export const redirectUri = AuthSession.makeRedirectUri({ scheme: "cpc", path: "auth" });
 
 console.log("Redirect URI:", redirectUri);
 

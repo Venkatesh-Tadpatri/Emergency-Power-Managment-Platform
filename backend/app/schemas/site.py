@@ -1,30 +1,27 @@
 from pydantic import BaseModel, ConfigDict
 
 
-class SystemBase(BaseModel):
+class SiteBase(BaseModel):
     name: str
     address: str | None = None
     lat: float | None = None
     lng: float | None = None
-    company_id: str
-    site_id: str | None = None
-    status: str = "normal"
+    customer_id: str
+    status: str = "active"
 
 
-class SystemCreate(SystemBase):
+class SiteCreate(SiteBase):
     pass
 
 
-class SystemUpdate(BaseModel):
+class SiteUpdate(BaseModel):
     name: str | None = None
     address: str | None = None
     lat: float | None = None
     lng: float | None = None
-    company_id: str | None = None
-    site_id: str | None = None
     status: str | None = None
 
 
-class SystemRead(SystemBase):
+class SiteRead(SiteBase):
     model_config = ConfigDict(from_attributes=True)
     id: str

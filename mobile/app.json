@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "EMPM",
-    "slug": "empm-mobile",
+    "name": "CPC — Critical Power Command",
+    "slug": "cpc-critical-power-command",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "empm",
+    "scheme": "cpc",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.empm.mobile"
+      "bundleIdentifier": "com.solution61.cpc"
     },
     "android": {
-      "package": "com.empm.mobile"
+      "package": "com.solution61.cpc"
     },
     "plugins": [
       "expo-secure-store",

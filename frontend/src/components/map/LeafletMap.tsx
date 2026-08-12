@@ -83,11 +83,11 @@ export function LeafletMap({
         `<div style="font-family:Inter,sans-serif;font-size:12px"><div style="font-weight:700;margin-bottom:4px">${m.label}</div>${
           m.sublabel ? `<div style="color:#94a3b8;font-size:10px">${m.sublabel}</div>` : ""
         }</div>`,
-        { direction: "top", offset: [0, -10], className: "empm-map-tooltip" }
+        { direction: "top", offset: [0, -10], className: "cpc-map-tooltip" }
       );
       L.marker([m.lat, m.lng], {
         icon: L.divIcon({
-          className: "empm-map-label",
+          className: "cpc-map-label",
           html: `<span style="font-family:Inter;font-size:10px;font-weight:600;color:#e2e8f0;text-shadow:0 0 4px #000,0 0 8px #000;white-space:nowrap">${m.label}</span>`,
           iconSize: [0, 0],
           iconAnchor: [-12, 4],

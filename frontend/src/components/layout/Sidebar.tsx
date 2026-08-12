@@ -17,7 +17,7 @@ import { useMe } from "../../queries/me";
 import { useCompany } from "../../queries/companies";
 import { useAlarms } from "../../queries/alarms";
 import { useReseller } from "../../queries/resellers";
-import { useSystem, useSystems } from "../../queries/systems";
+import { useSites, useSystem, useSystems } from "../../queries/systems";
 
 const DOT: Record<string, string> = {
   normal: "dot-green",
@@ -59,21 +59,28 @@ export function Sidebar() {
   const navigate = useNavigate();
   const auth = useAuth();
   const { data: me } = useMe(auth.isAuthenticated);
+  // Keep the Super Admin hierarchy available while /api/me is loading or
+  // recovering from a backend restart; the API still enforces authorization.
+  const canManageHierarchy = me?.permissions.manage_resellers || (auth.isAuthenticated && !me);
 
   const resellerMatch = useMatch("/resellers/:resellerId/*");
   const companyMatch = useMatch("/companies/:companyId/*");
+  const siteMatch = useMatch("/companies/:companyId/sites/:siteId");
   const systemMatch = useMatch("/systems/:systemId");
 
   const resellerId = resellerMatch?.params.resellerId;
   const companyIdFromRoute = companyMatch?.params.companyId;
   const systemId = systemMatch?.params.systemId;
+  const siteId = siteMatch?.params.siteId;
 
   const { data: systemForNav } = useSystem(systemId);
   const companyId = companyIdFromRoute || systemForNav?.company_id;
+  const activeSiteId = siteId || systemForNav?.site_id;
 
   const { data: reseller } = useReseller(resellerId);
   const { data: company } = useCompany(companyId);
-  const { data: systems } = useSystems(companyId);
+  const { data: sites } = useSites(companyId);
+  const { data: systems } = useSystems(companyId, activeSiteId);
   const { data: companyAlarms } = useAlarms({ companyId: companyId });
   const { data: resellerAlarms } = useAlarms({ resellerId });
 
@@ -103,8 +110,14 @@ export function Sidebar() {
           <NavItem icon={IconMap} color="#2563eb" label="Map View" active={path.endsWith("/map")} onClick={() => navigate(`/companies/${companyId}/map`)} />
         </div>
         <div className="nav-section">
-          <div className="nav-section-label">Systems</div>
-          {(systems || []).map((s) => (
+          <div className="nav-section-label">{activeSiteId ? "Systems" : "Sites"}</div>
+          {!activeSiteId && (sites || []).filter((site) => site.status !== "archived").map((site) => (
+            <div key={site.id} className={`nav-item sys-nav-item${activeSiteId === site.id ? " active" : ""}`} onClick={() => navigate(`/companies/${companyId}/sites/${site.id}`)}>
+              <span className="sys-dot dot-green" />
+              <span className="sys-nav-name">{site.name}</span>
+            </div>
+          ))}
+          {activeSiteId && (systems || []).map((s) => (
             <div
               key={s.id}
               className={`nav-item sys-nav-item${systemId === s.id ? " active" : ""}`}
@@ -146,7 +159,7 @@ export function Sidebar() {
         </div>
         <div className="nav-section">
           <div className="nav-section-label">Portfolio</div>
-          <NavItem icon={IconBuilding} color="#16a34a" label="Companies" active={path.endsWith("/companies")} onClick={() => navigate(`/resellers/${resellerId}/companies`)} />
+          <NavItem icon={IconBuilding} color="#16a34a" label="Customers" active={path.endsWith("/companies")} onClick={() => navigate(`/resellers/${resellerId}/companies`)} />
           <NavItem icon={IconUsers} color="#7c3aed" label="Users" active={path.endsWith("/users")} onClick={() => navigate(`/resellers/${resellerId}/users`)} />
         </div>
         <div className="nav-section">
@@ -164,11 +177,11 @@ export function Sidebar() {
         <NavItem icon={IconDashboard} color="#4f46e5" label="Dashboard" active={path === "/"} onClick={() => navigate("/")} />
         <NavItem icon={IconMap} color="#2563eb" label="Map View" active={path === "/map"} onClick={() => navigate("/map")} />
       </div>
-      {me?.permissions.manage_resellers && (
+      {canManageHierarchy && (
         <div className="nav-section">
           <div className="nav-section-label">Hierarchy</div>
           <NavItem icon={IconResellers} color="#7c3aed" label="Resellers" active={path.startsWith("/resellers")} onClick={() => navigate("/resellers")} />
-          <NavItem icon={IconBuilding} color="#2563eb" label="Companies" active={path === "/companies"} onClick={() => navigate("/companies")} />
+          <NavItem icon={IconBuilding} color="#2563eb" label="Customers" active={path === "/companies"} onClick={() => navigate("/companies")} />
         </div>
       )}
       <div className="nav-section">
@@ -178,7 +191,7 @@ export function Sidebar() {
       </div>
       <div className="nav-section">
         <div className="nav-section-label">Platform</div>
-        {me?.permissions.manage_resellers && (
+        {canManageHierarchy && (
           <NavItem icon={IconUsers} color="#db2777" label="Users" active={path === "/users"} onClick={() => navigate("/users")} />
         )}
         <NavItem icon={IconSettings} color="#64748b" label="Settings" active={path === "/settings"} onClick={() => navigate("/settings")} />

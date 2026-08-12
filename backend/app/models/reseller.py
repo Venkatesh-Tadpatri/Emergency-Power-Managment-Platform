@@ -13,6 +13,6 @@ class Reseller(Base, UUIDPKMixin, TimestampMixin):
     contact_phone: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
 
-    companies: Mapped[list["Company"]] = relationship(
+    customers: Mapped[list["Customer"]] = relationship(
         back_populates="reseller", cascade="all, delete-orphan"
     )

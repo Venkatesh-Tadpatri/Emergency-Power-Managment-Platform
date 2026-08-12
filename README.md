@@ -1,6 +1,6 @@
-# Emergency Power Management Platform (EMPM)
+# CPC — Critical Power Command
 
-EMPM is a full-stack platform for monitoring emergency-power equipment. It includes a FastAPI API with role-based access control, a React web dashboard, an Expo mobile client, Zitadel authentication, MySQL, and Grafana demo dashboards.
+CPC (Critical Power Command) is a full-stack platform for monitoring emergency-power equipment. It includes a FastAPI API with role-based access control, a React web dashboard, an Expo mobile client, Zitadel authentication, MySQL, and Grafana demo dashboards.
 
 ## Components
 
@@ -116,7 +116,7 @@ npm ci
 npm start
 ```
 
-For a physical device, replace `localhost` in `mobile/.env` with your computer’s LAN IP address. Create a native application in Zitadel, register the redirect URI `empm://auth`, and set its client ID as `EXPO_PUBLIC_ZITADEL_CLIENT_ID`. Keep the API, Zitadel authority, and mobile app on the same reachable host.
+For a physical device, replace `localhost` in `mobile/.env` with your computer’s LAN IP address. Create a native application in Zitadel, register the redirect URI `cpc://auth`, and set its client ID as `EXPO_PUBLIC_ZITADEL_CLIENT_ID`. Keep the API, Zitadel authority, and mobile app on the same reachable host.
 
 ## Tests and build checks
 

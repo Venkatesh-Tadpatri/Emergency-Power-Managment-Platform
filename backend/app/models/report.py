@@ -11,7 +11,7 @@ class Report(Base, UUIDPKMixin, TimestampMixin):
 
     __tablename__ = "reports"
 
-    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), nullable=False)
+    company_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), nullable=False)
     system_id: Mapped[str] = mapped_column(ForeignKey("systems.id"), nullable=False)
     report_code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     # gen-run | ats-emergency | test
@@ -27,5 +27,5 @@ class Report(Base, UUIDPKMixin, TimestampMixin):
     # Array of kW samples across the run, used to draw the canvas load-profile chart.
     load_profile_data: Mapped[list | None] = mapped_column(JSON)
 
-    company: Mapped["Company"] = relationship()
+    company: Mapped["Customer"] = relationship()
     system: Mapped["System"] = relationship()

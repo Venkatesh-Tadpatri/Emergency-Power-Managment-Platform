@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.auth.permissions import can_view_system, can_write_system
 from app.crud import company as company_crud
+from app.crud import site as site_crud
 from app.crud import system as crud
 from app.database import get_db
 from app.models.user import User
@@ -15,10 +16,11 @@ router = APIRouter(prefix="/api/systems", tags=["systems"])
 @router.get("", response_model=list[SystemRead])
 def list_systems(
     company_id: str | None = Query(default=None),
+    site_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    all_systems = crud.list_systems(db, company_id)
+    all_systems = crud.list_systems(db, company_id, site_id)
     return [s for s in all_systems if can_view_system(user, db, s)]
 
 
@@ -33,6 +35,10 @@ def create_system(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "company not found")
     if not can_write_system(user, db, company.id, company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to create systems here")
+    if data.site_id:
+        site = site_crud.get_site(db, data.site_id)
+        if not site or site.customer_id != company.id:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "site must belong to the selected customer")
     return crud.create_system(db, data)
 
 

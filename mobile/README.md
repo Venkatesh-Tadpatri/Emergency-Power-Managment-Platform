@@ -1,11 +1,11 @@
-# EMPM Mobile
+# CPC Mobile — Critical Power Command
 
-Expo React Native client for Android and iOS. It uses the existing EMPM API and Zitadel identity provider; there is no separate mobile backend.
+Expo React Native client for Android and iOS. It uses the existing CPC API and Zitadel identity provider; there is no separate mobile backend.
 
 ## Start
 
 1. Copy `.env.example` to `.env` and set the API, Zitadel authority, and native OIDC client ID.
-2. In Zitadel, create a native application and register the redirect URI `empm://auth`.
+2. In Zitadel, create a native application and register the redirect URI `cpc://auth`.
 3. Add the mobile app origin/URL as needed to the backend's `CORS_ORIGINS` configuration.
 4. Run `npm install`, then `npm start`. The default start command uses LAN mode so
    Expo Go on a phone can reach the development server. Scan the QR code shown

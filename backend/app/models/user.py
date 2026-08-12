@@ -19,7 +19,7 @@ class User(Base, UUIDPKMixin, TimestampMixin):
     role: Mapped[str | None] = mapped_column(String(30))
     scope_type: Mapped[str | None] = mapped_column(String(20))
     reseller_id: Mapped[str | None] = mapped_column(ForeignKey("resellers.id"))
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id"))
+    company_id: Mapped[str | None] = mapped_column(ForeignKey("customers.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     assigned_systems: Mapped[list["UserAssignedSystem"]] = relationship(

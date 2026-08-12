@@ -23,7 +23,7 @@ export function ResellerCompanies() {
     const archiveCompany = useArchiveCompany();
     const [editing, setEditing] = useState(null);
     const [form, setForm] = useState({ name: "", address: "" });
-    usePageHeader("Companies", [
+    usePageHeader("Customers", [
         { label: "Resellers", onClick: () => navigate("/resellers") },
         { label: reseller?.name || "", onClick: () => navigate(`/resellers/${resellerId}`) },
     ]);
@@ -49,7 +49,7 @@ export function ResellerCompanies() {
         }
         setEditing(null);
     };
-    return (_jsxs(_Fragment, { children: [canManage && (_jsxs("div", { className: "section-header", children: [_jsx("div", {}), _jsx("button", { className: "header-btn primary", onClick: openNew, children: "+ New Company" })] })), _jsx("div", { className: "card-grid", children: (companies || []).map((c) => {
+    return (_jsxs(_Fragment, { children: [canManage && (_jsxs("div", { className: "section-header", children: [_jsx("div", {}), _jsx("button", { className: "header-btn primary", onClick: openNew, children: "+ New Customer" })] })), _jsx("div", { className: "card-grid", children: (companies || []).map((c) => {
                     const cSystems = (systems || []).filter((s) => s.company_id === c.id);
                     const cNormal = cSystems.filter((s) => s.status === "normal").length;
                     return (_jsxs("div", { className: "reseller-company-card-shell", children: [_jsx(InfoCard, { title: c.name, status: c.status, subtitle: c.address, icon: IconBuilding, stats: [
@@ -60,5 +60,5 @@ export function ResellerCompanies() {
                                             e.stopPropagation();
                                             archiveCompany.mutate(c.id);
                                         }, children: "Archive" }))] }))] }, c.id));
-                }) }), editing && (_jsx(Modal, { title: editing === "new" ? "New Company" : "Edit Company", onClose: () => setEditing(null), children: _jsxs("form", { onSubmit: submit, children: [_jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Company Name *" }), _jsx("input", { required: true, minLength: 2, maxLength: 120, value: form.name, onChange: (e) => setForm({ ...form, name: e.target.value }), placeholder: "e.g. Riverside Medical Center", autoFocus: true })] }), _jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Address / City" }), _jsx("input", { value: form.address, onChange: (e) => setForm({ ...form, address: e.target.value }), placeholder: "e.g. 200 Main St, Springfield" })] }), _jsxs("div", { className: "modal-actions", children: [_jsx("button", { type: "button", className: "header-btn", onClick: () => setEditing(null), children: "Cancel" }), _jsx("button", { type: "submit", className: "header-btn primary", children: "Save" })] })] }) }))] }));
+                }) }), editing && (_jsx(Modal, { title: editing === "new" ? "New Customer" : "Edit Customer", onClose: () => setEditing(null), children: _jsxs("form", { onSubmit: submit, children: [_jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Customer Name *" }), _jsx("input", { required: true, minLength: 2, maxLength: 120, value: form.name, onChange: (e) => setForm({ ...form, name: e.target.value }), placeholder: "e.g. Riverside Medical Center", autoFocus: true })] }), _jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Address / City" }), _jsx("input", { value: form.address, onChange: (e) => setForm({ ...form, address: e.target.value }), placeholder: "e.g. 200 Main St, Springfield" })] }), _jsxs("div", { className: "modal-actions", children: [_jsx("button", { type: "button", className: "header-btn", onClick: () => setEditing(null), children: "Cancel" }), _jsx("button", { type: "submit", className: "header-btn primary", children: "Save" })] })] }) }))] }));
 }

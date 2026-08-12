@@ -12,7 +12,7 @@ import { useHeader } from "./HeaderContext";
 const ROLE_LABEL: Record<string, string> = {
   superadmin: "Super Admin",
   reseller_admin: "Reseller Admin",
-  company_admin: "Company Admin",
+  company_admin: "Customer Admin",
   system_operator: "System Operator",
   system_viewer: "System Viewer",
 };
@@ -42,18 +42,25 @@ export function Header() {
   const headingDetails = {
     Dashboard: { icon: IconDashboard, subtitle: `Welcome back, ${firstName}!` },
     Resellers: { icon: IconResellers, subtitle: "View and manage reseller partners across your organization" },
-    Companies: { icon: IconBuilding, subtitle: "View and manage all companies across your organization" },
+    Customers: { icon: IconBuilding, subtitle: "View and manage all customers across your organization" },
     "Platform Users": { icon: IconUsers, subtitle: "Manage access, roles, and organization scope" },
     "Map View": { icon: IconMap, subtitle: "Monitor facilities and systems across the network" },
     Alarms: { icon: IconAlert, subtitle: "Review active events and power-system alerts" },
     Analytics: { icon: IconDashboard, subtitle: "Explore operational performance and system insights" },
     Settings: { icon: IconSettings, subtitle: "Configure platform preferences and integrations" },
-  }[title] || { icon: IconDashboard, subtitle: "Emergency power management platform" };
+  }[title] || { icon: IconDashboard, subtitle: "Critical Power Command" };
   const HeadingIcon = headingDetails.icon;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("cpc-theme") === "dark");
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-dashboard", darkMode);
+    localStorage.setItem("cpc-theme", darkMode ? "dark" : "light");
+    return () => document.body.classList.remove("dark-dashboard");
+  }, [darkMode]);
 
   useEffect(() => {
     if (location.pathname === "/resellers") {
@@ -87,7 +94,7 @@ export function Header() {
   const orgLabel = reseller?.name
     ? "Reseller"
     : company?.name
-    ? "Company"
+    ? "Customer"
     : me?.role === "superadmin"
     ? null
     : null;
@@ -117,6 +124,16 @@ export function Header() {
         </div>
       </div>
       <div className="header-right">
+        <button
+          className="theme-toggle"
+          type="button"
+          onClick={() => setDarkMode((mode) => !mode)}
+          aria-label={`Switch to ${darkMode ? "light" : "dark"} mode`}
+          title={`Switch to ${darkMode ? "light" : "dark"} mode`}
+        >
+          <span aria-hidden="true">{darkMode ? "☀" : "◐"}</span>
+          {darkMode ? "Light" : "Dark"}
+        </button>
         <div className="search-box">
           <IconSearch size={13} />
           <input
@@ -165,7 +182,7 @@ export function Header() {
                   <div className="header-user-menu-row">
                     <span className="header-user-menu-label">Scope</span>
                     <span className="header-user-menu-value">
-                      {me.scope_type === "assigned" ? "Assigned systems" : "Company-wide"}
+                      {me.scope_type === "assigned" ? "Assigned systems" : "Customer-wide"}
                     </span>
                   </div>
                 )}

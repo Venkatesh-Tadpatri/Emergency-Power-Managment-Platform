@@ -17,6 +17,16 @@ export interface Company {
   status: string;
 }
 
+export interface Site {
+  id: string;
+  name: string;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  customer_id: string;
+  status: string;
+}
+
 export interface System {
   id: string;
   name: string;
@@ -24,6 +34,7 @@ export interface System {
   lat?: number | null;
   lng?: number | null;
   company_id: string;
+  site_id: string;
   status: "normal" | "emergency" | "alarm" | "test" | "offline" | string;
 }
 

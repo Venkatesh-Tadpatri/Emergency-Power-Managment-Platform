@@ -15,6 +15,7 @@ from app.models.oncall import OnCallShift
 from app.models.panel import Panel
 from app.models.report import Report
 from app.models.reseller import Reseller
+from app.models.site import Site
 from app.models.system import System
 from app.models.user import User
 from app.seed.demo_fixtures import (
@@ -88,6 +89,34 @@ def seed(db: Session) -> None:
         company_reseller_of[slug] = c["reseller"]
     db.flush()
 
+    # Demo customers have multiple physical sites. Aster Prime deliberately
+    # mirrors the Hyderabad hospital example: Ameerpet, Gachibowli,
+    # Jubilee Hills, and Miyapur. Systems are assigned to their site below.
+    site_names_by_customer = {
+        "piedmont": ["Main Hospital", "Ameerpet Campus", "Gachibowli Campus"],
+        "msk": ["Ameerpet Hospital", "Gachibowli Hospital", "Jubilee Hills Hospital", "Miyapur Hospital"],
+        "duke": ["Main Campus", "Raleigh Campus", "Regional Campus"],
+        "nyu": ["Tisch Campus", "Kimmel Campus", "Science Campus"],
+        "jhu": ["Weinberg Campus", "Bloomberg Campus"],
+        "unc": ["Main Hospital", "Cancer Hospital", "Hillsborough Campus"],
+        "capefear": ["Main Hospital", "Rehabilitation Center", "Health Pavilion"],
+    }
+    site_ids: dict[tuple[str, str], str] = {}
+    for customer_slug, site_names in site_names_by_customer.items():
+        customer = COMPANIES[customer_slug]
+        for site_name in site_names:
+            site = Site(
+                name=site_name,
+                address=customer["city"],
+                lat=customer["lat"],
+                lng=customer["lng"],
+                customer_id=company_ids[customer_slug],
+                status="active",
+            )
+            db.add(site)
+            db.flush()
+            site_ids[(customer_slug, site_name)] = site.id
+
     system_ids: dict[str, str] = {}
     system_company_of: dict[str, str] = {}
     ats_id_by_system_and_code: dict[str, dict[str, str]] = {}
@@ -103,12 +132,16 @@ def seed(db: Session) -> None:
         lat = company["lat"] + (jitter * __import__("math").cos(angle) if idx else 0)
         lng = company["lng"] + (jitter * __import__("math").sin(angle) if idx else 0)
 
+        site_names = site_names_by_customer[company_slug]
+        site_name = site_names[idx % len(site_names)]
+
         system_row = System(
             name=s["name"],
             address=company["city"],
             lat=lat,
             lng=lng,
             company_id=company_ids[company_slug],
+            site_id=site_ids[(company_slug, site_name)],
             status=s["status"],
         )
         db.add(system_row)
@@ -235,14 +268,13 @@ def seed(db: Session) -> None:
     # Bootstrapped Zitadel admin -> local superadmin, per docker-compose.yml's
     # ZITADEL_FIRSTINSTANCE_* vars and scripts/bootstrap_zitadel.py.
     if settings.superadmin_zitadel_sub:
-        db.add(
-            User(
-                zitadel_sub=settings.superadmin_zitadel_sub,
-                email=settings.superadmin_email,
-                display_name="Superadmin",
-                role="superadmin",
-                is_active=True,
-            )
-        )
+        admin = db.query(User).filter(User.zitadel_sub == settings.superadmin_zitadel_sub).one_or_none()
+        if admin is None:
+            admin = User(zitadel_sub=settings.superadmin_zitadel_sub, email=settings.superadmin_email)
+            db.add(admin)
+        admin.email = settings.superadmin_email
+        admin.display_name = "Superadmin"
+        admin.role = "superadmin"
+        admin.is_active = True
 
     db.commit()

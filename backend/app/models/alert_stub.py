@@ -10,7 +10,7 @@ class AlertSchedule(Base, UUIDPKMixin, TimestampMixin):
     __tablename__ = "alert_schedules"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), nullable=False)
+    company_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), nullable=False)
 
     rules: Mapped[list["AlertRule"]] = relationship(
         back_populates="alert_schedule", cascade="all, delete-orphan"

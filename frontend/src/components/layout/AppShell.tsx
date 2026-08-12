@@ -1,7 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 
-import { IconBolt } from "../common/Icons";
 import { useMe } from "../../queries/me";
 import { HeaderProvider } from "./HeaderContext";
 import { Header } from "./Header";
@@ -10,7 +9,7 @@ import { Sidebar } from "./Sidebar";
 const ROLE_LABEL: Record<string, string> = {
   superadmin: "Super Admin",
   reseller_admin: "Reseller Admin",
-  company_admin: "Company Admin",
+  company_admin: "Customer Admin",
   system_operator: "System Operator",
   system_viewer: "System Viewer",
 };
@@ -30,14 +29,9 @@ export function AppShell() {
     <HeaderProvider>
       <div className="sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <IconBolt size={18} />
-          </div>
-          <div>
-            <div className="sidebar-brand">
-              EM<span>PM</span>
-            </div>
-            <div className="sidebar-tagline">Emergency Power Management Platform</div>
+          <img className="sidebar-logo" src="/images/solution61-logo.svg" alt="Solution 61" />
+          <div className="sidebar-brand-copy">
+            <div className="sidebar-brand"><span>CPC</span><span className="sidebar-brand-name">Critical Power Command</span></div>
           </div>
         </div>
         <Sidebar />

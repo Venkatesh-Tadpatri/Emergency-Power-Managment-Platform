@@ -9,7 +9,7 @@ import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useCompanies } from "../../queries/companies";
 import { useMe } from "../../queries/me";
 import { useArchiveReseller, useCreateReseller, useResellers, useUpdateReseller, } from "../../queries/resellers";
-import { useSystems } from "../../queries/systems";
+import { useSites, useSystems } from "../../queries/systems";
 export function ResellersList() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -18,6 +18,7 @@ export function ResellersList() {
     const { data: resellers } = useResellers();
     const { data: companies } = useCompanies();
     const { data: systems } = useSystems();
+    const { data: sites } = useSites();
     const createReseller = useCreateReseller();
     const updateReseller = useUpdateReseller();
     const archiveReseller = useArchiveReseller();
@@ -62,10 +63,11 @@ export function ResellersList() {
     return (_jsxs(_Fragment, { children: [canManage && (_jsxs("div", { className: "section-header", children: [_jsx("div", {}), _jsx("button", { className: "header-btn primary", onClick: openNew, children: "+ New Reseller" })] })), _jsx("div", { className: "card-grid", children: (resellers || []).filter((r) => !searchTerm || r.name.toLowerCase().includes(searchTerm)).map((r) => {
                     const rCompanies = (companies || []).filter((c) => c.reseller_id === r.id);
                     const rSystems = (systems || []).filter((s) => rCompanies.some((c) => c.id === s.company_id));
+                    const rSites = (sites || []).filter((site) => site.status !== "archived" && rCompanies.some((c) => c.id === site.customer_id));
                     const rNormal = rSystems.filter((s) => s.status === "normal").length;
                     return (_jsxs("div", { className: "reseller-card-shell", children: [_jsx(InfoCard, { title: r.name, status: r.status, icon: IconResellers, stats: [
-                                    { label: "Companies", value: rCompanies.length, color: "var(--blue)" },
-                                    { label: "Systems", value: rSystems.length, color: "var(--cyan)" },
+                                    { label: "Customers", value: rCompanies.length, color: "var(--blue)" },
+                                    { label: "Sites", value: rSites.length, color: "var(--cyan)" },
                                     { label: "Normal", value: rNormal, color: "var(--green)" },
                                     { label: "Events", value: rSystems.length - rNormal, color: "var(--red)" },
                                 ], onClick: () => navigate(`/resellers/${r.id}`) }), canManage && (_jsxs("div", { className: "reseller-card-actions", children: [_jsx("button", { className: "header-btn", onClick: (e) => openEdit(r, e), children: "Edit" }), r.status !== "archived" && (_jsx("button", { className: "header-btn", onClick: (e) => {

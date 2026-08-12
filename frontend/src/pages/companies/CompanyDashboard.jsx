@@ -31,7 +31,7 @@ export function CompanyDashboard() {
     const archiveSystem = useArchiveSystem();
     const [editing, setEditing] = useState(null);
     const [form, setForm] = useState({ name: "", address: "", lat: "", lng: "" });
-    usePageHeader(company?.name || "Company", canViewReseller
+    usePageHeader(company?.name || "Customer", canViewReseller
         ? [
             { label: "Resellers", onClick: () => navigate("/resellers") },
             { label: reseller?.name || "", onClick: () => reseller && navigate(`/resellers/${reseller.id}`) },
@@ -69,7 +69,7 @@ export function CompanyDashboard() {
         }
         setEditing(null);
     };
-    return (_jsxs(_Fragment, { children: [_jsx(PageHero, { title: company?.name || "Company", subtitle: company?.address, icon: IconBuilding, color: events > 0 ? "#dc2626" : "#2563eb", bgImage: "/images/hero-bg.jpg" }), _jsx(StatsGrid, { stats: [
+    return (_jsxs(_Fragment, { children: [_jsx(PageHero, { title: company?.name || "Customer", subtitle: company?.address, icon: IconBuilding, color: events > 0 ? "#dc2626" : "#2563eb", bgImage: "/images/hero-bg.jpg" }), _jsx(StatsGrid, { stats: [
                     { label: "Systems", value: systems?.length ?? 0, color: "var(--cyan)", icon: IconPanel },
                     { label: "Normal", value: normal, color: "var(--green)", icon: IconCheckCircle },
                     { label: "Events", value: events, color: events ? "var(--red)" : "var(--green)", icon: IconAlert },
