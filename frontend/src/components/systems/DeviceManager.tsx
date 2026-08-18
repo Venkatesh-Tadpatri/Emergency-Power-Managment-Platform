@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 
 import { Modal } from "../common/Modal";
@@ -28,6 +29,7 @@ const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "",
 const emptyGenForm = { name: "", make: "", model: "", serial_number: "", rated_volts: "", rated_amps: "", rated_kw: "" };
 
 export function DeviceManager({ systemId }: { systemId: string }) {
+  const navigate = useNavigate();
   const auth = useAuth();
   const { data: me } = useMe(auth.isAuthenticated);
   const canManage = me?.role === "superadmin";
@@ -132,7 +134,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
   };
 
   return (
-    <div style={{ marginTop: 24 }}>
+    <div className="device-manager" style={{ marginTop: 24 }}>
       <div className="section-header">
         <div>
           <div className="section-title">Devices</div>
@@ -141,7 +143,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       </div>
 
       <div className="grid-2">
-        <div className="card" style={{ marginTop: 0 }}>
+        <div className="card device-manager-panel" style={{ marginTop: 0 }}>
           <div className="section-header">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <IconATS size={15} />
@@ -149,19 +151,19 @@ export function DeviceManager({ systemId }: { systemId: string }) {
             </div>
             {canManage && <button className="header-btn primary" onClick={openNewAts}>+ Add ATS</button>}
           </div>
-          <table className="data-table">
+          <table className="data-table device-manager-table">
             <thead>
               <tr><th>Name</th><th>Branch</th><th>Meter</th><th></th></tr>
             </thead>
             <tbody>
               {(ats || []).map((a) => (
-                <AtsRow key={a.id} ats={a} canManage={canManage} onEdit={() => openEditAts(a)} onDelete={() => deleteAts.mutate(a.id)} onMeter={() => setMeterFor(a)} />
+                <AtsRow key={a.id} ats={a} canManage={canManage} onDetail={() => navigate(`/systems/${systemId}/ats`)} onEdit={() => openEditAts(a)} onDelete={() => deleteAts.mutate(a.id)} onMeter={() => setMeterFor(a)} />
               ))}
             </tbody>
           </table>
         </div>
 
-        <div className="card" style={{ marginTop: 0 }}>
+        <div className="card device-manager-panel" style={{ marginTop: 0 }}>
           <div className="section-header">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <IconGenerator size={15} />
@@ -169,7 +171,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
             </div>
             {canManage && <button className="header-btn primary" onClick={openNewGen}>+ Add Generator</button>}
           </div>
-          <table className="data-table">
+          <table className="data-table device-manager-table">
             <thead>
               <tr><th>Name</th><th>Make / Model</th><th>Rated kW</th><th></th></tr>
             </thead>
@@ -179,10 +181,11 @@ export function DeviceManager({ systemId }: { systemId: string }) {
                   <td style={{ fontWeight: 600 }}>{g.name}</td>
                   <td>{[g.make, g.model].filter(Boolean).join(" ") || "—"}</td>
                   <td className="mono">{g.rated_kw ?? "—"}</td>
-                  <td style={{ display: "flex", gap: 6 }}>
+                  <td className="device-row-actions" style={{ display: "flex", gap: 6 }}>
+                    <button className="header-btn detail-action" onClick={() => navigate(`/systems/${systemId}/generators`)}>Detailed view</button>
                     {canManage && <>
-                      <button className="header-btn" onClick={() => openEditGen(g)}>Edit</button>
-                      <button className="header-btn" onClick={() => deleteGenerator.mutate(g.id)}>Delete</button>
+                      <button className="header-btn edit-action" onClick={() => openEditGen(g)}>Edit</button>
+                      <button className="header-btn delete-action" onClick={() => deleteGenerator.mutate(g.id)}>Delete</button>
                     </>}
                   </td>
                 </tr>
@@ -285,7 +288,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
   );
 }
 
-function AtsRow({ ats, canManage, onEdit, onDelete, onMeter }: { ats: ATS; canManage: boolean; onEdit: () => void; onDelete: () => void; onMeter: () => void }) {
+function AtsRow({ ats, canManage, onDetail, onEdit, onDelete, onMeter }: { ats: ATS; canManage: boolean; onDetail: () => void; onEdit: () => void; onDelete: () => void; onMeter: () => void }) {
   const { data: meter } = useMeter(ats.id);
   return (
     <tr>
@@ -299,10 +302,11 @@ function AtsRow({ ats, canManage, onEdit, onDelete, onMeter }: { ats: ATS; canMa
         ) : "â€”"}
         {meter && canManage && <button className="header-btn" style={{ padding: "3px 8px", fontSize: 10, marginLeft: 6 }} onClick={onMeter}>Edit</button>}
       </td>
-      <td style={{ display: "flex", gap: 6 }}>
+      <td className="device-row-actions" style={{ display: "flex", gap: 6 }}>
+        <button className="header-btn detail-action" onClick={onDetail}>Detailed view</button>
         {canManage && <>
-          <button className="header-btn" onClick={onEdit}>Edit</button>
-          <button className="header-btn" onClick={onDelete}>Delete</button>
+          <button className="header-btn edit-action" onClick={onEdit}>Edit</button>
+          <button className="header-btn delete-action" onClick={onDelete}>Delete</button>
         </>}
       </td>
     </tr>

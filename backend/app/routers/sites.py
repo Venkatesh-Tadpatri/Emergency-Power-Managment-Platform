@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import can_view_company, can_write_system
+from app.auth.permissions import can_view_site, can_write_system
 from app.crud import company as company_crud
 from app.crud import site as crud
 from app.database import get_db
@@ -13,8 +13,7 @@ router = APIRouter(prefix="/api/sites", tags=["sites"])
 
 
 def _can_view_site(user: User, db: Session, site) -> bool:
-    customer = company_crud.get_company(db, site.customer_id)
-    return bool(customer and can_view_company(user, db, customer.id, customer.reseller_id))
+    return can_view_site(user, db, site)
 
 
 @router.get("", response_model=list[SiteRead])

@@ -8,7 +8,7 @@ from app.models.ats import ATS
 from app.models.generator import Generator
 from app.models.id_sequence import IDSequence
 from app.models.meter import Meter
-from app.models.user import User, UserAssignedSystem
+from app.models.user import User, UserAssignedSite, UserAssignedSystem
 from app.models.alarm import Alarm
 from app.models.report import Report
 from app.models.oncall import OnCallShift
@@ -27,6 +27,7 @@ __all__ = [
     "Meter",
     "User",
     "UserAssignedSystem",
+    "UserAssignedSite",
     "Alarm",
     "Report",
     "OnCallShift",

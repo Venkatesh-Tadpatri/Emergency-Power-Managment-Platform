@@ -34,4 +34,5 @@ def list_alarms(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
     elif user.role != "superadmin":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "a scope filter is required for this role")
-    return crud.list_alarms(db, system_id, company_id, reseller_id)
+    return [alarm for alarm in crud.list_alarms(db, system_id, company_id, reseller_id)
+            if can_view_system(user, db, alarm.system)]

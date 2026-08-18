@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 import { usePageHeader } from "../../components/layout/HeaderContext";
+import { Modal } from "../../components/common/Modal";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
-import { lookupUnassignedUser, useAssignRole, useUsers } from "../../queries/users";
+import { useSystems } from "../../queries/systems";
+import { lookupUnassignedUser, useAssignRole, useAssignSystems, useUsers } from "../../queries/users";
 const ROLES = ["company_admin", "system_operator", "system_viewer"];
 export function CompanyUsers() {
     const { companyId } = useParams();
@@ -15,7 +17,10 @@ export function CompanyUsers() {
     const { data: users } = useUsers(companyId);
     const { data: me } = useMe(auth.isAuthenticated);
     const assignRole = useAssignRole();
+    const assignSystems = useAssignSystems();
+    const { data: systems } = useSystems(companyId);
     const [scopeTypeDraft, setScopeTypeDraft] = useState({});
+    const [accessUser, setAccessUser] = useState(null);
     usePageHeader("Users", [{ label: company?.name || "", onClick: () => navigate(`/companies/${companyId}`) }]);
     const canManage = !!me?.permissions.manage_company_users;
     return (_jsxs(_Fragment, { children: [canManage && companyId && _jsx(AssignExistingUser, { companyId: companyId }), _jsxs("table", { className: "data-table", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { children: "Name" }), _jsx("th", { children: "Email" }), _jsx("th", { children: "Role" }), _jsx("th", { children: "Scope" }), canManage && _jsx("th", { children: "Actions" })] }) }), _jsx("tbody", { children: (users || []).map((u) => (_jsxs("tr", { children: [_jsx("td", { style: { fontWeight: 600 }, children: u.display_name || u.email }), _jsx("td", { className: "mono", children: u.email }), _jsx("td", { children: u.role || _jsx("span", { style: { color: "var(--text-dim)" }, children: "Unassigned" }) }), _jsx("td", { children: u.scope_type === "assigned" ? "Assigned systems only" : u.scope_type === "company_wide" ? "Company-wide" : "—" }), canManage && (_jsxs("td", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [_jsxs("select", { defaultValue: u.role || "", onChange: (e) => {
@@ -26,7 +31,15 @@ export function CompanyUsers() {
                                                     ? scopeTypeDraft[u.id] || "company_wide"
                                                     : undefined;
                                                 assignRole.mutate({ userId: u.id, role, scopeType, companyId });
-                                            }, children: [_jsx("option", { value: "", children: "Select role..." }), ROLES.map((r) => (_jsx("option", { value: r, children: r }, r)))] }), (u.role === "system_operator" || u.role === "system_viewer") && (_jsxs("select", { defaultValue: u.scope_type || "company_wide", onChange: (e) => setScopeTypeDraft((d) => ({ ...d, [u.id]: e.target.value })), children: [_jsx("option", { value: "company_wide", children: "Company-wide" }), _jsx("option", { value: "assigned", children: "Assigned systems" })] }))] }))] }, u.id))) })] })] }));
+                                            }, children: [_jsx("option", { value: "", children: "Select role..." }), ROLES.map((r) => (_jsx("option", { value: r, children: r }, r)))] }), (u.role === "system_operator" || u.role === "system_viewer") && (_jsxs(_Fragment, { children: [_jsxs("select", { defaultValue: u.scope_type || "company_wide", onChange: (e) => { const scopeType = e.target.value; setScopeTypeDraft((d) => ({ ...d, [u.id]: scopeType })); assignRole.mutate({ userId: u.id, role: u.role, scopeType, companyId }); }, children: [_jsx("option", { value: "company_wide", children: "Company-wide" }), _jsx("option", { value: "assigned", children: "Selected sites/equipment" })] }), u.scope_type === "assigned" && _jsx("button", { className: "header-btn", onClick: () => setAccessUser(u), children: "Manage access" })] }))] }))] }, u.id))) })] }), accessUser && _jsx(AccessPicker, { user: accessUser, systems: systems || [], saving: assignSystems.isPending, onClose: () => setAccessUser(null), onSave: (systemIds, siteIds) => assignSystems.mutate({ userId: accessUser.id, systemIds, siteIds }, { onSuccess: () => setAccessUser(null) }) })] }));
+}
+
+function AccessPicker({ user, systems, saving, onClose, onSave }) {
+    const [systemIds, setSystemIds] = useState(user.assigned_system_ids || []);
+    const [siteIds, setSiteIds] = useState(user.assigned_site_ids || []);
+    const sites = systems.reduce((groups, system) => { (groups[system.site_id] ||= { name: system.site_name || "Site", systems: [] }).systems.push(system); return groups; }, {});
+    const toggle = (ids, setIds, id) => setIds(ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]);
+    return _jsx(Modal, { title: `Access for ${user.display_name || user.email}`, onClose: onClose, children: _jsxs("div", { className: "system-assignment-picker", children: [_jsx("p", { children: "Select complete sites, or only the individual equipment this operator may access." }), Object.entries(sites).map(([siteId, group]) => _jsxs("fieldset", { children: [_jsx("legend", { children: _jsxs("label", { children: [_jsx("input", { type: "checkbox", checked: siteIds.includes(siteId), onChange: () => toggle(siteIds, setSiteIds, siteId) }), " Entire site: ", group.name] }) }), group.systems.map((system) => _jsxs("label", { children: [_jsx("input", { type: "checkbox", checked: systemIds.includes(system.id), onChange: () => toggle(systemIds, setSystemIds, system.id) }), " ", system.name] }, system.id))] }, siteId)), _jsxs("div", { className: "modal-actions", children: [_jsx("button", { className: "header-btn", onClick: onClose, children: "Cancel" }), _jsx("button", { className: "header-btn primary", disabled: saving, onClick: () => onSave(systemIds, siteIds), children: saving ? "Saving…" : "Save access" })] })] }) });
 }
 function AssignExistingUser({ companyId }) {
     const assignRole = useAssignRole();

@@ -97,6 +97,15 @@ export function usePanels(systemId: string | undefined) {
   });
 }
 
+/** Portfolio-level equipment lookup for dashboards. The API still applies role scope. */
+export function useAllPanels(enabled = true) {
+  return useQuery({
+    queryKey: ["panels", "all"],
+    queryFn: async () => (await api.get<Panel[]>("/api/panels")).data,
+    enabled,
+  });
+}
+
 export function useCreatePanel() {
   const qc = useQueryClient();
   return useMutation({
@@ -110,6 +119,23 @@ export function useAts(panelId: string | undefined) {
     queryKey: ["ats", { panelId }],
     queryFn: async () => (await api.get<ATS[]>("/api/ats", { params: { panel_id: panelId } })).data,
     enabled: !!panelId,
+  });
+}
+
+/** Portfolio-level ATS lookup for dashboard and system-list summaries. */
+export function useAllAts(enabled = true) {
+  return useQuery({
+    queryKey: ["ats", "all"],
+    queryFn: async () => (await api.get<ATS[]>("/api/ats")).data,
+    enabled,
+  });
+}
+
+export function useAtsDevice(id: string | undefined) {
+  return useQuery({
+    queryKey: ["ats", id],
+    queryFn: async () => (await api.get<ATS>(`/api/ats/${id}`)).data,
+    enabled: !!id,
   });
 }
 
@@ -144,6 +170,23 @@ export function useGenerators(panelId: string | undefined) {
     queryFn: async () =>
       (await api.get<Generator[]>("/api/generators", { params: { panel_id: panelId } })).data,
     enabled: !!panelId,
+  });
+}
+
+/** Portfolio-level generator lookup for dashboards. The API still applies role scope. */
+export function useAllGenerators(enabled = true) {
+  return useQuery({
+    queryKey: ["generators", "all"],
+    queryFn: async () => (await api.get<Generator[]>("/api/generators")).data,
+    enabled,
+  });
+}
+
+export function useGenerator(id: string | undefined) {
+  return useQuery({
+    queryKey: ["generators", id],
+    queryFn: async () => (await api.get<Generator>(`/api/generators/${id}`)).data,
+    enabled: !!id,
   });
 }
 

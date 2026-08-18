@@ -63,3 +63,12 @@ export function useAssignRole() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });
 }
+
+export function useAssignSystems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, systemIds, siteIds = [] }: { userId: string; systemIds: string[]; siteIds?: string[] }) =>
+      (await api.patch<AppUser>(`/api/users/${userId}/assigned-systems`, { system_ids: systemIds, site_ids: siteIds })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+}

@@ -21,3 +21,7 @@ class System(Base, UUIDPKMixin, TimestampMixin):
     panels: Mapped[list["Panel"]] = relationship(
         back_populates="system", cascade="all, delete-orphan"
     )
+
+    @property
+    def site_name(self) -> str | None:
+        return self.site.name if self.site else None

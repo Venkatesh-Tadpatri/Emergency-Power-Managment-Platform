@@ -8,7 +8,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.auth.permissions import can_view_company, can_view_system, can_write_system, get_scope
+from app.auth.permissions import can_view_company, can_view_site, can_view_system, can_write_system, get_scope
+from app.models.site import Site
 from app.models.base import Base
 from app.models.company import Company
 from app.models.reseller import Reseller
@@ -119,6 +120,25 @@ def test_assigned_scope_operator_sees_only_assigned_systems(db, fixtures):
     db.commit()
 
     assert can_view_system(user, db, fixtures["system_a1_1"])
+    assert not can_view_system(user, db, fixtures["system_a1_2"])
+
+
+def test_assigned_site_grants_all_its_systems_but_not_other_sites(db, fixtures):
+    site_a = Site(name="Site A", customer_id=fixtures["company_a1"].id)
+    site_b = Site(name="Site B", customer_id=fixtures["company_a1"].id)
+    db.add_all([site_a, site_b])
+    db.flush()
+    fixtures["system_a1_1"].site_id = site_a.id
+    fixtures["system_a1_2"].site_id = site_b.id
+    user = User(zitadel_sub="sub-site", email="site@x.com", role="system_operator", scope_type="assigned", company_id=fixtures["company_a1"].id)
+    db.add(user)
+    db.flush()
+    from app.models.user import UserAssignedSite
+    db.add(UserAssignedSite(user_id=user.id, site_id=site_a.id))
+    db.commit()
+    assert can_view_site(user, db, site_a)
+    assert can_view_system(user, db, fixtures["system_a1_1"])
+    assert not can_view_site(user, db, site_b)
     assert not can_view_system(user, db, fixtures["system_a1_2"])
 
 

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.database import get_db
 from app.models.system import System
-from app.models.user import User, UserAssignedSystem
+from app.models.user import User, UserAssignedSite, UserAssignedSystem
 
 
 @dataclass
@@ -22,6 +22,7 @@ class Scope:
     reseller_id: str | None = None
     company_id: str | None = None
     assigned_system_ids: set[str] | None = None  # None = not restricted to a fixed set
+    assigned_site_ids: set[str] | None = None
 
 
 def get_scope(user: User, db: Session) -> Scope:
@@ -40,9 +41,13 @@ def get_scope(user: User, db: Session) -> Scope:
                 UserAssignedSystem.user_id == user.id
             )
         }
-        return Scope(assigned_system_ids=ids)
+        site_ids = {
+            row.site_id
+            for row in db.query(UserAssignedSite).filter(UserAssignedSite.user_id == user.id)
+        }
+        return Scope(assigned_system_ids=ids, assigned_site_ids=site_ids)
     # No role assigned yet (freshly auto-provisioned) — no access.
-    return Scope(assigned_system_ids=set())
+    return Scope(assigned_system_ids=set(), assigned_site_ids=set())
 
 
 def can_view_reseller(user: User, db: Session, reseller_id: str) -> bool:
@@ -63,7 +68,10 @@ def can_view_company(user: User, db: Session, company_id: str, reseller_id: str)
     if scope.assigned_system_ids is not None:
         return (
             db.query(System)
-            .filter(System.company_id == company_id, System.id.in_(scope.assigned_system_ids))
+            .filter(
+                System.company_id == company_id,
+                (System.id.in_(scope.assigned_system_ids)) | (System.site_id.in_(scope.assigned_site_ids or set())),
+            )
             .first()
             is not None
         )
@@ -71,7 +79,33 @@ def can_view_company(user: User, db: Session, company_id: str, reseller_id: str)
 
 
 def can_view_system(user: User, db: Session, system: System) -> bool:
-    return can_view_company(user, db, system.company_id, system.company.reseller_id)
+    scope = get_scope(user, db)
+    if scope.all_access:
+        return True
+    if scope.reseller_id is not None:
+        return scope.reseller_id == system.company.reseller_id
+    if scope.company_id is not None:
+        return scope.company_id == system.company_id
+    return bool(
+        scope.assigned_system_ids is not None
+        and (system.id in scope.assigned_system_ids or system.site_id in (scope.assigned_site_ids or set()))
+    )
+
+
+def can_view_site(user: User, db: Session, site) -> bool:
+    scope = get_scope(user, db)
+    if scope.all_access:
+        return True
+    if scope.reseller_id is not None:
+        return scope.reseller_id == site.customer.reseller_id
+    if scope.company_id is not None:
+        return scope.company_id == site.customer_id
+    return bool(
+        scope.assigned_site_ids is not None
+        and (site.id in scope.assigned_site_ids or db.query(System).filter(
+            System.site_id == site.id, System.id.in_(scope.assigned_system_ids or set())
+        ).first() is not None)
+    )
 
 
 def can_manage_resellers(user: User) -> bool:

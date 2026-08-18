@@ -12,6 +12,8 @@ class UserRead(BaseModel):
     reseller_id: str | None = None
     company_id: str | None = None
     is_active: bool
+    assigned_system_ids: list[str] = []
+    assigned_site_ids: list[str] = []
 
 
 class UserRoleAssign(BaseModel):
@@ -23,6 +25,7 @@ class UserRoleAssign(BaseModel):
 
 class UserAssignSystems(BaseModel):
     system_ids: list[str]
+    site_ids: list[str] = []
 
 
 class MeRead(UserRead):

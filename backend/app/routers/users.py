@@ -92,4 +92,7 @@ def assign_systems(
     company = company_crud.get_company(db, target.company_id)
     if not company or not can_manage_company_users(user, company.id, company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to manage this user")
-    return crud.assign_systems(db, target, data)
+    try:
+        return crud.assign_systems(db, target, data)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc

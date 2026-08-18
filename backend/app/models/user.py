@@ -25,6 +25,17 @@ class User(Base, UUIDPKMixin, TimestampMixin):
     assigned_systems: Mapped[list["UserAssignedSystem"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    assigned_sites: Mapped[list["UserAssignedSite"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+    @property
+    def assigned_system_ids(self) -> list[str]:
+        return [assignment.system_id for assignment in self.assigned_systems]
+
+    @property
+    def assigned_site_ids(self) -> list[str]:
+        return [assignment.site_id for assignment in self.assigned_sites]
 
 
 class UserAssignedSystem(Base, UUIDPKMixin):
@@ -34,3 +45,12 @@ class UserAssignedSystem(Base, UUIDPKMixin):
     system_id: Mapped[str] = mapped_column(ForeignKey("systems.id"), nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="assigned_systems")
+
+
+class UserAssignedSite(Base, UUIDPKMixin):
+    __tablename__ = "user_assigned_sites"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id"), nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="assigned_sites")

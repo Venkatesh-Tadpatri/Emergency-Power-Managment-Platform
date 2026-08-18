@@ -2,7 +2,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.company import Company
-from app.models.user import User, UserAssignedSystem
+from app.models.system import System
+from app.models.site import Site
+from app.models.user import User, UserAssignedSite, UserAssignedSystem
 from app.schemas.user import UserAssignSystems, UserRoleAssign
 
 
@@ -43,9 +45,28 @@ def assign_role(db: Session, user: User, data: UserRoleAssign) -> User:
 
 
 def assign_systems(db: Session, user: User, data: UserAssignSystems) -> User:
+    if user.role not in ("system_operator", "system_viewer") or user.scope_type != "assigned":
+        raise ValueError("system assignments require an assigned-systems operator or viewer")
+    valid_ids = {
+        system.id for system in db.query(System.id).filter(
+            System.company_id == user.company_id, System.id.in_(data.system_ids)
+        )
+    }
+    if valid_ids != set(data.system_ids):
+        raise ValueError("every assigned system must belong to the user's company")
+    valid_site_ids = {
+        site.id for site in db.query(Site.id).filter(
+            Site.customer_id == user.company_id, Site.id.in_(data.site_ids)
+        )
+    }
+    if valid_site_ids != set(data.site_ids):
+        raise ValueError("every assigned site must belong to the user's company")
     db.query(UserAssignedSystem).filter(UserAssignedSystem.user_id == user.id).delete()
-    for system_id in data.system_ids:
+    db.query(UserAssignedSite).filter(UserAssignedSite.user_id == user.id).delete()
+    for system_id in valid_ids:
         db.add(UserAssignedSystem(user_id=user.id, system_id=system_id))
+    for site_id in valid_site_ids:
+        db.add(UserAssignedSite(user_id=user.id, site_id=site_id))
     db.commit()
     db.refresh(user)
     return user

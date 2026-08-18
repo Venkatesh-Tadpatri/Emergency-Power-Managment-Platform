@@ -30,7 +30,8 @@ def list_reports(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "company not found")
     elif user.role != "superadmin":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "company_id or system_id is required")
-    return crud.list_reports(db, company_id, system_id)
+    return [report for report in crud.list_reports(db, company_id, system_id)
+            if can_view_system(user, db, report.system)]
 
 
 @router.get("/{report_id}", response_model=ReportDetail)
@@ -40,6 +41,6 @@ def get_report(
     report = crud.get_report(db, report_id)
     if not report:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
-    if not can_view_company(user, db, report.company_id, report.company.reseller_id):
+    if not can_view_system(user, db, report.system):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
     return report

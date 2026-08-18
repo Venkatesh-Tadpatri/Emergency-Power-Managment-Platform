@@ -35,6 +35,7 @@ export interface System {
   lng?: number | null;
   company_id: string;
   site_id: string;
+  site_name?: string | null;
   status: "normal" | "emergency" | "alarm" | "test" | "offline" | string;
 }
 
@@ -143,4 +144,6 @@ export interface AppUser {
   reseller_id: string | null;
   company_id: string | null;
   is_active: boolean;
+  assigned_system_ids: string[];
+  assigned_site_ids: string[];
 }

@@ -29,6 +29,7 @@ import { Settings } from "./pages/settings/Settings";
 import { CustomerSites } from "./pages/sites/CustomerSites";
 import { SiteSystems } from "./pages/sites/SiteSystems";
 import { SystemDetail } from "./pages/systems/SystemDetail";
+import { AtsDetail, GeneratorDetail } from "./pages/systems/DeviceDetail";
 
 export function App() {
   return (
@@ -82,6 +83,8 @@ function Gate() {
         <Route path="companies/:companyId/oncall" element={<CompanyOnCall />} />
 
         <Route path="systems/:systemId" element={<SystemDetail />} />
+        <Route path="systems/:systemId/ats" element={<AtsDetail />} />
+        <Route path="systems/:systemId/generators" element={<GeneratorDetail />} />
       </Route>
     </Routes>
   );

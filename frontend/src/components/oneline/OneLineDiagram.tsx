@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { IconATS, IconGenerator, IconMeter } from "../common/Icons";
 import type { ATS, Generator } from "../../types/entities";
@@ -12,7 +13,8 @@ function Reading({ label, unit = "V" }: { label: string; unit?: string }) {
   return <div className="telemetry-reading"><span>{label}</span><b>000</b><em>{unit}</em></div>;
 }
 
-export function OneLineDiagram({ ats, generators, utilityName }: { ats: ATS[]; generators: Generator[]; utilityName?: string }) {
+export function OneLineDiagram({ ats, generators, utilityName, systemId }: { ats: ATS[]; generators: Generator[]; utilityName?: string; systemId?: string }) {
+  const navigate = useNavigate();
   const [scenario, setScenario] = useState<Scenario>("normal");
   const [viewMode, setViewMode] = useState<"simple" | "detail">("simple");
   const shownAts = ats.length ? ats : [];
@@ -54,18 +56,18 @@ export function OneLineDiagram({ ats, generators, utilityName }: { ats: ATS[]; g
           <div className="ats-flow-list">
             {shownAts.map((item, index) => {
               const branch = item.branch || "equipment";
-              return <div className="ats-flow" key={item.id}>
+              return <button className="ats-flow detail-link" key={item.id} onClick={() => systemId && navigate(`/systems/${systemId}/ats`)}>
                 <i className="flow-node" />
                 <div className="flow-line left" />
                 <div className="flow-unit"><span className={`branch-tag ${branch}`}>{BRANCH_TAG[branch] || "EQ"}</span><b>{item.name}</b><small>{SCENARIO_LABEL[scenario]}</small></div>
                 <div className="flow-line right" />
-              </div>;
+              </button>;
             })}
             {!shownAts.length && <div className="telemetry-empty">No ATS units registered</div>}
           </div>
         </section>
 
-        <section className={`telemetry-source generator-source${scenario === "emergency" ? " emergency-active" : scenario === "test" ? " test-active" : ""}`}>
+        <button className={`telemetry-source generator-source detail-link${scenario === "emergency" ? " emergency-active" : scenario === "test" ? " test-active" : ""}`} onClick={() => systemId && shownGenerators[0] && navigate(`/systems/${systemId}/generators`)}>
           <h4><IconGenerator size={14} /> {shownGenerators.length > 1 ? `Generators (${shownGenerators.length})` : "Generator"}</h4>
           <p>{shownGenerators[0]?.make || "Generator set"} — Standby Source</p>
           <div className="telemetry-readings"><Reading label="V A-B" /><Reading label="V B-C" /><Reading label="Eng Temp" unit="°F" /><Reading label="Hours" unit="hr" /></div>
@@ -74,17 +76,17 @@ export function OneLineDiagram({ ats, generators, utilityName }: { ats: ATS[]; g
             <div className="fuel-forecast"><span>Fuel Forecast</span><b>000h 00m</b><em>@ 000 kW · 00% tank</em><i><u /></i></div>
           </div>}
           <strong className={`source-state ${scenario === "normal" ? "standby" : "running"}`}>{generatorStatus}</strong>
-        </section>
+        </button>
       </div>
 
       <div className={`telemetry-ats-row ${viewMode}`}>
         {shownAts.map((item) => {
           const branch = item.branch || "equipment";
-          return <div className={`telemetry-ats ${viewMode === "simple" ? "compact" : "detailed"}`} key={item.id} style={{ "--ats-accent": branch === "life-safety" ? "#ef4444" : branch === "critical" ? "#f59e0b" : "#3b82f6" } as CSSProperties}>
+          return <button className={`telemetry-ats detail-link ${viewMode === "simple" ? "compact" : "detailed"}`} key={item.id} onClick={() => systemId && navigate(`/systems/${systemId}/ats`)} style={{ "--ats-accent": branch === "life-safety" ? "#ef4444" : branch === "critical" ? "#f59e0b" : "#3b82f6" } as CSSProperties}>
             <div><span className={`branch-tag ${branch}`}>{BRANCH_TAG[branch] || "EQ"}</span><b>{item.name}</b></div>
             <em>{SCENARIO_LABEL[scenario]}</em>
             {viewMode === "simple" ? <span className="ats-simple-reading">000 kW · 000 A · 000 V</span> : <><div className="ats-metric-grid"><span><small>Load</small><b>000 kW</b></span><span><small>Current</small><b>000 A</b></span><span><small>Voltage</small><b>000 V</b></span><span><small>Power Factor</small><b>0.00</b></span></div><div className="ats-load-strip"><i><u /></i><span>Load</span><b>000%</b></div></>}
-          </div>;
+          </button>;
         })}
       </div>
 

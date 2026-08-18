@@ -28,3 +28,4 @@ class SystemUpdate(BaseModel):
 class SystemRead(SystemBase):
     model_config = ConfigDict(from_attributes=True)
     id: str
+    site_name: str | None = None
