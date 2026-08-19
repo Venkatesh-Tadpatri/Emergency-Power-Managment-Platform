@@ -153,11 +153,11 @@ export function DeviceManager({ systemId }: { systemId: string }) {
           </div>
           <table className="data-table device-manager-table">
             <thead>
-              <tr><th>Name</th><th>Branch</th><th>Meter</th><th></th></tr>
+              <tr><th>Sl.</th><th>Name</th><th>Branch</th><th>Meter</th><th></th></tr>
             </thead>
             <tbody>
-              {(ats || []).map((a) => (
-                <AtsRow key={a.id} ats={a} canManage={canManage} onDetail={() => navigate(`/systems/${systemId}/ats`)} onEdit={() => openEditAts(a)} onDelete={() => deleteAts.mutate(a.id)} onMeter={() => setMeterFor(a)} />
+              {(ats || []).map((a, index) => (
+                <AtsRow key={a.id} serial={index + 1} ats={a} canManage={canManage} onDetail={() => navigate(`/systems/${systemId}/ats`)} onEdit={() => openEditAts(a)} onDelete={() => deleteAts.mutate(a.id)} onMeter={() => setMeterFor(a)} />
               ))}
             </tbody>
           </table>
@@ -173,12 +173,12 @@ export function DeviceManager({ systemId }: { systemId: string }) {
           </div>
           <table className="data-table device-manager-table">
             <thead>
-              <tr><th>Name</th><th>Make / Model</th><th>Rated kW</th><th></th></tr>
+              <tr><th>Sl.</th><th>Name</th><th>Make / Model</th><th>Rated kW</th><th></th></tr>
             </thead>
             <tbody>
-              {(generators || []).map((g) => (
+              {(generators || []).map((g, index) => (
                 <tr key={g.id}>
-                  <td style={{ fontWeight: 600 }}>{g.name}</td>
+                  <td className="mono">{String(index + 1).padStart(2, "0")}</td><td style={{ fontWeight: 600 }}>{g.name}</td>
                   <td>{[g.make, g.model].filter(Boolean).join(" ") || "—"}</td>
                   <td className="mono">{g.rated_kw ?? "—"}</td>
                   <td className="device-row-actions" style={{ display: "flex", gap: 6 }}>
@@ -288,11 +288,11 @@ export function DeviceManager({ systemId }: { systemId: string }) {
   );
 }
 
-function AtsRow({ ats, canManage, onDetail, onEdit, onDelete, onMeter }: { ats: ATS; canManage: boolean; onDetail: () => void; onEdit: () => void; onDelete: () => void; onMeter: () => void }) {
+function AtsRow({ serial, ats, canManage, onDetail, onEdit, onDelete, onMeter }: { serial: number; ats: ATS; canManage: boolean; onDetail: () => void; onEdit: () => void; onDelete: () => void; onMeter: () => void }) {
   const { data: meter } = useMeter(ats.id);
   return (
     <tr>
-      <td style={{ fontWeight: 600 }}>{ats.name}</td>
+      <td className="mono">{String(serial).padStart(2, "0")}</td><td style={{ fontWeight: 600 }}>{ats.name}</td>
       <td><span className={`branch-tag ${ats.branch}`}>{ats.branch}</span></td>
       <td>
         {meter ? (

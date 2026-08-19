@@ -84,7 +84,9 @@ function Gate() {
 
         <Route path="systems/:systemId" element={<SystemDetail />} />
         <Route path="systems/:systemId/ats" element={<AtsDetail />} />
+        <Route path="systems/:systemId/ats/:atsId" element={<AtsDetail />} />
         <Route path="systems/:systemId/generators" element={<GeneratorDetail />} />
+        <Route path="systems/:systemId/generators/:generatorId" element={<GeneratorDetail />} />
       </Route>
     </Routes>
   );

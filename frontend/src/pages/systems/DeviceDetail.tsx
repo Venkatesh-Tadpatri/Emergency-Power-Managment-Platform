@@ -25,12 +25,12 @@ function DetailShell({ title, type, children }: { title: string; type: "ats" | "
 }
 
 export function GeneratorDetail() {
-  const { systemId } = useParams();
+  const { systemId, generatorId } = useParams();
   const { data: panels } = usePanels(systemId);
   const { data: generators } = useGenerators(panels?.[0]?.id);
   return <DetailShell title="Generator Detail View" type="generator">
     <h2 className="legacy-device-section-heading">Generator Detail</h2>
-    <section className="generator-detail-grid">{(generators || []).map((generator) => { const capacity = generator.rated_kw ?? 0; return <article className="generator-monitor-card" key={generator.id}>
+    <section className="generator-detail-grid">{(generators || []).filter((generator) => !generatorId || generator.id === generatorId).map((generator) => { const capacity = generator.rated_kw ?? 0; return <article className="generator-monitor-card" key={generator.id}>
       <h3 className="generator-card-name">{generator.name}</h3>
       <div className="device-card-title"><span>Generator control panel</span><b>{[generator.make, generator.model].filter(Boolean).join(" · ") || "Generator set"}</b></div>
       <div className="generator-status-row"><strong>READY</strong><span>{generator.serial_number ? `S/N ${generator.serial_number}` : "Telemetry pending"}</span></div>
@@ -47,10 +47,11 @@ export function GeneratorDetail() {
 }
 
 export function AtsDetail() {
-  const { systemId } = useParams();
+  const { systemId, atsId } = useParams();
   const { data: system } = useSystem(systemId);
   const { data: panels } = usePanels(systemId);
-  const { data: ats } = useAts(panels?.[0]?.id);
+  const { data: atsData } = useAts(panels?.[0]?.id);
+  const ats = atsId ? (atsData || []).filter((item) => item.id === atsId) : atsData;
   const emergency = system?.status === "emergency" || system?.status === "alarm";
   const stateLabel = emergency ? "Utility power failed — on emergency" : "Utility power normal — on utility";
   return <DetailShell title="Detailed ATS View" type="ats">

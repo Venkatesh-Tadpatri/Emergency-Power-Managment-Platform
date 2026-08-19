@@ -50,12 +50,12 @@ export function CustomerSites() {
     ]} />
     <div className="section-header"><div><div className="section-title">Sites</div><div className="section-sub">Select a site to view its systems</div></div>{canManage && <button className="header-btn primary" onClick={openNew}>+ New Site</button>}</div>
     <table className="data-table">
-      <thead><tr><th>Site</th><th>Location</th><th>Systems</th><th>Normal</th><th>Events</th><th>Status</th><th /></tr></thead>
-      <tbody>{activeSites.map((site) => {
+      <thead><tr><th>Sl.</th><th>Site</th><th>Location</th><th>Systems</th><th>Normal</th><th>Events</th><th>Status</th><th /></tr></thead>
+      <tbody>{activeSites.map((site, index) => {
         const siteSystems = (systems || []).filter((system) => system.site_id === site.id);
         const siteNormal = siteSystems.filter((system) => system.status === "normal").length;
         return <tr key={site.id} style={{ cursor: "pointer" }} onClick={() => navigate(`/companies/${companyId}/sites/${site.id}`)}>
-          <td style={{ fontWeight: 600 }}><span style={{ display: "inline-flex", verticalAlign: "middle", marginRight: 8, color: "var(--blue)" }}><IconMap size={16} /></span>{site.name}</td>
+          <td className="mono">{String(index + 1).padStart(2, "0")}</td><td style={{ fontWeight: 600 }}><span style={{ display: "inline-flex", verticalAlign: "middle", marginRight: 8, color: "var(--blue)" }}><IconMap size={16} /></span>{site.name}</td>
           <td>{site.address || "—"}</td><td>{siteSystems.length}</td><td style={{ color: "var(--green)", fontWeight: 600 }}>{siteNormal}</td><td style={{ color: siteSystems.length - siteNormal ? "var(--red)" : "var(--text-dim)", fontWeight: 600 }}>{siteSystems.length - siteNormal}</td><td><StatusPill status={site.status} /></td>
           <td onClick={(event) => event.stopPropagation()}>{canManage && <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}><button className="header-btn" onClick={(event) => openEdit(site, event)}>Edit</button><button className="header-btn" onClick={() => archiveSite.mutate(site.id)}>Archive</button></span>}</td>
         </tr>;
