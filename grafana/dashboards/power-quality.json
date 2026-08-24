@@ -5,5 +5,21 @@
     { "id": 2, "type": "timeseries", "title": "Frequency stability", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 10 }, "datasource": { "type": "testdata", "uid": "empm-demo-telemetry" }, "targets": [{ "refId": "A", "scenarioId": "random_walk", "startValue": 50, "spread": 0.35, "noise": 0.03 }], "fieldConfig": { "defaults": { "unit": "hertz", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 49.5 }, { "color": "red", "value": 50.5 }] } }, "overrides": [] }, "options": { "legend": { "displayMode": "list", "placement": "bottom" } } },
     { "id": 3, "type": "gauge", "title": "Voltage THD", "gridPos": { "x": 0, "y": 10, "w": 8, "h": 7 }, "datasource": { "type": "testdata", "uid": "empm-demo-telemetry" }, "targets": [{ "refId": "A", "scenarioId": "random_walk", "startValue": 2.7, "spread": 1.5, "noise": 0.1 }], "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 10, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 5 }, { "color": "red", "value": 8 }] } }, "overrides": [] }, "options": { "showThresholdMarkers": true } },
     { "id": 4, "type": "stat", "title": "Quality events (24h)", "gridPos": { "x": 8, "y": 10, "w": 8, "h": 7 }, "datasource": { "type": "testdata", "uid": "empm-demo-telemetry" }, "targets": [{ "refId": "A", "scenarioId": "csv_content", "csvContent": "Time,events\n2024-01-01,3" }], "fieldConfig": { "defaults": { "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 2 }, { "color": "red", "value": 5 }] } }, "overrides": [] }, "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background" } }
-  ]
+  ],
+  "templating": { "list": [{
+    "name": "equipment", "type": "custom", "label": "Equipment", "multi": false, "includeAll": false,
+    "query": "All equipment : ,GEN-001 (ASTER-GEN-001) : GEN-001,GEN-002 (ASTER-GEN-002) : GEN-002,GEN-003 (ASTER-GEN-003) : GEN-003,ATS-001 (ASTER-ATS-001) : ATS-001,ATS-002 (ASTER-ATS-002) : ATS-002,ATS-003 (ASTER-ATS-003) : ATS-003,ATS-004 (ASTER-ATS-004) : ATS-004,ATS-005 (ASTER-ATS-005) : ATS-005",
+    "current": { "text": "All equipment", "value": "" },
+    "options": [
+      { "text": "All equipment", "value": "", "selected": true },
+      { "text": "GEN-001 (ASTER-GEN-001)", "value": "GEN-001", "selected": false },
+      { "text": "GEN-002 (ASTER-GEN-002)", "value": "GEN-002", "selected": false },
+      { "text": "GEN-003 (ASTER-GEN-003)", "value": "GEN-003", "selected": false },
+      { "text": "ATS-001 (ASTER-ATS-001)", "value": "ATS-001", "selected": false },
+      { "text": "ATS-002 (ASTER-ATS-002)", "value": "ATS-002", "selected": false },
+      { "text": "ATS-003 (ASTER-ATS-003)", "value": "ATS-003", "selected": false },
+      { "text": "ATS-004 (ASTER-ATS-004)", "value": "ATS-004", "selected": false },
+      { "text": "ATS-005 (ASTER-ATS-005)", "value": "ATS-005", "selected": false }
+    ]
+  }] }
 }

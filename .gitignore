@@ -40,6 +40,8 @@ env/
 *.sqlite
 *.sqlite3
 data/
+!frontend/public/data/
+!frontend/public/data/telemetry.json
 coverage/
 
 # IDE and operating-system files
