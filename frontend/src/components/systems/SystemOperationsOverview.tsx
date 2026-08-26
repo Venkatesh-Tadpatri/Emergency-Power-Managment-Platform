@@ -5,9 +5,18 @@ import { Modal } from "../common/Modal";
 import { TestWizard } from "./TestWizard";
 import type { ATS, Generator } from "../../types/entities";
 import { telemetryFor, useTelemetrySnapshot, type AtsTelemetry, type GeneratorTelemetry } from "../../hooks/useTelemetry";
+import { demoAtsTelemetry, demoGeneratorTelemetry } from "../../data/mepstraTelemetry";
 
 type EquipmentSelection = { type: "ats"; id: string } | { type: "generator"; id: string };
 type TestTarget = EquipmentSelection;
+
+/** Live telemetry first; falls back to the Mepstra demo register snapshot for the specific devices it covers. */
+function resolveGeneratorTelemetry(generatorTelemetry: GeneratorTelemetry[] | undefined, id: string, name: string) {
+  return telemetryFor(generatorTelemetry, id, name) || demoGeneratorTelemetry(id) || undefined;
+}
+function resolveAtsTelemetry(atsTelemetry: AtsTelemetry[] | undefined, id: string, name: string) {
+  return telemetryFor(atsTelemetry, id, name) || demoAtsTelemetry(id) || undefined;
+}
 
 const branchLabel = (branch?: string | null) => branch === "life-safety" ? "Life Safety" : branch === "critical" ? "Critical" : "Equipment";
 const unavailableReading = "00";
@@ -17,7 +26,7 @@ function Indicator({ active, label, tone = "normal", blinking = false }: { activ
   return <span className={`equipment-popup-indicator ${active ? "active" : ""} ${tone} ${blinking && active ? "blinking" : ""}`}><i />{label}</span>;
 }
 
-function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generatorTelemetry, onClose }: { systemName: string; ats?: ATS; generator?: Generator; atsTelemetry?: AtsTelemetry; generatorTelemetry?: GeneratorTelemetry; onClose: () => void }) {
+function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generatorTelemetry, onClose }: { systemName: string; ats?: ATS; generator?: Generator; atsTelemetry?: Partial<AtsTelemetry>; generatorTelemetry?: Partial<GeneratorTelemetry>; onClose: () => void }) {
   const isAts = Boolean(ats);
   const telemetry = isAts ? atsTelemetry : generatorTelemetry;
   const name = ats?.name || generator?.name || "Equipment";
@@ -77,11 +86,11 @@ function SingleLineDiagram({ ats, generators, atsTelemetry, generatorTelemetry, 
     <div className="system-sld-canvas">
       <div className="sld-sources">
         <div className="sld-source utility"><i>⚡</i><div><b>UTILITY</b><small>Normal source available</small></div></div>
-        <div className="sld-generators">{generators.map((generator) => { const data = telemetryFor(generatorTelemetry, generator.id, generator.name); return <button type="button" className={`sld-generator ${data?.running ? "emergency-source" : "normal-source"}`} key={generator.id} aria-label={`Open ${generator.name}`} title={`Open ${generator.name}`} onClick={() => onGeneratorClick(generator.id)}><i>G</i><em aria-hidden="true" /><span>{generator.name}</span><small>{data?.status || "Waiting"}</small></button>; })}</div>
+        <div className="sld-generators">{generators.map((generator) => { const data = resolveGeneratorTelemetry(generatorTelemetry, generator.id, generator.name); return <button type="button" className={`sld-generator ${data?.running ? "emergency-source" : "normal-source"}`} key={generator.id} aria-label={`Open ${generator.name}`} title={`Open ${generator.name}`} onClick={() => onGeneratorClick(generator.id)}><i>G</i><em aria-hidden="true" /><span>{generator.name}</span><small>{data?.status || "Waiting"}</small></button>; })}</div>
       </div>
       <div className="sld-buses"><div className="sld-bus normal"><span>Normal bus</span></div><div className="sld-bus emergency"><span>Emergency bus</span></div></div>
       <div className="sld-ats-grid">{ats.map((item, index) => {
-        const data = telemetryFor(atsTelemetry, item.id, item.name);
+        const data = resolveAtsTelemetry(atsTelemetry, item.id, item.name);
         const onEmergency = data?.connected_source === "GENERATOR";
         return <div className={`sld-ats ${onEmergency ? "on-emergency" : "on-normal"}`} key={item.id}>
           <button type="button" className="sld-switch" aria-label={`Open ${item.name}: ${onEmergency ? "connected to emergency" : "connected to normal"}`} onClick={() => onAtsClick(item.id)}>
@@ -115,8 +124,8 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
   };
   const selectedAts = selectedEquipment?.type === "ats" ? ats.find((item) => item.id === selectedEquipment.id) : undefined;
   const selectedGenerator = selectedEquipment?.type === "generator" ? generators.find((generator) => generator.id === selectedEquipment.id) : undefined;
-  const selectedAtsTelemetry = selectedAts ? telemetryFor(telemetry?.ats, selectedAts.id, selectedAts.name) : undefined;
-  const selectedGeneratorTelemetry = selectedGenerator ? telemetryFor(telemetry?.generators, selectedGenerator.id, selectedGenerator.name) : undefined;
+  const selectedAtsTelemetry = selectedAts ? resolveAtsTelemetry(telemetry?.ats, selectedAts.id, selectedAts.name) : undefined;
+  const selectedGeneratorTelemetry = selectedGenerator ? resolveGeneratorTelemetry(telemetry?.generators, selectedGenerator.id, selectedGenerator.name) : undefined;
   // Keep the overview in two panels while ensuring every ATS is displayed.
   // For five ATS this renders 3 on the left and 2 on the right, without a
   // redundant third table header for the final unit.
@@ -130,14 +139,14 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
       <div className="operations-section-title"><div><span>Emergency power</span><h3>Generators</h3></div><button onClick={openGeneratorDetail}>View details</button></div>
       <div className="operations-table-wrap">
         <table className="operations-table generator-overview-table"><thead><tr><th>Sl.</th><th>Generator</th><th>Status</th><th>Test</th><th>Oil psi</th><th>H₂O temp</th><th>Batt volts</th><th>Eng hours</th><th>VAB</th><th>VBC</th><th>VCA</th><th>Amps A</th><th>Amps B</th><th>Amps C</th><th>Hz</th><th>kW</th><th>% kW</th></tr></thead><tbody>
-          {generators.map((generator, index) => { const data = telemetryFor(telemetry?.generators, generator.id, generator.name); return <tr key={generator.id}><td className="serial-cell">{String(index + 1).padStart(2, "0")}</td><td className="device-name-cell">{generator.name}</td><td className={data?.status === "FAULT" ? "emergency-state" : "ready"}>{data?.status || "WAITING"}</td><td><button className="device-test-btn" onClick={() => setTestWizardTarget({ type: "generator", id: generator.id })}>Test Gen</button></td><td>{reading(data?.oil_pressure_psi, 1)}</td><td>{data ? `${reading(data.coolant_temperature_c, 1)}°C` : "—"}</td><td>{reading(data?.battery_voltage, 1)}</td><td>{reading(data?.engine_hours, 1)}</td><td>{reading(data?.voltage_ab, 1)}</td><td>{reading(data?.voltage_bc, 1)}</td><td>{reading(data?.voltage_ca, 1)}</td><td>{reading(data?.current_a, 1)}</td><td>{reading(data?.current_b, 1)}</td><td>{reading(data?.current_c, 1)}</td><td>{reading(data?.frequency, 1)}</td><td>{reading(data?.active_power_kw, 1)}</td><td>{reading(data?.load_percentage, 1)}</td></tr>; })}
+          {generators.map((generator, index) => { const data = resolveGeneratorTelemetry(telemetry?.generators, generator.id, generator.name); return <tr key={generator.id}><td className="serial-cell">{String(index + 1).padStart(2, "0")}</td><td className="device-name-cell">{generator.name}</td><td className={data?.status === "FAULT" ? "emergency-state" : "ready"}>{data?.status || "WAITING"}</td><td><button className="device-test-btn" onClick={() => setTestWizardTarget({ type: "generator", id: generator.id })}>Test Gen</button></td><td>{reading(data?.oil_pressure_psi, 1)}</td><td>{data ? `${reading(data.coolant_temperature_c, 1)}°C` : "—"}</td><td>{reading(data?.battery_voltage, 1)}</td><td>{reading(data?.engine_hours, 1)}</td><td>{reading(data?.voltage_ab, 1)}</td><td>{reading(data?.voltage_bc, 1)}</td><td>{reading(data?.voltage_ca, 1)}</td><td>{reading(data?.current_a, 1)}</td><td>{reading(data?.current_b, 1)}</td><td>{reading(data?.current_c, 1)}</td><td>{reading(data?.frequency, 1)}</td><td>{reading(data?.active_power_kw, 1)}</td><td>{reading(data?.load_percentage, 1)}</td></tr>; })}
           {!generators.length && <tr><td colSpan={17} className="operations-empty">No generator registered for this system.</td></tr>}
         </tbody></table>
       </div>
     </section>
     <section className="operations-section ats-section">
       <div className="operations-section-title"><div><span>Power distribution</span><h3>Automatic Transfer Switches</h3></div><button onClick={openAtsDetail}>View details</button></div>
-      <div className="ats-overview-grid">{atsBanks.map((bank, bankIndex) => <div className="ats-overview-card" key={bankIndex}><table className="operations-table"><thead><tr><th>Sl.</th><th>ATS name</th><th>Status</th><th>Test</th><th>Connected to</th><th>Source available</th><th>Time to xfer</th><th>Time to bus</th></tr></thead><tbody>{bank.map((item, index) => { const serial = (bankIndex ? leftBankSize : 0) + index + 1; const data = telemetryFor(telemetry?.ats, item.id, item.name); const emergency = data?.connected_source === "GENERATOR"; return <tr className={emergency ? "ats-emergency-demo" : ""} key={item.id}><td className="serial-cell">{String(serial).padStart(2, "0")}</td><td className="device-name-cell">{item.name}</td><td className={data?.status === "EMERGENCY" || data?.status === "FAULT" ? "emergency-state" : "ready"}>{data?.status || "WAITING"}</td><td><button className="device-test-btn" onClick={() => setTestWizardTarget({ type: "ats", id: item.id })}>Test ATS</button></td><td className={emergency ? "emergency-state" : "ready"}>{data?.connected_source || "—"}</td><td><span className={`source-light ${data?.utility_available ? "live" : ""}`} /> <span className={`source-light ${data?.generator_available ? "live emergency-source" : ""}`} /></td><td>{data?.transfer_time_seconds ?? "—"}</td><td>{data?.time_on_emergency_seconds ?? "—"}</td></tr>; })}</tbody></table></div>)}</div>
+      <div className="ats-overview-grid">{atsBanks.map((bank, bankIndex) => <div className="ats-overview-card" key={bankIndex}><table className="operations-table"><thead><tr><th>Sl.</th><th>ATS name</th><th>Status</th><th>Test</th><th>Connected to</th><th>Source available</th><th>Time to xfer</th><th>Time to bus</th></tr></thead><tbody>{bank.map((item, index) => { const serial = (bankIndex ? leftBankSize : 0) + index + 1; const data = resolveAtsTelemetry(telemetry?.ats, item.id, item.name); const emergency = data?.connected_source === "GENERATOR"; return <tr className={emergency ? "ats-emergency-demo" : ""} key={item.id}><td className="serial-cell">{String(serial).padStart(2, "0")}</td><td className="device-name-cell">{item.name}</td><td className={data?.status === "EMERGENCY" || data?.status === "FAULT" ? "emergency-state" : "ready"}>{data?.status || "WAITING"}</td><td><button className="device-test-btn" onClick={() => setTestWizardTarget({ type: "ats", id: item.id })}>Test ATS</button></td><td className={emergency ? "emergency-state" : "ready"}>{data?.connected_source || "—"}</td><td><span className={`source-light ${data?.utility_available ? "live" : ""}`} /> <span className={`source-light ${data?.generator_available ? "live emergency-source" : ""}`} /></td><td>{data?.transfer_time_seconds ?? "—"}</td><td>{data?.time_on_emergency_seconds ?? "—"}</td></tr>; })}</tbody></table></div>)}</div>
       {!ats.length && <div className="operations-empty">No ATS units registered for this system.</div>}
     </section>
     {(selectedAts || selectedGenerator) && <EquipmentFaceplate systemName={systemName} ats={selectedAts} generator={selectedGenerator} atsTelemetry={selectedAtsTelemetry} generatorTelemetry={selectedGeneratorTelemetry} onClose={() => setSelectedEquipment(null)} />}

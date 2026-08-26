@@ -42,6 +42,9 @@ env/
 data/
 !frontend/public/data/
 !frontend/public/data/telemetry.json
+!mobile/src/data/
+!mobile/src/data/telemetry.json
+!mobile/src/data/mepstra-telemetry.json
 coverage/
 
 # IDE and operating-system files

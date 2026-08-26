@@ -6,16 +6,32 @@
     "orientation": "portrait",
     "scheme": "cpc",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.solution61.cpc"
+      "bundleIdentifier": "com.solution61.cpc",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
     },
     "android": {
-      "package": "com.solution61.cpc"
+      "package": "com.solution61.cpc",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9eb8890d-cf1a-48c4-a490-015b3c221523"
+      }
+    }
   }
 }

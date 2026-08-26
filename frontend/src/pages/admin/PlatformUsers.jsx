@@ -103,8 +103,9 @@ export function PlatformUsers() {
     <div className="directory-filter-count">{filteredUsers.length} of {(users || []).length} users</div>
 
     <table className="data-table">
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Customer</th><th /></tr></thead>
-      <tbody>{filteredUsers.map((user) => <tr key={user.id}>
+      <thead><tr><th>Sl.</th><th>Name</th><th>Email</th><th>Role</th><th>Customer</th><th /></tr></thead>
+      <tbody>{filteredUsers.map((user, index) => <tr key={user.id}>
+        <td>{String(index + 1).padStart(2, "0")}</td>
         <td style={{ fontWeight: 600 }}>{user.display_name || user.email}</td>
         <td className="mono">{user.email}</td>
         <td>{user.role ? roleLabel(user.role) : <span style={{ color: "var(--text-dim)" }}>Unassigned</span>}</td>

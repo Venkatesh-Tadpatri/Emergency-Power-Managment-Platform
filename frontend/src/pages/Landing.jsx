@@ -25,7 +25,7 @@ features.forEach((feature) => {
 
 export function Landing() {
   const auth = useAuth();
-  const signIn = () => auth.signinRedirect();
+  const signIn = () => auth.signinRedirect().catch((err) => console.error("signinRedirect failed:", err));
 
   useEffect(() => {
     document.body.classList.add("marketing-mode");
