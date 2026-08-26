@@ -69,6 +69,21 @@ python scripts/bootstrap_zitadel.py --pat <service-user-token>
 
 Copy the printed `ZITADEL_CLIENT_ID` and `VITE_ZITADEL_CLIENT_ID` values into `.env`. Also set `SUPERADMIN_ZITADEL_SUB` to the ID of the human administrator account—not the service user.
 
+### Testing from another device on your network (phone, tablet, second computer)
+
+`localhost` only resolves on the machine running Docker. To reach the stack from any other device, every one of these values must point at the **same** LAN IP address (your computer's IP on the local network, e.g. `192.168.1.28`) — not a mix of `localhost` and the IP:
+
+- `.env`: `ZITADEL_EXTERNAL_DOMAIN`, `ZITADEL_ISSUER`, `CORS_ORIGINS`, `VITE_API_BASE`, `VITE_ZITADEL_AUTHORITY`
+- `mobile/.env`: `EXPO_PUBLIC_API_BASE`, `EXPO_PUBLIC_ZITADEL_AUTHORITY`, `EXPO_PUBLIC_GRAFANA_URL`
+
+`ZITADEL_EXTERNAL_DOMAIN` and `ZITADEL_ISSUER` in particular must match exactly — Zitadel bakes the domain into every token's issuer claim, and the backend rejects tokens whose issuer doesn't match `ZITADEL_ISSUER` character-for-character. After changing any of these, recreate the affected containers so they pick up the new values:
+
+```bash
+docker compose up -d --force-recreate zitadel backend frontend
+```
+
+Your machine's LAN IP can change (new network, DHCP lease renewal, VPN). If login or API calls suddenly stop working after previously working, check `ipconfig` (Windows) / `ip addr` (Linux/Mac) for your current IP and re-sync the values above.
+
 ### Start all services
 
 ```bash
@@ -127,6 +142,30 @@ docker compose exec backend pytest
 # Frontend production build
 cd frontend
 npm run build
+```
+
+## Demo telemetry data
+
+Live equipment readings (voltage, current, oil pressure, etc.) are not backed by a real MQTT/historian pipeline yet — the web app, the mobile app, and the Grafana dashboards all fall back to static demo fixtures for the specific devices they cover:
+
+- `frontend/public/data/telemetry.json` — the primary fixture, matched by device name (e.g. `ASTER-GEN-001`)
+- `frontend/src/data/mepstra-telemetry.json` — a secondary fallback matched by device ID, covering a wider range of Aster Prime's equipment (`GEN-0079`–`GEN-0099`, `ATS-0163`–`ATS-0186`)
+- `mobile/src/data/telemetry.json` and `mobile/src/data/mepstra-telemetry.json` — copies of the same two files, used by the mobile app's own resolver (`mobile/src/telemetry.js`)
+
+Devices outside those ID ranges show placeholder values (`—` / `WAITING`) — that's expected, not a bug. If you add new demo equipment and want it to show live-looking readings, extend these fixtures.
+
+**Careful with `mobile/src/data/`**: the root `.gitignore` has a broad `data/` rule (it matches any directory named `data` at any depth) with explicit negation exceptions carved out for the paths above. If you add another `data/` directory anywhere in the repo, it will be silently gitignored — and critically, silently **excluded from EAS Build's upload archive** too, which fails the mobile build with a "module not found" error that gives no hint it's a gitignore problem. Add a matching `!path/to/your/data/` negation if you hit this.
+
+## Troubleshooting
+
+**Grafana container stuck restarting / crash-looping.** Usually stale internal SQLite state left over from a previous run conflicting with datasource provisioning (`data source with the same uid already exists` in `docker compose logs grafana`). Since Grafana's data directory isn't a mounted volume, recreating the container gives it a clean state:
+```bash
+docker compose up -d --force-recreate grafana
+```
+
+**Backend/Zitadel unreachable after changing `.env`.** Config changes only take effect on container *recreation*, not `docker compose restart`:
+```bash
+docker compose up -d --force-recreate zitadel backend frontend
 ```
 
 ## Security and repository hygiene
