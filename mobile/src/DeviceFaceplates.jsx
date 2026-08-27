@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AtsSwitch } from "./AtsSwitch";
+import { TestWizard } from "./TestWizard";
 import { useTheme } from "./theme";
 import { resolveAtsTelemetry, resolveGeneratorTelemetry } from "./telemetry";
 
@@ -10,6 +11,7 @@ export function DeviceFaceplateScreen({ system, ats, generators, initialTab }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const [tab, setTab] = useState(initialTab || (generators.length ? "generators" : "ats"));
+  const [testTarget, setTestTarget] = useState(null);
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <Text style={styles.title}>{system.name} · Detail view</Text>
@@ -17,15 +19,24 @@ export function DeviceFaceplateScreen({ system, ats, generators, initialTab }) {
         <Pressable style={[styles.tab, tab === "generators" && styles.tabActive]} onPress={() => setTab("generators")}><Text style={[styles.tabText, tab === "generators" && styles.tabTextActive]}>Generators</Text></Pressable>
         <Pressable style={[styles.tab, tab === "ats" && styles.tabActiveAts]} onPress={() => setTab("ats")}><Text style={[styles.tabText, tab === "ats" && styles.tabTextActiveAts]}>ATS</Text></Pressable>
       </View>
-      {tab === "generators" && generators.map((item) => <GeneratorFaceplate key={item.id} item={item} />)}
+      {tab === "generators" && generators.map((item) => <GeneratorFaceplate key={item.id} item={item} onTest={() => setTestTarget({ type: "generator", id: item.id })} />)}
       {tab === "generators" && generators.length === 0 && <Text style={styles.empty}>No generators registered</Text>}
-      {tab === "ats" && ats.map((item) => <AtsFaceplate key={item.id} item={item} />)}
+      {tab === "ats" && ats.map((item) => <AtsFaceplate key={item.id} item={item} onTest={() => setTestTarget({ type: "ats", id: item.id })} />)}
       {tab === "ats" && ats.length === 0 && <Text style={styles.empty}>No ATS units registered</Text>}
+      {testTarget && (
+        <TestWizard
+          systemName={system.name}
+          ats={ats}
+          generators={generators}
+          initialTarget={testTarget}
+          onClose={() => setTestTarget(null)}
+        />
+      )}
     </ScrollView>
   );
 }
 
-function GeneratorFaceplate({ item }) {
+function GeneratorFaceplate({ item, onTest }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const data = resolveGeneratorTelemetry(item.id, item.name);
@@ -47,11 +58,12 @@ function GeneratorFaceplate({ item }) {
         <Footer label="Rated current" value={item.rated_amps ? `${item.rated_amps} A` : "—"} />
         <Footer label="Rated voltage" value={item.rated_volts ? `${item.rated_volts} V` : "—"} />
       </View>
+      {onTest && <Pressable style={styles.testBtn} onPress={onTest}><Text style={styles.testBtnText}>Test Gen</Text></Pressable>}
     </View>
   );
 }
 
-function AtsFaceplate({ item }) {
+function AtsFaceplate({ item, onTest }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const data = resolveAtsTelemetry(item.id, item.name);
@@ -63,14 +75,17 @@ function AtsFaceplate({ item }) {
       <View style={styles.atsTop}>
         <AtsSwitch onNormal={onNormal} />
         <View style={styles.atsSourceLabels}>
-          <View style={styles.sourceLabelRow}><View style={[styles.sourceDot, onNormal && styles.sourceDotActive]} /><Text style={styles.sourceLabelText}>Utility{!data ? " (default)" : ""}</Text></View>
-          <View style={styles.sourceLabelRow}><View style={[styles.sourceDot, !onNormal && styles.sourceDotActive]} /><Text style={styles.sourceLabelText}>Emergency</Text></View>
+          <View style={styles.sourceLabelRow}><View style={[styles.sourceDot, onNormal && styles.sourceDotNormal]} /><Text style={[styles.sourceLabelText, onNormal && styles.sourceLabelTextNormal]}>Utility{!data ? " (default)" : ""}</Text></View>
+          <View style={styles.sourceLabelRow}><View style={[styles.sourceDot, !onNormal && styles.sourceDotEmergency]} /><Text style={[styles.sourceLabelText, !onNormal && styles.sourceLabelTextEmergency]}>Emergency</Text></View>
         </View>
       </View>
       <Text style={styles.faceplateMeta}>{[item.manufacturer, item.model].filter(Boolean).join(" · ") || "Not configured"}</Text>
       <Text style={styles.faceplateMeta}>{item.serial_number || "Serial pending"}</Text>
       <View style={styles.grid}>{readings.map(([label, value]) => <Reading key={label} label={label} value={value} />)}</View>
-      <Text style={styles.equipmentFooter}>{item.rated_amps ?? "—"} A · {item.rated_volts ?? "—"} V{item.branch ? ` · ${item.branch}` : ""}</Text>
+      <View style={styles.cardFooterRow}>
+        <Text style={styles.equipmentFooter}>{item.rated_amps ?? "—"} A · {item.rated_volts ?? "—"} V{item.branch ? ` · ${item.branch}` : ""}</Text>
+        {onTest && <Pressable style={styles.testBtn} onPress={onTest}><Text style={styles.testBtnText}>Test ATS</Text></Pressable>}
+      </View>
     </View>
   );
 }
@@ -119,11 +134,17 @@ function makeStyles(theme) {
     footerBoxLabel: { fontSize: 8, color: theme.textMuted, textTransform: "uppercase" },
     footerBoxValue: { fontSize: 12, fontWeight: "800", color: theme.blue, marginTop: 3 },
     equipmentFooter: { fontSize: 11, color: theme.textMuted, marginTop: 10 },
+    cardFooterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    testBtn: { alignSelf: "flex-start", marginTop: 14, borderWidth: 1, borderColor: theme.blue, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 14 },
+    testBtnText: { fontSize: 11, fontWeight: "800", color: theme.blue },
     atsTop: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 10, marginBottom: 6 },
     atsSourceLabels: { gap: 8 },
     sourceLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     sourceDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.border },
-    sourceDotActive: { backgroundColor: theme.green },
+    sourceDotNormal: { backgroundColor: theme.green },
+    sourceDotEmergency: { backgroundColor: theme.red },
     sourceLabelText: { fontSize: 11, color: theme.textDim },
+    sourceLabelTextNormal: { color: theme.green, fontWeight: "800" },
+    sourceLabelTextEmergency: { color: theme.red, fontWeight: "800" },
   });
 }

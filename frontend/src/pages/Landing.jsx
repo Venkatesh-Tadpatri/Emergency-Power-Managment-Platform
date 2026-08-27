@@ -2,12 +2,12 @@ import { useAuth } from "react-oidc-context";
 import { useEffect } from "react";
 
 const features = [
-  ["◉", "Live Monitoring", "See the real-time status of generators, ATS units, and power systems.", "View live status"],
-  ["♧", "Smart Alerts", "Receive instant notifications for faults, tests, and critical events.", "Manage alerts"],
-  ["◇", "Remote Control", "Start, stop, and test ATS equipment securely from one place.", "Learn more"],
-  ["▣", "Compliance Reports", "Keep NFPA 110 compliance and automated reporting on track.", "Explore reports"],
-  ["□", "Test Management", "Schedule and track generator and ATS test activities.", "View calendar"],
-  ["◔", "Analytics Dashboard", "Turn fleet performance and trends into clear decisions.", "Explore analytics"],
+  ["◉", "Live Monitoring", "See the real-time status of generators, ATS units, and power systems.", "View live status", "blue"],
+  ["♧", "Smart Alerts", "Receive instant notifications for faults, tests, and critical events.", "Manage alerts", "red"],
+  ["◇", "Remote Control", "Start, stop, and test ATS equipment securely from one place.", "Learn more", "purple"],
+  ["▣", "Compliance Reports", "Keep NFPA 110 compliance and automated reporting on track.", "Explore reports", "green"],
+  ["□", "Test Management", "Schedule and track generator and ATS test activities.", "View calendar", "orange"],
+  ["◔", "Analytics Dashboard", "Turn fleet performance and trends into clear decisions.", "Explore analytics", "cyan"],
 ];
 
 const featureDetails = {
@@ -55,7 +55,7 @@ export function Landing() {
 
       <section className="marketing-section feature-section" id="solutions">
         <p className="section-kicker">Powering reliability</p><h2>Everything you need in one platform</h2>
-        <div className="feature-grid">{features.map(([icon, title, text, link]) => <article className="feature-card" key={title}><span className="feature-icon">{icon}</span><h3>{title}</h3><p>{text}</p><a href="#platform">{link} →</a></article>)}</div>
+        <div className="feature-grid">{features.map(([icon, title, text, link, accent]) => <article className={`feature-card feature-${accent}`} key={title}><span className="feature-icon">{icon}</span><h3>{title}</h3><p>{text}</p><a href="#platform">{link} →</a></article>)}</div>
       </section>
 
       <section className="marketing-section visibility-section" id="platform">

@@ -3,19 +3,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { SolutionLogo } from "./SolutionLogo";
 
 const FEATURES = [
-  ["◉", "Live Monitoring", "See generator, ATS, fuel, and utility status in real time across every location."],
-  ["♧", "Smart Alerts", "Route fault, low-fuel, and test notifications to the right people before issues escalate."],
-  ["◇", "Remote Control", "Securely start, stop, and exercise supported equipment without travelling to the site."],
-  ["▣", "Compliance Reports", "Create audit-ready NFPA 110 records and recurring reports with a complete activity history."],
-  ["□", "Test Management", "Plan scheduled tests, track completion, and keep every generator and ATS inspection on time."],
-  ["◔", "Analytics Dashboard", "Compare uptime, alarms, load trends, and maintenance needs to make confident fleet decisions."],
+  ["◉", "Live Monitoring", "See generator, ATS, fuel, and utility status in real time across every location.", "#2563eb", "#dbeafe"],
+  ["♧", "Smart Alerts", "Route fault, low-fuel, and test notifications to the right people before issues escalate.", "#dc2626", "#fee2e2"],
+  ["◇", "Remote Control", "Securely start, stop, and exercise supported equipment without travelling to the site.", "#7c3aed", "#ede9fe"],
+  ["▣", "Compliance Reports", "Create audit-ready NFPA 110 records and recurring reports with a complete activity history.", "#16a34a", "#dcfce7"],
+  ["□", "Test Management", "Plan scheduled tests, track completion, and keep every generator and ATS inspection on time.", "#ea580c", "#ffedd5"],
+  ["◔", "Analytics Dashboard", "Compare uptime, alarms, load trends, and maintenance needs to make confident fleet decisions.", "#0891b2", "#cffafe"],
 ];
 
 const PROOF = [
-  ["99.8%", "Fleet uptime"],
-  ["NFPA 110", "Compliant"],
-  ["24/7", "Monitoring"],
-  ["Multi-site", "Fleet view"],
+  ["99.8%", "Fleet uptime", "⏻", "#16a34a", "#dcfce7"],
+  ["NFPA 110", "Compliant", "⛨", "#2563eb", "#dbeafe"],
+  ["24/7", "Monitoring", "◔", "#7c3aed", "#ede9fe"],
+  ["Multi-site", "Fleet view", "▣", "#c2410c", "#ffedd5"],
 ];
 
 export function Landing({ disabled, onSignIn }) {
@@ -52,10 +52,13 @@ export function Landing({ disabled, onSignIn }) {
         </ImageBackground>
 
         <View style={styles.body}>
-          <View style={styles.proofRow}>
-            {PROOF.map(([value, label]) => (
-              <View key={label} style={styles.proofItem}>
-                <Text style={styles.proofValue}>{value}</Text>
+          <View style={styles.proofGrid}>
+            {PROOF.map(([value, label, icon, accent, soft]) => (
+              <View key={label} style={[styles.proofCard, { borderTopColor: accent }]}>
+                <View style={[styles.proofIconBox, { backgroundColor: soft }]}>
+                  <Text style={[styles.proofIcon, { color: accent }]}>{icon}</Text>
+                </View>
+                <Text style={[styles.proofValue, { color: accent }]}>{value}</Text>
                 <Text style={styles.proofLabel}>{label}</Text>
               </View>
             ))}
@@ -63,9 +66,11 @@ export function Landing({ disabled, onSignIn }) {
 
           <Text style={styles.sectionKicker}>Powering reliability</Text>
           <Text style={styles.sectionTitle}>Everything you need in one platform</Text>
-          {FEATURES.map(([icon, title, text]) => (
-            <View key={title} style={styles.featureCard}>
-              <View style={styles.featureIconBox}><Text style={styles.featureIcon}>{icon}</Text></View>
+          {FEATURES.map(([icon, title, text, accent, soft]) => (
+            <View key={title} style={[styles.featureCard, { borderLeftColor: accent }]}>
+              <View style={[styles.featureIconBox, { backgroundColor: soft }]}>
+                <Text style={[styles.featureIcon, { color: accent }]}>{icon}</Text>
+              </View>
               <Text style={styles.featureTitle}>{title}</Text>
               <Text style={styles.featureText}>{text}</Text>
             </View>
@@ -134,15 +139,17 @@ const styles = StyleSheet.create({
   primaryText: { color: "#fff", fontWeight: "800", fontSize: 16 },
   disabled: { opacity: 0.5 },
   body: { padding: 20 },
-  proofRow: { flexDirection: "row", flexWrap: "wrap", gap: 20, paddingBottom: 24, borderBottomWidth: 1, borderColor: "#e2e8f0" },
-  proofItem: { minWidth: "40%" },
-  proofValue: { fontSize: 19, fontWeight: "800", color: "#0f172a" },
-  proofLabel: { fontSize: 11, color: "#64748b", marginTop: 2 },
+  proofGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingBottom: 24, borderBottomWidth: 1, borderColor: "#e2e8f0" },
+  proofCard: { width: "47%", backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#e2e8f0", borderTopWidth: 3, padding: 14, shadowColor: "#0f172a", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  proofIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  proofIcon: { fontSize: 15, fontWeight: "800" },
+  proofValue: { fontSize: 18, fontWeight: "800" },
+  proofLabel: { fontSize: 11, color: "#64748b", marginTop: 2, fontWeight: "600" },
   sectionKicker: { fontSize: 11, fontWeight: "800", color: "#1875ff", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 32 },
   sectionTitle: { fontSize: 21, fontWeight: "800", color: "#0f172a", marginTop: 6, marginBottom: 16 },
-  featureCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 12, padding: 16, marginBottom: 10 },
-  featureIconBox: { width: 34, height: 34, borderRadius: 8, backgroundColor: "#e7f2ff", alignItems: "center", justifyContent: "center", marginBottom: 10 },
-  featureIcon: { fontSize: 17, color: "#196ffc" },
+  featureCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#e2e8f0", borderLeftWidth: 4, borderRadius: 12, padding: 16, marginBottom: 10, shadowColor: "#0f172a", shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  featureIconBox: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  featureIcon: { fontSize: 17 },
   featureTitle: { fontSize: 15, fontWeight: "800", color: "#0f172a", marginBottom: 4 },
   featureText: { fontSize: 12.5, color: "#64748b", lineHeight: 18 },
   quote: { backgroundColor: "#f8fbff", borderWidth: 1, borderColor: "#dbe6f5", borderRadius: 14, padding: 20, marginTop: 28, alignItems: "center" },

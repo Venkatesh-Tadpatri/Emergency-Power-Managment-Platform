@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, ImageBackground, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, FlatList, ImageBackground, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import { createAts, createGenerator, getAlarms, getAts, getCompanies, getGenerators, getMe, getOnCall, getPanels, getReports, getResellers, getSystems } from "./src/api";
@@ -12,6 +12,7 @@ import { Analytics } from "./src/Analytics";
 import { Drawer } from "./src/Drawer";
 import { SLD } from "./src/SLD";
 import { DeviceFaceplateScreen } from "./src/DeviceFaceplates";
+import { TestWizard } from "./src/TestWizard";
 import { roleName } from "./src/roles";
 import { resolveAtsTelemetry, resolveGeneratorTelemetry } from "./src/telemetry";
 import { ThemeProvider, useTheme } from "./src/theme";
@@ -34,7 +35,7 @@ function AppInner() {
   const pop = () => setStack((s) => s.slice(0, -1));
   const navigate = (nextScreen) => { setScreen(nextScreen); setStack([]); setDrawerOpen(false); };
   const discovery = AuthSession.useAutoDiscovery(process.env.EXPO_PUBLIC_ZITADEL_AUTHORITY || "https://invalid.local");
-  const [request, response, promptAsync] = AuthSession.useAuthRequest({ clientId, redirectUri, responseType: AuthSession.ResponseType.Code, scopes: ["openid", "profile", "email"], usePKCE: true }, discovery);
+  const [request, response, promptAsync] = AuthSession.useAuthRequest({ clientId, redirectUri, responseType: AuthSession.ResponseType.Code, scopes: ["openid", "profile", "email"], usePKCE: true, extraParams: { prompt: "login" } }, discovery);
 
   const load = async (accessToken = token) => {
     if (!accessToken) return;
@@ -143,11 +144,11 @@ function Home({ me, systems, alarms, reports, onCall, refresh, refreshing, isSup
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {rollups.map(({ reseller, customerCount, systemCount, normalCount: n, eventCount }) => (
               <View key={reseller.id} style={styles.rollupCard}>
-                <Text style={styles.rollupName}>{reseller.name}</Text>
-                <View style={styles.rollupRow}><Text style={styles.rollupValue}>{customerCount}</Text><Text style={styles.rollupLabel}>Customers</Text></View>
-                <View style={styles.rollupRow}><Text style={styles.rollupValue}>{systemCount}</Text><Text style={styles.rollupLabel}>Systems</Text></View>
-                <View style={styles.rollupRow}><Text style={[styles.rollupValue, styles.green]}>{n}</Text><Text style={styles.rollupLabel}>Normal</Text></View>
-                <View style={styles.rollupRow}><Text style={[styles.rollupValue, eventCount > 0 && styles.danger]}>{eventCount}</Text><Text style={styles.rollupLabel}>Events</Text></View>
+                <Text style={styles.rollupName} numberOfLines={1}>{reseller.name}</Text>
+                <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Customers</Text><Text style={styles.rollupValue}>{customerCount}</Text></View>
+                <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Systems</Text><Text style={styles.rollupValue}>{systemCount}</Text></View>
+                <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Normal</Text><Text style={[styles.rollupValue, styles.green]}>{n}</Text></View>
+                <View style={[styles.rollupRow, styles.rollupRowLast]}><Text style={styles.rollupLabel}>Events</Text><Text style={[styles.rollupValue, eventCount > 0 && styles.danger]}>{eventCount}</Text></View>
               </View>
             ))}
           </ScrollView>
@@ -266,6 +267,7 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
   const [devices, setDevices] = useState({ ats: [], generators: [] });
   const [loading, setLoading] = useState(true);
   const [addModal, setAddModal] = useState(null);
+  const [testTarget, setTestTarget] = useState(null);
 
   const loadDevices = async (panel) => {
     const [ats, generators] = await Promise.all([getAts(panel, token), getGenerators(panel, token)]);
@@ -303,7 +305,7 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
           {isSuperAdmin && panelId && <Pressable onPress={() => setAddModal("generator")}><Text style={styles.viewAll}>+ Add</Text></Pressable>}
         </View>
       </View>
-      {!loading && devices.generators.map((item) => <GeneratorReadingCard key={item.id} item={item} />)}
+      {!loading && devices.generators.map((item) => <GeneratorReadingCard key={item.id} item={item} onTest={() => setTestTarget({ type: "generator", id: item.id })} />)}
       {!loading && devices.generators.length === 0 && <Empty text="No generators" />}
 
       <View style={styles.sectionHeadRow}>
@@ -313,7 +315,7 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
           {isSuperAdmin && panelId && <Pressable onPress={() => setAddModal("ats")}><Text style={styles.viewAll}>+ Add</Text></Pressable>}
         </View>
       </View>
-      {!loading && devices.ats.map((item) => <AtsReadingCard key={item.id} item={item} />)}
+      {!loading && devices.ats.map((item) => <AtsReadingCard key={item.id} item={item} onTest={() => setTestTarget({ type: "ats", id: item.id })} />)}
       {!loading && devices.ats.length === 0 && <Empty text="No ATS units" />}
 
       {addModal && (
@@ -325,37 +327,82 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
           onCreated={() => { setAddModal(null); loadDevices(panelId); }}
         />
       )}
+      {testTarget && (
+        <TestWizard
+          systemName={system.name}
+          ats={devices.ats}
+          generators={devices.generators}
+          initialTarget={testTarget}
+          onClose={() => setTestTarget(null)}
+        />
+      )}
     </ScrollView>
   );
 }
 
 const fmt = (value, digits = 1) => (typeof value === "number" ? value.toFixed(digits) : "—");
+const CRITICAL_STATUSES = new Set(["EMERGENCY", "FAULT", "ALARM"]);
 
-function AtsReadingCard({ item }) {
+function useBlink(active) {
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!active) {
+      pulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.3, duration: 550, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 550, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, pulse]);
+  return pulse;
+}
+
+function StatusPill({ status, live }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
+  const critical = live && CRITICAL_STATUSES.has(status);
+  const pulse = useBlink(critical);
+  return (
+    <Animated.View style={[styles.waitingPill, live && (critical ? styles.statusPillCritical : styles.statusPillLive), critical && { opacity: pulse }]}>
+      <Text style={[styles.waitingText, live && (critical ? styles.statusTextCritical : styles.statusTextLive)]}>{status || "WAITING"}</Text>
+    </Animated.View>
+  );
+}
+
+function AtsReadingCard({ item, onTest }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const data = resolveAtsTelemetry(item.id, item.name);
   const onNormal = data?.connected_source !== "GENERATOR";
+  const emergencyPulse = useBlink(!onNormal);
   const readings = [["VAB", fmt(data?.voltage_ab)], ["VBC", fmt(data?.voltage_bc)], ["VCA", fmt(data?.voltage_ca)], ["Hz", fmt(data?.frequency)], ["Amps A", fmt(data?.current_a)], ["Amps B", fmt(data?.current_b)], ["Amps C", fmt(data?.current_c)], ["kW", fmt(data?.active_power_kw)]];
   return (
     <View style={styles.readingCard}>
       <View style={styles.sectionHeadRow}>
         <Text style={styles.readingName}>{item.name}</Text>
-        <View style={[styles.waitingPill, data && styles.statusPillLive]}><Text style={[styles.waitingText, data && styles.statusTextLive]}>{data?.status || "WAITING"}</Text></View>
+        <StatusPill status={data?.status} live={Boolean(data)} />
       </View>
       <Text style={styles.muted}>{[item.manufacturer, item.model].filter(Boolean).join(" · ") || "Equipment not configured"}</Text>
       <View style={styles.sourceRow}>
-        <View style={[styles.sourceBadge, onNormal && styles.sourceBadgeActive]}><Text style={onNormal ? styles.sourceBadgeText : styles.sourceBadgeTextDim}>N</Text></View>
-        <Text style={styles.sourceLabel}>{data ? `Connected to ${onNormal ? "Normal" : "Emergency"}` : "Connected to Normal (default)"}</Text>
-        <View style={[styles.sourceBadge, !onNormal && styles.sourceBadgeActive]}><Text style={!onNormal ? styles.sourceBadgeText : styles.sourceBadgeTextDim}>E</Text></View>
+        <View style={[styles.sourceBadge, onNormal && styles.sourceBadgeActiveNormal]}><Text style={onNormal ? styles.sourceBadgeText : styles.sourceBadgeTextDim}>N</Text></View>
+        <Text style={[styles.sourceLabel, !onNormal && styles.sourceLabelEmergency]}>{data ? `Connected to ${onNormal ? "Normal" : "Emergency"}` : "Connected to Normal (default)"}</Text>
+        <Animated.View style={[styles.sourceBadge, !onNormal && styles.sourceBadgeActiveEmergency, !onNormal && { opacity: emergencyPulse }]}><Text style={!onNormal ? styles.sourceBadgeText : styles.sourceBadgeTextDim}>E</Text></Animated.View>
       </View>
       <View style={styles.readingGrid}>{readings.map(([label, value]) => <ReadingCell key={label} label={label} value={value} />)}</View>
-      <Text style={styles.equipmentMeta}>{item.rated_amps ?? "—"} A · {item.rated_volts ?? "—"} V{item.branch ? ` · ${item.branch}` : ""}</Text>
+      <View style={styles.cardFooterRow}>
+        <Text style={styles.equipmentMeta}>{item.rated_amps ?? "—"} A · {item.rated_volts ?? "—"} V{item.branch ? ` · ${item.branch}` : ""}</Text>
+        {onTest && <Pressable style={styles.testBtn} onPress={onTest}><Text style={styles.testBtnText}>Test ATS</Text></Pressable>}
+      </View>
     </View>
   );
 }
 
-function GeneratorReadingCard({ item }) {
+function GeneratorReadingCard({ item, onTest }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const data = resolveGeneratorTelemetry(item.id, item.name);
@@ -364,11 +411,14 @@ function GeneratorReadingCard({ item }) {
     <View style={styles.readingCard}>
       <View style={styles.sectionHeadRow}>
         <Text style={styles.readingName}>{item.name}</Text>
-        <View style={[styles.waitingPill, data && styles.statusPillLive]}><Text style={[styles.waitingText, data && styles.statusTextLive]}>{data?.status || "WAITING"}</Text></View>
+        <StatusPill status={data?.status} live={Boolean(data)} />
       </View>
       <Text style={styles.muted}>{[item.make, item.model].filter(Boolean).join(" · ") || "Equipment not configured"}</Text>
       <View style={styles.readingGrid}>{readings.map(([label, value]) => <ReadingCell key={label} label={label} value={value} />)}</View>
-      <Text style={styles.equipmentMeta}>Rated {item.rated_kw ?? "—"} kW · {item.rated_amps ?? "—"} A · {item.rated_volts ?? "—"} V</Text>
+      <View style={styles.cardFooterRow}>
+        <Text style={styles.equipmentMeta}>Rated {item.rated_kw ?? "—"} kW · {item.rated_amps ?? "—"} A · {item.rated_volts ?? "—"} V</Text>
+        {onTest && <Pressable style={styles.testBtn} onPress={onTest}><Text style={styles.testBtnText}>Test Gen</Text></Pressable>}
+      </View>
     </View>
   );
 }
@@ -605,11 +655,12 @@ function makeStyles(theme) {
     quickLink: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
     quickLinkIcon: { fontSize: 13, color: "#fff" },
     quickLinkLabel: { fontSize: 11.5, color: "#fff", fontWeight: "700" },
-    rollupCard: { width: 150, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 12 },
-    rollupName: { fontSize: 13, fontWeight: "800", color: theme.text, marginBottom: 8 },
-    rollupRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 3 },
-    rollupValue: { fontSize: 14, fontWeight: "800", color: theme.text },
-    rollupLabel: { fontSize: 10, color: theme.textDim, textTransform: "uppercase" },
+    rollupCard: { width: 172, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 14, padding: 14 },
+    rollupName: { fontSize: 13, fontWeight: "800", color: theme.text, marginBottom: 10, paddingBottom: 10, borderBottomWidth: 1, borderColor: theme.border },
+    rollupRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderColor: theme.surface2 },
+    rollupRowLast: { borderBottomWidth: 0, paddingBottom: 0 },
+    rollupValue: { fontSize: 14, fontWeight: "800", color: theme.text, minWidth: 26, textAlign: "right" },
+    rollupLabel: { fontSize: 10.5, color: theme.textDim, textTransform: "uppercase", letterSpacing: 0.3 },
     listCard: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14, marginBottom: 9, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     cardCopy: { flex: 1 },
     listTitle: { fontSize: 14, fontWeight: "700", color: theme.text },
@@ -639,17 +690,24 @@ function makeStyles(theme) {
     waitingText: { fontSize: 10, fontWeight: "800", color: theme.textDim },
     statusPillLive: { backgroundColor: theme.greenSoft, borderColor: theme.green },
     statusTextLive: { color: theme.green },
+    statusPillCritical: { backgroundColor: theme.redSoft, borderColor: theme.red },
+    statusTextCritical: { color: theme.red },
     sourceRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
     sourceBadge: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: theme.surface2, borderWidth: 1, borderColor: theme.border },
-    sourceBadgeActive: { backgroundColor: theme.green, borderColor: theme.green },
+    sourceBadgeActiveNormal: { backgroundColor: theme.green, borderColor: theme.green },
+    sourceBadgeActiveEmergency: { backgroundColor: theme.red, borderColor: theme.red },
     sourceBadgeText: { fontSize: 11, fontWeight: "800", color: "#fff" },
     sourceBadgeTextDim: { fontSize: 11, fontWeight: "800", color: theme.textMuted },
     sourceLabel: { fontSize: 11, color: theme.textDim, flex: 1 },
+    sourceLabelEmergency: { color: theme.red, fontWeight: "800" },
     readingGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
     readingCell: { width: "23%", backgroundColor: theme.surface2, borderRadius: 8, paddingVertical: 8, alignItems: "center" },
     readingCellLabel: { fontSize: 8.5, color: theme.textMuted, textTransform: "uppercase" },
     readingCellValue: { fontSize: 13, fontWeight: "800", color: theme.text, marginTop: 3 },
     equipmentMeta: { fontSize: 11, color: theme.textMuted, marginTop: 10 },
+    cardFooterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+    testBtn: { borderWidth: 1, borderColor: theme.blue, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
+    testBtnText: { fontSize: 10.5, fontWeight: "800", color: theme.blue },
     modalBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.45)" },
     modalScroll: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
     modalScrollContent: { flexGrow: 1, justifyContent: "center", padding: 20 },
