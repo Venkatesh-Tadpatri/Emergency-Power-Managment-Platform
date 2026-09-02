@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, FlatList, ImageBackground, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import { createAts, createGenerator, getAlarms, getAts, getCompanies, getGenerators, getMe, getOnCall, getPanels, getReports, getResellers, getSystems } from "./src/api";
+import { createAts, createGenerator, getAlarms, getAllAts, getAllGenerators, getAllPanels, getAts, getCompanies, getGenerators, getMe, getOnCall, getPanels, getReports, getResellers, getSystems } from "./src/api";
 import { HealthDonut } from "./src/HealthDonut";
 import { clearToken, exchangeAuthorizationCode, readToken, redirectUri } from "./src/auth";
 import { SolutionLogo } from "./src/SolutionLogo";
@@ -11,7 +11,7 @@ import { Customers, CustomerDetail, PlatformUsers, Resellers, ResellerDetail, Si
 import { Analytics } from "./src/Analytics";
 import { Drawer } from "./src/Drawer";
 import { SLD } from "./src/SLD";
-import { DeviceFaceplateScreen } from "./src/DeviceFaceplates";
+import { DeviceFaceplateScreen, EquipmentDetailModal } from "./src/DeviceFaceplates";
 import { TestWizard } from "./src/TestWizard";
 import { roleName } from "./src/roles";
 import { resolveAtsTelemetry, resolveGeneratorTelemetry } from "./src/telemetry";
@@ -175,10 +175,34 @@ function Systems({ systems, onOpen, refresh, refreshing, isSuperAdmin, token }) 
   const [companies, setCompanies] = useState([]);
   const [resellerFilter, setResellerFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
+  const [assetsBySystem, setAssetsBySystem] = useState({});
   useEffect(() => {
     if (!isSuperAdmin) return;
     Promise.all([getResellers(token), getCompanies(token)]).then(([r, c]) => { setResellers(r); setCompanies(c); }).catch(() => {});
   }, [isSuperAdmin, token]);
+  // Bulk-fetch every panel/ATS/generator once and group client-side, so each list row can show a
+  // live, telemetry-aware status (matching the web app) without an N+1 fetch per system.
+  useEffect(() => {
+    Promise.all([getAllPanels(token), getAllAts(token), getAllGenerators(token)])
+      .then(([panels, ats, generators]) => {
+        const panelsBySystem = {};
+        panels.forEach((p) => { if (!panelsBySystem[p.system_id]) panelsBySystem[p.system_id] = []; panelsBySystem[p.system_id].push(p); });
+        const atsByPanel = {};
+        ats.forEach((a) => { if (!atsByPanel[a.panel_id]) atsByPanel[a.panel_id] = []; atsByPanel[a.panel_id].push(a); });
+        const generatorsByPanel = {};
+        generators.forEach((g) => { if (!generatorsByPanel[g.panel_id]) generatorsByPanel[g.panel_id] = []; generatorsByPanel[g.panel_id].push(g); });
+        const map = {};
+        Object.keys(panelsBySystem).forEach((systemId) => {
+          const systemPanels = panelsBySystem[systemId];
+          map[systemId] = {
+            ats: systemPanels.flatMap((p) => atsByPanel[p.id] || []),
+            generators: systemPanels.flatMap((p) => generatorsByPanel[p.id] || []),
+          };
+        });
+        setAssetsBySystem(map);
+      })
+      .catch(() => {});
+  }, [token]);
 
   const companyIdsForReseller = resellerFilter === "all" ? null : new Set(companies.filter((c) => c.reseller_id === resellerFilter).map((c) => c.id));
   const visibleCompanies = resellerFilter === "all" ? companies : companies.filter((c) => c.reseller_id === resellerFilter);
@@ -219,12 +243,26 @@ function Systems({ systems, onOpen, refresh, refreshing, isSuperAdmin, token }) 
         </View>
       }
       ListEmptyComponent={<Empty text="No systems match" />}
-      renderItem={({ item }) => (
-        <Pressable style={styles.listCard} onPress={() => onOpen(item)}>
-          <View style={styles.cardCopy}><Text style={styles.listTitle}>{item.name}</Text><Text style={styles.muted}>{item.address || "No address configured"}</Text></View>
-          <Status status={item.status} />
-        </Pressable>
-      )}
+      renderItem={({ item }) => {
+        const assets = assetsBySystem[item.id];
+        const emergencyAts = assets ? assets.ats.filter((a) => resolveAtsTelemetry(a.id, a.name)?.connected_source === "GENERATOR") : [];
+        const effectiveStatus = emergencyAts.length ? "emergency" : item.status;
+        return (
+          <Pressable style={styles.listCard} onPress={() => onOpen(item)}>
+            <View style={styles.cardCopy}>
+              <Text style={styles.listTitle}>{item.name}</Text>
+              <Text style={styles.muted}>{item.address || "No address configured"}</Text>
+              {assets && (
+                <Text style={styles.statLine}>
+                  {assets.generators.length} generator{assets.generators.length === 1 ? "" : "s"} · {assets.ats.length} ATS
+                  {emergencyAts.length > 0 ? ` · ${emergencyAts.length} on emergency` : ""}
+                </Text>
+              )}
+            </View>
+            <Status status={effectiveStatus} />
+          </Pressable>
+        );
+      }}
     />
   );
 }
@@ -268,6 +306,8 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
   const [loading, setLoading] = useState(true);
   const [addModal, setAddModal] = useState(null);
   const [testTarget, setTestTarget] = useState(null);
+  const [view, setView] = useState(system.initialView === "one-line" ? "one-line" : "details");
+  const [selectedDevice, setSelectedDevice] = useState(null);
 
   const loadDevices = async (panel) => {
     const [ats, generators] = await Promise.all([getAts(panel, token), getGenerators(panel, token)]);
@@ -296,27 +336,44 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       {(system.address || system.lat) && <Pressable style={styles.directionsButton} onPress={openDirections}><Text style={styles.directionsText}>Open directions</Text></Pressable>}
-      {loading ? <Loading /> : <SLD ats={devices.ats} generators={devices.generators} />}
 
-      <View style={styles.sectionHeadRow}>
-        <Text style={styles.sectionTitle}>Generators</Text>
-        <View style={styles.headActions}>
-          {!loading && devices.generators.length > 0 && <Pressable onPress={() => onPush("deviceFaceplate", { system, ats: devices.ats, generators: devices.generators, initialTab: "generators" })}><Text style={styles.viewAll}>View details</Text></Pressable>}
-          {isSuperAdmin && panelId && <Pressable onPress={() => setAddModal("generator")}><Text style={styles.viewAll}>+ Add</Text></Pressable>}
-        </View>
+      <View style={styles.viewTabRow}>
+        <Pressable style={[styles.viewTab, view === "details" && styles.viewTabActive]} onPress={() => setView("details")}><Text style={[styles.viewTabText, view === "details" && styles.viewTabTextActive]}>System Details</Text></Pressable>
+        <Pressable style={[styles.viewTab, view === "one-line" && styles.viewTabActive]} onPress={() => setView("one-line")}><Text style={[styles.viewTabText, view === "one-line" && styles.viewTabTextActive]}>One-Line</Text></Pressable>
       </View>
-      {!loading && devices.generators.map((item) => <GeneratorReadingCard key={item.id} item={item} onTest={() => setTestTarget({ type: "generator", id: item.id })} />)}
-      {!loading && devices.generators.length === 0 && <Empty text="No generators" />}
 
-      <View style={styles.sectionHeadRow}>
-        <Text style={styles.sectionTitle}>Automatic transfer switches</Text>
-        <View style={styles.headActions}>
-          {!loading && devices.ats.length > 0 && <Pressable onPress={() => onPush("deviceFaceplate", { system, ats: devices.ats, generators: devices.generators, initialTab: "ats" })}><Text style={styles.viewAll}>View details</Text></Pressable>}
-          {isSuperAdmin && panelId && <Pressable onPress={() => setAddModal("ats")}><Text style={styles.viewAll}>+ Add</Text></Pressable>}
-        </View>
-      </View>
-      {!loading && devices.ats.map((item) => <AtsReadingCard key={item.id} item={item} onTest={() => setTestTarget({ type: "ats", id: item.id })} />)}
-      {!loading && devices.ats.length === 0 && <Empty text="No ATS units" />}
+      {view === "one-line" ? (
+        loading ? <Loading /> : (
+          <SLD
+            ats={devices.ats}
+            generators={devices.generators}
+            onSelectAts={(item) => setSelectedDevice({ kind: "ats", item })}
+            onSelectGenerator={(item) => setSelectedDevice({ kind: "generator", item })}
+          />
+        )
+      ) : (
+        <>
+          <View style={styles.sectionHeadRow}>
+            <Text style={styles.sectionTitle}>Generators</Text>
+            <View style={styles.headActions}>
+              {!loading && devices.generators.length > 0 && <Pressable onPress={() => onPush("deviceFaceplate", { system, ats: devices.ats, generators: devices.generators, initialTab: "generators" })}><Text style={styles.viewAll}>View details</Text></Pressable>}
+              {isSuperAdmin && panelId && <Pressable onPress={() => setAddModal("generator")}><Text style={styles.viewAll}>+ Add</Text></Pressable>}
+            </View>
+          </View>
+          {!loading && devices.generators.map((item) => <GeneratorReadingCard key={item.id} item={item} onTest={() => setTestTarget({ type: "generator", id: item.id })} />)}
+          {!loading && devices.generators.length === 0 && <Empty text="No generators" />}
+
+          <View style={styles.sectionHeadRow}>
+            <Text style={styles.sectionTitle}>Automatic transfer switches</Text>
+            <View style={styles.headActions}>
+              {!loading && devices.ats.length > 0 && <Pressable onPress={() => onPush("deviceFaceplate", { system, ats: devices.ats, generators: devices.generators, initialTab: "ats" })}><Text style={styles.viewAll}>View details</Text></Pressable>}
+              {isSuperAdmin && panelId && <Pressable onPress={() => setAddModal("ats")}><Text style={styles.viewAll}>+ Add</Text></Pressable>}
+            </View>
+          </View>
+          {!loading && devices.ats.map((item) => <AtsReadingCard key={item.id} item={item} onTest={() => setTestTarget({ type: "ats", id: item.id })} />)}
+          {!loading && devices.ats.length === 0 && <Empty text="No ATS units" />}
+        </>
+      )}
 
       {addModal && (
         <AddDeviceModal
@@ -334,6 +391,13 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
           generators={devices.generators}
           initialTarget={testTarget}
           onClose={() => setTestTarget(null)}
+        />
+      )}
+      {selectedDevice && (
+        <EquipmentDetailModal
+          kind={selectedDevice.kind}
+          item={selectedDevice.item}
+          onClose={() => setSelectedDevice(null)}
         />
       )}
     </ScrollView>
@@ -538,7 +602,7 @@ function DetailScreen({ frame, token, onBack, onPush, isSuperAdmin }) {
       <View style={styles.body}>
         {frame.type === "resellerDetail" && <ResellerDetail reseller={frame.data} token={token} onOpenCustomer={(c) => onPush("customerDetail", c)} />}
         {frame.type === "customerDetail" && <CustomerDetail customer={frame.data} token={token} onOpenSite={(s) => onPush("siteDetail", s)} onOpenSystem={(s) => onPush("systemDetail", s)} />}
-        {frame.type === "siteDetail" && <SiteDetail site={frame.data} token={token} onOpenSystem={(s) => onPush("systemDetail", s)} />}
+        {frame.type === "siteDetail" && <SiteDetail site={frame.data} token={token} onOpenSystem={(s, view) => onPush("systemDetail", { ...s, initialView: view })} />}
         {frame.type === "systemDetail" && <SystemDetail system={frame.data} token={token} isSuperAdmin={isSuperAdmin} onPush={onPush} />}
         {frame.type === "userDetail" && <UserDetail user={frame.data} token={token} />}
         {frame.type === "deviceFaceplate" && <DeviceFaceplateScreen system={frame.data.system} ats={frame.data.ats} generators={frame.data.generators} initialTab={frame.data.initialTab} />}
@@ -583,10 +647,32 @@ function Stat({ label, value, green, danger }) {
   return <View style={styles.stat}><Text style={[styles.statValue, green && styles.green, danger && styles.danger]}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
 }
 
+function useStatusBlink(active) {
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!active) { pulse.setValue(1); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.35, duration: 550, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 550, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, pulse]);
+  return pulse;
+}
+
 function Status({ status }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  return <View style={[styles.status, status === "normal" ? styles.statusGood : styles.statusBad]}><Text style={[styles.statusText, status !== "normal" && styles.statusBadText]}>{(status || "unknown").toUpperCase()}</Text></View>;
+  const emergency = status === "emergency";
+  const pulse = useStatusBlink(emergency);
+  return (
+    <Animated.View style={[styles.status, status === "normal" ? styles.statusGood : styles.statusBad, emergency && { opacity: pulse }]}>
+      <Text style={[styles.statusText, status !== "normal" && styles.statusBadText]}>{(status || "unknown").toUpperCase()}</Text>
+    </Animated.View>
+  );
 }
 
 function AlarmCard({ alarm }) {
@@ -664,6 +750,7 @@ function makeStyles(theme) {
     listCard: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14, marginBottom: 9, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     cardCopy: { flex: 1 },
     listTitle: { fontSize: 14, fontWeight: "700", color: theme.text },
+    statLine: { fontSize: 10.5, color: theme.textMuted, marginTop: 4, fontWeight: "600" },
     status: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
     statusGood: { backgroundColor: theme.greenSoft },
     statusBad: { backgroundColor: theme.redSoft },
@@ -677,6 +764,11 @@ function makeStyles(theme) {
     detailTitle: { fontSize: 20, fontWeight: "800", color: theme.text },
     directionsButton: { borderWidth: 1, borderColor: theme.blue, backgroundColor: theme.blueSoft, padding: 12, borderRadius: 10, alignItems: "center", marginBottom: 16 },
     directionsText: { color: theme.blue, fontWeight: "700" },
+    viewTabRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+    viewTab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: "center", borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface },
+    viewTabActive: { backgroundColor: theme.blue, borderColor: theme.blue },
+    viewTabText: { fontSize: 12, fontWeight: "700", color: theme.textDim },
+    viewTabTextActive: { color: "#fff" },
     profileAvatar: { backgroundColor: "#8b5cf6", width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", marginTop: 18 },
     avatarText: { color: "#fff", fontSize: 28, fontWeight: "800" },
     profileName: { fontSize: 20, fontWeight: "800", marginTop: 12, color: theme.text },

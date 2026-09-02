@@ -38,6 +38,10 @@ export const getSystem = (id, token) => api(`/api/systems/${id}`, token);
 export const getPanels = (systemId, token) => api(`/api/panels?system_id=${systemId}`, token);
 export const getAts = (panelId, token) => api(`/api/ats?panel_id=${panelId}`, token);
 export const getGenerators = (panelId, token) => api(`/api/generators?panel_id=${panelId}`, token);
+// Unfiltered variants — used to compute per-system live status/counts in list views without an N+1 fetch per system.
+export const getAllPanels = (token) => api("/api/panels", token);
+export const getAllAts = (token) => api("/api/ats", token);
+export const getAllGenerators = (token) => api("/api/generators", token);
 export const createAts = (token, data) => api("/api/ats", token, { method: "POST", body: JSON.stringify(data) });
 export const createGenerator = (token, data) => api("/api/generators", token, { method: "POST", body: JSON.stringify(data) });
 export const getReports = (token, companyId, isSuperAdmin) =>

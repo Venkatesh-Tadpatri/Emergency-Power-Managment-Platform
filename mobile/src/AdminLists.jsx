@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { assignUserSystems, getCompanies, getResellers, getSites, getSystems, getUsers } from "./api";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Animated, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { assignUserSystems, getAllAts, getAllGenerators, getAllPanels, getCompanies, getResellers, getSites, getSystems, getUsers } from "./api";
 import { roleName } from "./roles";
 import { useTheme } from "./theme";
+import { resolveAtsTelemetry, resolveGeneratorTelemetry } from "./telemetry";
+import { TestWizard } from "./TestWizard";
 
 function useList(loader, deps) {
   const [items, setItems] = useState([]);
@@ -26,9 +28,31 @@ function Avatar({ letter, color, styles }) {
   return <View style={[styles.avatar, { backgroundColor: color }]}><Text style={styles.avatarLetter}>{letter}</Text></View>;
 }
 
+function useBlink(active) {
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!active) { pulse.setValue(1); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.35, duration: 550, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 550, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, pulse]);
+  return pulse;
+}
+
 function StatusPill({ status, styles }) {
   const active = status === "active" || status === "normal";
-  return <View style={[styles.status, active ? styles.statusGood : styles.statusBad]}><Text style={[styles.statusText, !active && styles.statusBadText]}>{(status || "unknown").toUpperCase()}</Text></View>;
+  const emergency = status === "emergency";
+  const pulse = useBlink(emergency);
+  return (
+    <Animated.View style={[styles.status, active ? styles.statusGood : styles.statusBad, emergency && { opacity: pulse }]}>
+      <Text style={[styles.statusText, !active && styles.statusBadText]}>{(status || "unknown").toUpperCase()}</Text>
+    </Animated.View>
+  );
 }
 
 export function Resellers({ token, onOpen }) {
@@ -180,29 +204,100 @@ export function SiteDetail({ site, token, onOpenSystem }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const { items, loading, refreshing, refresh } = useList(() => getSystems(token, { siteId: site.id }), [token, site.id]);
+  const [assetsBySystem, setAssetsBySystem] = useState({});
+  const [testTarget, setTestTarget] = useState(null);
+
+  // Bulk-fetch every panel/ATS/generator once and group client-side — mirrors the web app's
+  // per-system stat cards (Utility / Generators / ATS) without an N+1 fetch per system.
+  useEffect(() => {
+    Promise.all([getAllPanels(token), getAllAts(token), getAllGenerators(token)])
+      .then(([panels, ats, generators]) => {
+        const panelsBySystem = {};
+        panels.forEach((p) => { if (!panelsBySystem[p.system_id]) panelsBySystem[p.system_id] = []; panelsBySystem[p.system_id].push(p); });
+        const atsByPanel = {};
+        ats.forEach((a) => { if (!atsByPanel[a.panel_id]) atsByPanel[a.panel_id] = []; atsByPanel[a.panel_id].push(a); });
+        const generatorsByPanel = {};
+        generators.forEach((g) => { if (!generatorsByPanel[g.panel_id]) generatorsByPanel[g.panel_id] = []; generatorsByPanel[g.panel_id].push(g); });
+        const map = {};
+        Object.keys(panelsBySystem).forEach((systemId) => {
+          const systemPanels = panelsBySystem[systemId];
+          map[systemId] = {
+            ats: systemPanels.flatMap((p) => atsByPanel[p.id] || []),
+            generators: systemPanels.flatMap((p) => generatorsByPanel[p.id] || []),
+          };
+        });
+        setAssetsBySystem(map);
+      })
+      .catch(() => {});
+  }, [token]);
+
   return (
-    <FlatList
-      style={styles.list}
-      data={items}
-      keyExtractor={(item) => item.id}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-      ListHeaderComponent={
-        <View>
-          <Text style={styles.sectionTitle}>{site.name}</Text>
-          {site.address && <Text style={styles.muted}>{site.address}</Text>}
-          <Text style={styles.subheading}>Equipment systems</Text>
-        </View>
-      }
-      ListEmptyComponent={!loading && <Text style={styles.empty}>No systems registered at this site</Text>}
-      renderItem={({ item }) => (
-        <Pressable style={styles.card} onPress={() => onOpenSystem(item)}>
-          <View style={styles.cardTop}>
-            <View style={styles.cardTitleRow}><Avatar letter="⚡" color={theme.green} styles={styles} /><Text style={styles.name}>{item.name}</Text></View>
-            <StatusPill status={item.status} styles={styles} />
+    <>
+      <FlatList
+        style={styles.list}
+        data={items}
+        keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+        ListHeaderComponent={
+          <View>
+            <Text style={styles.sectionTitle}>{site.name}</Text>
+            {site.address && <Text style={styles.muted}>{site.address}</Text>}
+            <Text style={styles.subheading}>Equipment systems</Text>
           </View>
-        </Pressable>
+        }
+        ListEmptyComponent={!loading && <Text style={styles.empty}>No systems registered at this site</Text>}
+        renderItem={({ item }) => {
+          const assets = assetsBySystem[item.id] || { ats: [], generators: [] };
+          const generatorsReady = assets.generators.filter((g) => resolveGeneratorTelemetry(g.id, g.name)?.status !== "FAULT").length;
+          const atsNormal = assets.ats.filter((a) => {
+            const st = resolveAtsTelemetry(a.id, a.name)?.status || "NORMAL";
+            return st !== "EMERGENCY" && st !== "FAULT";
+          }).length;
+          const utilityAvailable = assets.ats.length
+            ? assets.ats.some((a) => resolveAtsTelemetry(a.id, a.name)?.utility_available)
+            : item.status !== "offline";
+          const onEmergency = assets.ats.some((a) => resolveAtsTelemetry(a.id, a.name)?.connected_source === "GENERATOR");
+          const effectiveStatus = onEmergency ? "emergency" : item.status;
+          return (
+            <View style={styles.card}>
+              <Pressable onPress={() => onOpenSystem(item, "details")}>
+                <View style={styles.cardTop}>
+                  <View style={styles.cardTitleRow}><Avatar letter="⚡" color={theme.green} styles={styles} /><Text style={styles.name}>{item.name}</Text></View>
+                  <StatusPill status={effectiveStatus} styles={styles} />
+                </View>
+              </Pressable>
+              <View style={styles.statRow}>
+                <View style={styles.statCol}>
+                  <Text style={styles.statLabel2}>Utility</Text>
+                  <Text style={[styles.statValue2, utilityAvailable ? styles.statGood : styles.statBad]}>{utilityAvailable ? "Available" : "Unavailable"}</Text>
+                </View>
+                <View style={styles.statCol}>
+                  <Text style={styles.statLabel2}>Generators</Text>
+                  <Text style={styles.statValue2}>{generatorsReady} / {assets.generators.length} Ready</Text>
+                </View>
+                <View style={styles.statCol}>
+                  <Text style={styles.statLabel2}>ATS</Text>
+                  <Text style={styles.statValue2}>{atsNormal} / {assets.ats.length} Normal</Text>
+                </View>
+              </View>
+              <View style={styles.actionRow}>
+                <Pressable style={styles.actionBtn} onPress={() => onOpenSystem(item, "details")}><Text style={styles.actionBtnText}>Detail</Text></Pressable>
+                <Pressable style={styles.actionBtn} onPress={() => onOpenSystem(item, "one-line")}><Text style={styles.actionBtnText}>One-Line</Text></Pressable>
+                <Pressable style={styles.actionBtn} onPress={() => setTestTarget({ system: item, ats: assets.ats, generators: assets.generators })}><Text style={styles.actionBtnText}>Test</Text></Pressable>
+              </View>
+            </View>
+          );
+        }}
+      />
+      {testTarget && (
+        <TestWizard
+          systemName={testTarget.system.name}
+          ats={testTarget.ats}
+          generators={testTarget.generators}
+          onClose={() => setTestTarget(null)}
+        />
       )}
-    />
+    </>
   );
 }
 
@@ -368,5 +463,14 @@ function makeStyles(theme) {
     saveButton: { backgroundColor: theme.blue, paddingVertical: 14, borderRadius: 10, alignItems: "center", marginTop: 20 },
     saveButtonText: { color: "#fff", fontWeight: "800", fontSize: 15 },
     disabled: { opacity: 0.6 },
+    statRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+    statCol: { flex: 1, backgroundColor: theme.surface2, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 6, alignItems: "center" },
+    statLabel2: { fontSize: 8.5, color: theme.textMuted, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: "700" },
+    statValue2: { fontSize: 11.5, color: theme.text, fontWeight: "800", marginTop: 3, textAlign: "center" },
+    statGood: { color: theme.green },
+    statBad: { color: theme.red },
+    actionRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+    actionBtn: { flex: 1, backgroundColor: theme.blue, borderRadius: 8, paddingVertical: 9, alignItems: "center" },
+    actionBtnText: { color: "#fff", fontWeight: "800", fontSize: 11.5 },
   });
 }

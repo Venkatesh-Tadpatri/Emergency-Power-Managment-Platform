@@ -1,0 +1,2000 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CPC — Critical Power Command (Demo)</title>
+<style>
+  :root{
+    --bg:#eef3fa; --card:#ffffff; --card-2:#f6f9fd; --border:#dbe6f4; --text:#16273e; --text-dim:#5e7796;
+    --sidebar-1:#0a1a30; --sidebar-2:#0e2748; --sidebar-text:#c6d7ee; --sidebar-dim:#7d93b3;
+    --accent:#2563eb; --accent-dim:#e7f0ff; --accent-2:#1d4fd8;
+    --green:#16a34a; --green-bg:#e7f8ee; --red:#dc2626; --red-bg:#fdecec; --amber:#d97706; --amber-bg:#fdf2e0; --purple:#7c3aed; --purple-bg:#f1eafe;
+    --radius:12px; --shadow:0 6px 18px rgba(20,45,90,.08);
+  }
+  body.dark{
+    --bg:#0a1728; --card:#0f2038; --card-2:#0b1a30; --border:#1e3557; --text:#dfeaf9; --text-dim:#8fa5c4;
+    --sidebar-1:#050e1c; --sidebar-2:#081426; --accent-dim:#122a4d;
+    --green-bg:#0d2a1c; --red-bg:#301418; --amber-bg:#2c2009; --purple-bg:#221a3a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);transition:background .2s ease,color .2s ease;}
+  button,input{font:inherit;color:inherit;}
+  a{color:inherit;}
+  #root{min-height:100vh;}
+
+  /* ---------- login ---------- */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 20% 20%,#123 0%,#050b16 60%);padding:20px;}
+  .login-card{width:100%;max-width:380px;background:#0f1d33;border:1px solid #24406a;border-radius:16px;padding:32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .login-logo i{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px;font-style:normal;}
+  .login-logo b{color:#fff;font-size:16px;}
+  .login-logo span{display:block;color:#8fa5c4;font-size:10px;letter-spacing:.06em;text-transform:uppercase;}
+  .login-card h1{color:#fff;font-size:19px;margin:18px 0 4px;}
+  .login-card p{color:#93a8c6;font-size:12.5px;margin:0 0 22px;}
+  .login-field{margin-bottom:14px;}
+  .login-field label{display:block;color:#9db2cf;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .login-field input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a4a76;background:#0b1930;color:#e7eefb;}
+  .login-btn{width:100%;padding:11px;margin-top:8px;border:0;border-radius:8px;background:linear-gradient(135deg,#2563eb,#1d4fd8);color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;}
+  .login-btn:hover{filter:brightness(1.08);}
+  .login-note{margin-top:16px;padding:10px 12px;border-radius:8px;background:#132846;border:1px solid #1f3d66;color:#9db8dc;font-size:11px;}
+  .login-badge{display:inline-block;margin-top:16px;color:#5f7ba3;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;}
+  .login-role-group{display:flex;gap:8px;margin:2px 0 18px;}
+  .login-role-pill{flex:1;padding:10px 8px;border-radius:10px;border:1px solid #2a4a76;background:#0b1930;color:#9db2cf;cursor:pointer;text-align:center;}
+  .login-role-pill b{display:block;font-size:11.5px;color:#e7eefb;margin-bottom:2px;}
+  .login-role-pill span{display:block;font-size:8.5px;color:#7d93b3;line-height:1.3;}
+  .login-role-pill.sel{border-color:#2563eb;background:linear-gradient(135deg,rgba(37,99,235,.3),rgba(124,58,237,.22));}
+  .login-role-pill.sel b{color:#fff;}
+
+  /* ---------- shell ---------- */
+  .shell{display:flex;min-height:100vh;}
+  .sidebar{width:236px;flex:0 0 236px;background:linear-gradient(180deg,var(--sidebar-1),var(--sidebar-2));color:var(--sidebar-text);display:flex;flex-direction:column;}
+  .sidebar-header{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .sidebar-header i{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#2563eb,#7c3aed);display:grid;place-items:center;color:#fff;font-weight:800;font-style:normal;font-size:14px;flex:0 0 auto;}
+  .sidebar-brand b{display:block;color:#fff;font-size:13px;letter-spacing:.03em;}
+  .sidebar-brand span{display:block;color:var(--sidebar-dim);font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;}
+  .sidebar-nav{flex:1;overflow-y:auto;padding:10px 10px 16px;}
+  .scope-header{padding:8px 8px 10px;cursor:pointer;color:#9db3d4;font-size:11px;font-weight:700;}
+  .scope-header:hover{color:#fff;}
+  .scope-title{padding:0 8px;color:#fff;font-size:14px;font-weight:800;line-height:1.25;}
+  .scope-sub{padding:2px 8px 12px;color:var(--sidebar-dim);font-size:10.5px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:10px;}
+  .nav-section{margin-bottom:14px;}
+  .nav-label{padding:0 8px 6px;color:#5f7ba3;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;}
+  .nav-item{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--sidebar-text);}
+  .nav-item:hover{background:rgba(255,255,255,.06);}
+  .nav-item.active{background:rgba(37,99,235,.22);color:#fff;}
+  .nav-item .ico{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:0 0 auto;background:rgba(255,255,255,.08);}
+  .nav-item.sub{padding-left:10px;}
+  .nav-item .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
+  .dot.g{background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.25);}
+  .dot.r{background:#ef4444;box-shadow:0 0 0 2px rgba(239,68,68,.25);}
+  .dot.n{background:#94a3b8;box-shadow:0 0 0 2px rgba(148,163,184,.25);}
+  .nav-badge{margin-left:auto;background:#dc2626;color:#fff;font-size:10px;font-weight:800;border-radius:999px;padding:1px 6px;}
+  .sidebar-footer{padding:12px;border-top:1px solid rgba(255,255,255,.08);font-size:10.5px;color:#54719c;}
+
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--border);}
+  .breadcrumb{color:var(--text-dim);font-size:11px;margin-bottom:3px;}
+  .breadcrumb span.link{cursor:pointer;color:var(--accent);font-weight:600;}
+  .breadcrumb span.sep{margin:0 5px;opacity:.6;}
+  .page-title{font-size:18px;font-weight:800;}
+  .page-sub{color:var(--text-dim);font-size:12px;margin-top:2px;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+  .demo-pill{display:flex;align-items:center;gap:5px;background:var(--amber-bg);color:var(--amber);font-size:10.5px;font-weight:800;padding:5px 10px;border-radius:999px;letter-spacing:.03em;text-transform:uppercase;}
+  .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--card-2);display:grid;place-items:center;cursor:pointer;font-size:14px;}
+  .icon-btn:hover{background:var(--accent-dim);}
+  .user-chip{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border-radius:999px;border:1px solid var(--border);background:var(--card-2);cursor:pointer;}
+  .user-chip .av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;display:grid;place-items:center;font-weight:800;font-size:11px;}
+  .user-chip b{display:block;font-size:11.5px;}
+  .user-chip small{display:block;color:var(--text-dim);font-size:9.5px;}
+  .user-menu-wrap{position:relative;}
+  .user-menu{position:absolute;top:calc(100% + 8px);right:0;width:200px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;z-index:50;}
+  .user-menu-role{padding:4px 6px 10px;border-bottom:1px solid var(--border);margin-bottom:8px;font-size:10px;color:var(--text-dim);}
+  .user-menu-role b{display:block;color:var(--text);font-size:12.5px;margin-top:2px;}
+  .user-menu-item{width:100%;text-align:left;padding:8px;border-radius:8px;border:0;background:transparent;cursor:pointer;font-weight:700;font-size:12px;color:var(--text);}
+  .user-menu-item:hover{background:var(--accent-dim);color:var(--accent);}
+  .content{padding:22px 26px 60px;}
+
+  /* ---------- generic ---------- */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;}
+  .section-head h2{margin:0;font-size:15px;}
+  .section-head span{display:block;color:var(--accent);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card-2);cursor:pointer;font-weight:700;font-size:12px;}
+  .btn:hover{background:var(--accent-dim);}
+  .btn.primary{background:var(--accent);border-color:var(--accent-2);color:#fff;}
+  .btn.primary:hover{background:var(--accent-2);}
+  .btn.small{padding:5px 9px;font-size:11px;border-radius:6px;}
+  .btn.danger{background:var(--red-bg);border-color:#f3b9b9;color:var(--red);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px;}
+  .kpi{padding:16px;}
+  .kpi span{display:block;color:var(--text-dim);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+  .kpi b{font-size:24px;}
+  .kpi small{display:block;margin-top:4px;color:var(--text-dim);font-size:11px;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+  .obj-card{padding:16px;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;}
+  .obj-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(20,45,90,.14);}
+  .obj-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;}
+  .obj-card-icon{width:34px;height:34px;border-radius:9px;background:var(--accent-dim);color:var(--accent);display:grid;place-items:center;font-size:15px;}
+  .obj-card h3{margin:0 0 2px;font-size:13.5px;}
+  .obj-card p{margin:0;color:var(--text-dim);font-size:11px;}
+  .obj-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px;}
+  .obj-stat{text-align:center;padding:6px 2px;border-radius:7px;background:var(--card-2);}
+  .obj-stat b{display:block;font-size:14px;}
+  .obj-stat span{display:block;font-size:8.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:800;}
+  .pill.g{background:var(--green-bg);color:var(--green);}
+  .pill.r{background:var(--red-bg);color:var(--red);}
+  .pill.a{background:var(--amber-bg);color:var(--amber);}
+  .pill.n{background:var(--card-2);color:var(--text-dim);}
+  .pill-lg{padding:6px 14px;font-size:12px;border-radius:999px;font-weight:800;display:inline-flex;align-items:center;gap:7px;}
+  .pill-lg.n{background:var(--card-2);color:var(--text-dim);}
+  .pill-lg.blink,.pill.blink{animation:emergency-blink 1s steps(2,end) infinite;}
+
+  /* ---------- site system card ---------- */
+  .site-system-card{padding:16px;border-left:4px solid var(--green);}
+  .site-system-card.status-emergency{border-left-color:var(--red);}
+  .site-system-card.status-offline{border-left-color:var(--text-dim);opacity:.92;}
+  .site-system-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;}
+  .site-system-card-head h3{margin:0;font-size:13.5px;}
+  .site-system-card-sub{color:var(--text-dim);font-size:11px;margin-bottom:12px;}
+  .site-system-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+  .site-system-stat{padding:8px 4px;border-radius:8px;background:var(--card-2);text-align:center;}
+  .site-system-stat span{display:block;font-size:8.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+  .site-system-stat b{display:block;font-size:11.5px;}
+  .stat-good{color:var(--green);}
+  .stat-bad{color:var(--red);}
+  .site-system-card-actions{display:flex;gap:8px;}
+  .site-system-card-actions button{flex:1;padding:8px 4px;border-radius:8px;border:1px solid var(--border);background:var(--card-2);cursor:pointer;font-weight:700;font-size:11px;color:var(--text);}
+  .site-system-card-actions button:hover{background:var(--accent-dim);border-color:var(--accent-2);}
+  .site-systems-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+  table.tbl th{text-align:left;color:var(--text-dim);font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;padding:9px 10px;border-bottom:1px solid var(--border);background:var(--card-2);white-space:nowrap;}
+  table.tbl td{padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  table.tbl tbody tr:hover{background:var(--card-2);}
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
+  .state-ok{color:var(--green);font-weight:800;}
+  .state-bad{color:var(--red);font-weight:800;}
+
+  .placeholder{padding:60px 20px;text-align:center;color:var(--text-dim);}
+  .placeholder i{display:block;font-size:34px;margin-bottom:14px;}
+  .placeholder h3{color:var(--text);margin:0 0 6px;}
+
+  /* ---------- system detail ---------- */
+  .hero{display:flex;gap:18px;padding:20px;margin-bottom:18px;}
+  .hero-left{flex:1;}
+  .hero-kicker{display:block;color:var(--accent);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+  .hero h1{margin:0 0 4px;font-size:20px;}
+  .hero p{margin:0 0 12px;color:var(--text-dim);font-size:12px;}
+  .tabs{display:flex;gap:6px;margin-top:14px;}
+  .tab{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card-2);cursor:pointer;font-weight:700;font-size:12px;}
+  .tab.active{background:var(--accent);border-color:var(--accent-2);color:#fff;}
+  .events-panel{width:280px;flex:0 0 280px;}
+  .events-panel .eh{font-weight:800;font-size:11.5px;padding:10px 12px;border-bottom:1px solid var(--border);}
+  .events-panel ul{list-style:none;margin:0;padding:6px;}
+  .events-panel li{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:7px;font-size:11px;}
+  .events-panel li time{color:var(--text-dim);font-size:9.5px;flex:0 0 auto;}
+  .ev-critical{background:var(--red-bg);}
+  .ev-warning{background:var(--amber-bg);}
+  .ev-resolved{color:var(--text-dim);}
+
+  .op-section{margin-bottom:20px;}
+  .op-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .op-head span{display:block;color:var(--accent);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;}
+  .op-head h3{margin:2px 0 0;font-size:14px;}
+
+  /* ---------- one-line diagram (production SLD, ported) ---------- */
+  .system-sld{margin:0;overflow:hidden;border:1px solid #cddff1;border-radius:10px;background:linear-gradient(145deg,#fbfdff,#eef6ff);box-shadow:0 5px 14px rgba(30,64,112,.07);}
+  .system-sld-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 14px;border-bottom:1px solid #d8e6f3;background:rgba(255,255,255,.7);}
+  .system-sld-header span{display:block;margin-bottom:2px;color:#3076ca;font-size:8px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;}
+  .system-sld-header h3{margin:0;color:#183150;font-size:13px;}
+  .system-sld-legend{display:flex;align-items:center;gap:6px;color:#637c99;font-size:9px;font-weight:600;}
+  .system-sld-legend i{width:8px;height:8px;margin-left:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px #dcfce7;display:inline-block;}
+  .system-sld-legend i.emergency{background:#ef4444;box-shadow:0 0 0 3px #fee2e2;}
+  .system-sld-canvas{min-width:700px;overflow-x:auto;padding:12px 18px 14px;background-image:linear-gradient(rgba(148,163,184,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.08) 1px,transparent 1px);background-size:20px 20px;}
+  .system-sld-canvas-inner{width:100%;}
+  .sld-sources{display:flex;align-items:flex-start;justify-content:space-between;height:172px;overflow:hidden;}
+  .sld-source{position:relative;display:flex;align-items:center;gap:8px;}
+  .sld-source>i{display:grid;place-items:center;width:30px;height:30px;color:#15803d;font-style:normal;font-size:16px;}
+  .sld-source b,.sld-source small{display:block;}
+  .sld-source b{color:#1d4f38;font-size:10px;letter-spacing:.06em;}
+  .sld-source small{margin-top:2px;color:#6b8b7b;font-size:8px;}
+  .sld-utility-column{display:flex;flex-direction:column;align-items:flex-start;}
+  .sld-gear-connector{display:block;width:2px;height:18px;margin:0 0 0 14px;background:#22c55e;}
+  .sld-gear-connector.tail{height:80px;}
+  .sld-generators .sld-generator-column:first-child .sld-gear-connector.tail{height:110px;}
+  .sld-gear-connector.lead{height:60px;}
+  .sld-gear-connector.emergency-source{background:#ef4444;}
+  .sld-gear-icon{display:grid;place-items:center;width:30px;height:30px;flex:0 0 auto;overflow:visible;}
+  .sld-symbol{color:#22c55e;flex:0 0 auto;}
+  .sld-breaker-symbol.emergency{color:#ef4444;}
+  .sld-breaker-tag{align-self:flex-start;margin:0;padding:0;border:0;background:transparent;color:#166534;font:800 8px 'Courier New',monospace;text-transform:uppercase;white-space:nowrap;}
+  .sld-breaker-tag.emergency-source{color:#b91c1c;}
+  .sld-generators{position:relative;display:flex;flex-wrap:nowrap;align-items:flex-start;gap:40px;margin-right:8px;}
+  .sld-generator-column{display:flex;flex-direction:column;align-items:center;width:46px;min-width:46px;}
+  .sld-generator-column .sld-gear-connector{margin:0 auto;}
+  .sld-generator{position:relative;display:grid;justify-items:center;width:46px;min-width:46px;text-align:center;padding:0;border:0;background:transparent;cursor:pointer;font:inherit;}
+  .sld-generator i{position:relative;z-index:2;display:grid;place-items:center;width:29px;height:29px;border:2px solid #111827;border-radius:50%;color:#fff;background:#22c55e;font:800 16px Inter,sans-serif;font-style:normal;}
+  .sld-generator.emergency-source i{background:#ef4444;animation:emergency-blink 1s steps(2,end) infinite;}
+  .sld-generator span{order:-1;display:block;margin-bottom:2px;overflow:hidden;max-width:56px;color:#1d4f38;font-size:8px;font-weight:800;line-height:8px;text-align:center;text-overflow:ellipsis;white-space:nowrap;}
+  .sld-generator small{order:-1;display:block;margin-bottom:2px;color:#4b7360;font-size:7px;line-height:7px;text-align:center;white-space:nowrap;}
+  .sld-generator.emergency-source small{color:#c92a2a;}
+  .sld-generator:focus-visible,.sld-switch:focus-visible{outline:3px solid #2563eb;outline-offset:3px;}
+  .sld-breaker-with-tag{position:relative;display:inline-flex;align-items:center;}
+  .sld-breaker-with-tag .sld-breaker-tag{position:absolute;left:100%;top:50%;margin-left:5px;transform:translateY(-50%);white-space:nowrap;}
+  .sld-buses{position:relative;display:grid;grid-template-rows:16px 16px;margin:0 30px 0 15px;}
+  .sld-bus{position:relative;border-top:2px solid #22c55e;}
+  .sld-bus span{position:absolute;right:0;top:-12px;padding:1px 5px;border-radius:5px;color:#15803d;background:#ecf5f0;font-size:7px;font-weight:800;text-transform:uppercase;}
+  .sld-bus.normal span{top:-13px;right:auto;left:0;}
+  .sld-bus.emergency{border-color:#ef4444;}
+  .sld-bus.emergency::before{content:"";position:absolute;top:-19px;right:0;height:17px;border-left:2px solid #ef4444;}
+  .sld-bus.emergency span{top:3px;color:#c92a2a;background:#fff1f2;}
+  .sld-ats-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(100px,1fr);gap:10px;margin-top:2px;}
+  .sld-ats{position:relative;display:grid;justify-items:center;padding-top:13px;text-align:center;}
+  .sld-ats::before,.sld-ats::after{content:"";position:absolute;z-index:0;left:calc(50% - 12px);width:0;border-left:2px solid #22c55e;}
+  .sld-ats::before{top:-32px;height:45px;}
+  .sld-ats::after{display:none;left:calc(50% + 12px);top:-16px;height:29px;border-color:#ef4444;}
+  .sld-ats.on-emergency::before{display:none;}
+  .sld-ats.on-emergency::after{display:block;}
+  .sld-switch{position:relative;z-index:1;width:62px;height:62px;box-sizing:border-box;border:2px solid #15803d;border-radius:4px;background:#22c55e;box-shadow:0 3px 7px rgba(22,163,74,.2);padding:0;cursor:pointer;}
+  .sld-terminal{position:absolute;display:grid;place-items:center;z-index:2;width:17px;height:17px;box-sizing:border-box;border:2px solid #b8c8d9;border-radius:50%;color:#183150;background:#fff;font-size:8px;font-weight:900;}
+  .sld-terminal.normal-terminal{top:7px;left:7px;}
+  .sld-terminal.emergency-terminal{top:7px;right:7px;}
+  .sld-terminal.load-terminal{right:calc(50% - 8.5px);bottom:7px;border-color:#b8c8d9;}
+  .sld-terminal.active{color:#fff;border-color:#fff;background:#15803d;box-shadow:0 0 0 2px rgba(255,255,255,.55);}
+  .sld-ats.on-emergency .sld-terminal.active{background:#dc2626;}
+  .sld-arm{position:absolute;z-index:1;top:14px;left:16px;width:35px;height:3px;border-radius:3px;background:#50647a;transform:rotate(63.5deg);transform-origin:left center;}
+  .sld-ats.on-emergency .sld-arm{top:14px;left:12px;background:#50647a;transform:rotate(-63.5deg);transform-origin:right center;}
+  .sld-load-line{position:relative;z-index:0;display:block;height:10px;margin-top:-1px;border-left:2px solid #22c55e;}
+  .sld-ats b{display:block;max-width:100%;margin-top:1px;overflow:hidden;color:#294a6b;font-size:8px;text-overflow:ellipsis;white-space:nowrap;}
+  .sld-ats small{display:block;margin-top:2px;color:#16803d;font-size:7px;}
+  .sld-load-label{display:block;margin-top:3px;padding:2px 5px;border:1px solid #86efac;border-radius:4px;color:#166534;background:#f0fdf4;font-size:7px;font-weight:800;text-transform:uppercase;}
+  .sld-ats.on-emergency small{color:#d93636;}
+  .sld-ats.on-normal .sld-switch{border-color:#15803d;background:#22c55e;}
+  .sld-ats.on-emergency .sld-switch{border-color:#dc2626;background:#ef4444;box-shadow:0 0 0 3px rgba(254,202,202,.8),0 3px 9px rgba(239,68,68,.32);}
+  .sld-ats.on-emergency .sld-load-line{border-color:#ef4444;}
+  .sld-ats.on-emergency .sld-load-label{border-color:#fecaca;color:#b91c1c;background:#fff1f2;}
+  .sld-ats.on-emergency .sld-switch,.sld-ats.on-emergency .sld-load-line{animation:emergency-blink 1s steps(2,end) infinite;}
+  @keyframes emergency-blink{0%,49%{opacity:1;}50%,100%{opacity:.38;}}
+  body.dark .system-sld{border-color:#285073;background:linear-gradient(145deg,#0c2036,#081a2d);}
+  body.dark .system-sld-header{border-color:#244969;background:#0b1d31;}
+  body.dark .system-sld-header h3{color:#e1efff;}
+  body.dark .system-sld-canvas{background-color:#0a192b;background-image:linear-gradient(rgba(148,163,184,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.07) 1px,transparent 1px);}
+  body.dark .sld-switch{border-color:#315978;background:#0c2036;}
+  body.dark .sld-ats b{color:#d1e6fb;}
+  body.dark .sld-generator i{border-color:#7dc4a8;}
+  body.dark .sld-generator.emergency-source i{border-color:#f8a8a8;}
+  body.dark .sld-generator span{color:#d1e6fb;}
+  body.dark .sld-generator small{color:#9eb8d5;}
+  body.dark .sld-generator.emergency-source small{color:#fca5a5;}
+  body.dark .sld-source>i{color:#4ade80;}
+  body.dark .sld-source b{color:#4ade80;}
+  body.dark .sld-source small{color:#9eb8d5;}
+  body.dark .sld-breaker-tag{color:#6ee7a3;}
+  body.dark .sld-breaker-tag.emergency-source{color:#fca5a5;}
+  @media (prefers-reduced-motion:reduce){ .sld-ats.on-emergency .sld-switch,.sld-ats.on-emergency .sld-load-line,.sld-generator.emergency-source i,.pill-lg.blink,.pill.blink,.fp-banner.emergency{animation:none;} }
+  @media (max-width:850px){ .system-sld-header{min-width:700px;} }
+
+  /* ---------- modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(6,14,28,.6);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100;}
+  .modal{background:var(--card);border-radius:16px;width:100%;max-width:760px;max-height:92vh;overflow:auto;box-shadow:0 30px 70px rgba(0,0,0,.4);position:relative;}
+  .modal.wide{max-width:900px;}
+  .modal.sld-modal{padding:18px;}
+  .modal-close{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--card-2);cursor:pointer;font-weight:800;}
+
+  /* faceplate */
+  .fp{padding:20px 22px;}
+  .fp-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+  .fp-head h3{margin:0;font-size:16px;}
+  .fp-head p{margin:2px 0 0;color:var(--text-dim);font-size:11px;}
+  .fp-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .fp-tag{padding:4px 9px;border-radius:6px;background:var(--card-2);border:1px solid var(--border);font-size:10.5px;font-weight:700;}
+  .fp-banner{padding:9px;border-radius:8px;text-align:center;font-weight:800;letter-spacing:.06em;margin-bottom:14px;}
+  .fp-banner.ready{background:var(--green-bg);color:var(--green);}
+  .fp-banner.emergency{background:var(--red-bg);color:var(--red);animation:emergency-blink 1s steps(2,end) infinite;}
+  .fp-section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin:14px 0 8px;}
+  .fp-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .fp-box{padding:10px;border-radius:9px;border:1px solid var(--border);background:var(--card-2);}
+  .fp-box.on.normal{background:var(--green-bg);border-color:#bdeecb;}
+  .fp-box.on.normal span,.fp-box.on.normal b{color:var(--green);}
+  .fp-box.on.emergency{background:var(--red-bg);border-color:#f3b9b9;}
+  .fp-box.on.emergency span,.fp-box.on.emergency b{color:var(--red);}
+  .fp-box span{display:block;color:var(--text-dim);font-size:10px;}
+  .fp-box b{display:block;font-size:13px;margin-top:2px;}
+  .fp-elec{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .fp-col-title{font-size:9.5px;font-weight:800;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
+  .fp-row{display:flex;justify-content:space-between;padding:4px 0;font-size:11.5px;border-bottom:1px dashed var(--border);}
+  .fp-row b{font-weight:800;}
+
+  /* test wizard */
+  .tw{padding:20px 22px;}
+  .tw-head{display:flex;justify-content:space-between;margin-bottom:14px;}
+  .tw-head span{display:block;color:var(--accent);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;}
+  .tw-head h2{margin:2px 0 2px;font-size:17px;}
+  .tw-head p{margin:0;color:var(--text-dim);font-size:11.5px;}
+  .stepper{display:flex;gap:0;margin-bottom:20px;}
+  .stepper span{flex:1;text-align:center;padding-bottom:10px;border-bottom:3px solid var(--border);color:var(--text-dim);font-size:11px;font-weight:700;position:relative;}
+  .stepper span.active{border-color:var(--accent);color:var(--accent);}
+  .stepper span i{display:block;width:22px;height:22px;border-radius:50%;background:var(--card-2);border:1px solid var(--border);margin:0 auto 6px;line-height:20px;font-style:normal;font-size:11px;font-weight:800;}
+  .stepper span.active i{background:var(--accent);border-color:var(--accent-2);color:#fff;}
+  .tw-sec{display:flex;gap:8px;align-items:flex-start;margin:16px 0 10px;}
+  .tw-sec span{width:22px;height:22px;border-radius:6px;background:var(--accent-dim);color:var(--accent);display:grid;place-items:center;font-size:10px;font-weight:800;flex:0 0 auto;}
+  .tw-sec h4{margin:0 0 2px;font-size:12.5px;}
+  .tw-sec p{margin:0;color:var(--text-dim);font-size:11px;}
+  .tw-types{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .tw-type{border:2px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;}
+  .tw-type.sel{border-color:var(--accent);background:var(--accent-dim);}
+  .tw-type b{display:block;margin-bottom:3px;font-size:12.5px;}
+  .tw-type small{color:var(--text-dim);font-size:10.5px;}
+  .tw-settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;}
+  .tw-settings label{display:block;}
+  .tw-settings span{display:block;font-size:10px;color:var(--text-dim);margin-bottom:4px;font-weight:700;}
+  .tw-num{display:flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .tw-num input{width:100%;border:0;padding:8px;background:transparent;}
+  .tw-num b{padding:0 8px;color:var(--text-dim);font-size:10.5px;font-style:normal;}
+  .tw-actions-row{display:flex;gap:8px;margin-bottom:10px;}
+  .tw-list{max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+  .tw-list label{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;}
+  .tw-list label:last-child{border-bottom:0;}
+  .tw-list label.checked{background:var(--accent-dim);}
+  .tw-list small{margin-left:auto;color:var(--text-dim);font-size:10px;}
+  .tw-radio-list label{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:12px;}
+  footer.tw-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);}
+  .tw-warn{background:var(--amber-bg);color:#8a5a09;padding:12px;border-radius:8px;margin-bottom:14px;font-size:12px;}
+  .tw-warn b{display:block;margin-bottom:2px;}
+  dl.tw-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin:0 0 14px;}
+  dl.tw-summary div{padding:10px;background:var(--card-2);border-radius:8px;}
+  dl.tw-summary dt{font-size:9.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+  dl.tw-summary dd{margin:0;font-weight:800;font-size:12px;}
+  .tw-run-summary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}
+  .tw-run-summary>div{padding:10px 14px;background:var(--card-2);border-radius:8px;}
+  .tw-run-summary span{display:block;font-size:9.5px;color:var(--text-dim);text-transform:uppercase;}
+  .tw-run-summary b{display:block;font-size:13px;}
+  .tw-live{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;}
+  .tw-panel-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .tw-panel-title h3{margin:0;font-size:12.5px;}
+  .live-badge{background:var(--green-bg);color:var(--green);font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:999px;}
+  .evt-log{list-style:none;margin:0;padding:0;border:1px solid var(--border);border-radius:8px;}
+  .evt-log li{padding:8px 10px;border-bottom:1px solid var(--border);font-size:11.5px;}
+  .evt-log li:last-child{border-bottom:0;}
+  .evt-log time{color:var(--text-dim);margin-right:8px;font-size:10px;}
+  .tw-result-banner{display:flex;align-items:center;gap:12px;background:var(--green-bg);border-radius:10px;padding:14px;margin-bottom:16px;}
+  .tw-result-banner i{width:36px;height:36px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:800;font-style:normal;}
+  .tw-result-banner h3{margin:0;font-size:13.5px;}
+  .tw-result-banner p{margin:2px 0 0;font-size:11.5px;color:var(--text-dim);}
+  .tw-result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:6px;}
+  .tw-result-grid div{padding:10px;background:var(--card-2);border-radius:8px;}
+  .tw-result-grid span{display:block;font-size:9.5px;color:var(--text-dim);text-transform:uppercase;}
+  .tw-result-grid b{display:block;font-size:13px;}
+
+  /* ---------- on-call ---------- */
+  .oncall-banner{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;padding:18px 22px;margin-bottom:18px;background:linear-gradient(135deg,var(--accent-dim),var(--card));}
+  .oncall-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:6px;}
+  .oncall-primary,.oncall-secondary{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;margin-bottom:3px;}
+  .oncall-secondary{font-size:12.5px;font-weight:700;color:var(--text-dim);}
+  .oncall-role{margin-left:4px;font-size:8.5px;font-weight:800;text-transform:uppercase;color:var(--text-dim);background:var(--card-2);padding:2px 7px;border-radius:999px;}
+  .oncall-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto;}
+  .oncall-dot.g{background:#22c55e;} .oncall-dot.a{background:#d97706;}
+  .oncall-stats{display:flex;gap:22px;}
+  .oncall-stat{text-align:center;}
+  .oncall-stat b{display:block;font-size:22px;}
+  .oncall-stat span{display:block;font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;}
+  tr.oncall-today{background:var(--accent-dim);}
+  .role-badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:800;background:var(--accent-dim);color:var(--accent);}
+  .role-badge.none{background:var(--card-2);color:var(--text-dim);}
+
+  /* ---------- calendar ---------- */
+  .cal-nav{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:14px;}
+  .cal-nav button{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--card-2);cursor:pointer;font-weight:800;font-size:14px;}
+  .cal-nav b{font-size:14px;min-width:120px;text-align:center;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .cal-dow{text-align:center;font-size:9.5px;font-weight:800;color:var(--text-dim);text-transform:uppercase;padding-bottom:4px;}
+  .cal-cell{min-height:76px;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--card);}
+  .cal-cell.outside{opacity:.35;}
+  .cal-cell.today{border-color:var(--accent);border-width:2px;}
+  .cal-day-num{font-size:10.5px;font-weight:800;color:var(--text-dim);}
+  .cal-event{margin-top:4px;padding:3px 5px;border-radius:5px;background:var(--card-2);font-size:9px;cursor:pointer;font-weight:700;text-transform:capitalize;}
+  .cal-event small{display:block;font-weight:600;color:var(--text-dim);text-transform:none;}
+
+  /* ---------- map ---------- */
+  .map-wrap{position:relative;height:420px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#e4edf9,#cfe0f2);border:1px solid var(--border);}
+  body.dark .map-wrap{background:linear-gradient(135deg,#0c1c33,#0a1526);}
+  .map-grid-lines{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:.6;}
+  .map-pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;text-align:center;}
+  .map-pin i{display:block;width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);margin:0 auto;box-shadow:0 3px 8px rgba(0,0,0,.3);}
+  .map-pin.g i{background:#22c55e;} .map-pin.r i{background:#ef4444;}
+  .map-pin b{display:inline-block;margin-top:4px;background:var(--card);border:1px solid var(--border);padding:2px 7px;border-radius:6px;font-size:9.5px;font-weight:800;white-space:nowrap;box-shadow:var(--shadow);}
+  .map-legend{position:absolute;left:16px;bottom:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;box-shadow:var(--shadow);}
+  .map-legend-item{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;margin-top:4px;}
+  .map-legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  /* ---------- analytics ---------- */
+  .an-intro{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;padding:16px 20px;margin-bottom:16px;}
+  .an-intro h2{margin:0 0 3px;font-size:14.5px;}
+  .an-intro p{margin:0;color:var(--text-dim);font-size:11.5px;}
+  .an-actions{display:flex;align-items:center;gap:10px;}
+
+  /* ---------- device manager ---------- */
+  .devices-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:900px){ .devices-grid{grid-template-columns:1fr;} }
+  .devices-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);}
+  .devices-panel-head h3{margin:0;font-size:12.5px;display:flex;align-items:center;gap:7px;}
+  .branch-tag{display:inline-block;padding:3px 8px;border-radius:6px;background:var(--card-2);border:1px solid var(--border);font-size:9.5px;font-weight:700;text-transform:capitalize;}
+  .device-row-actions{display:flex;gap:6px;justify-content:flex-end;}
+
+  /* ---------- generic form row ---------- */
+  .frm-row{margin-bottom:14px;}
+  .frm-row label{display:block;font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em;}
+  .frm-row input,.frm-row select{width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--card-2);color:var(--text);font:inherit;}
+
+  /* ---------- report chart ---------- */
+  .chart-bars{display:flex;align-items:flex-end;gap:3px;height:170px;padding:14px 12px 4px;}
+  .chart-bars i{flex:1;background:var(--border);border-radius:3px 3px 0 0;min-height:2px;position:relative;}
+  .chart-bars i.hi{background:var(--accent);}
+  .chart-thresh{position:relative;border-top:2px dashed var(--amber);margin:0 12px;}
+  .chart-thresh span{position:absolute;right:0;top:-16px;font-size:9px;color:var(--amber);font-weight:800;}
+
+  @media (max-width:900px){
+    .sidebar{position:fixed;left:-236px;top:0;bottom:0;z-index:60;transition:left .2s ease;}
+    .tw-live{grid-template-columns:1fr;}
+    .fp-elec{grid-template-columns:1fr;}
+    .cal-grid{grid-template-columns:repeat(7,minmax(60px,1fr));}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+'use strict';
+
+/* =========================================================================
+   MOCK DATA — entirely fictional, for demo purposes only. No live systems,
+   credentials, or network calls are involved anywhere in this file.
+   ========================================================================= */
+
+var DB = {
+  resellers: [
+    { id:'R1', name:'Vantage Power Partners', contact:'Morgan Ellis', email:'morgan.ellis@vantagepower.example', phone:'+1 555 010 4471' },
+    { id:'R2', name:'NorthGrid Energy Solutions', contact:'Priya Shah', email:'priya.shah@northgrid.example', phone:'+1 555 010 8823' }
+  ],
+  companies: [
+    { id:'C1', resellerId:'R1', name:'Meridian Health Network', address:'480 Riverside Ave, Springfield', x:26, y:38 },
+    { id:'C2', resellerId:'R1', name:'BlueRiver Data Centers', address:'12 Harbor Rd, Springfield', x:64, y:58 },
+    { id:'C3', resellerId:'R2', name:'Lakeside Manufacturing Co.', address:'900 Industrial Pkwy, Lakeside', x:80, y:24 }
+  ],
+  sites: [
+    { id:'S1', companyId:'C1', name:'Meridian General — Riverside Campus', address:'480 Riverside Ave', x:32, y:48 },
+    { id:'S2', companyId:'C1', name:'Meridian West — Uptown Campus', address:'22 Uptown Blvd', x:62, y:22 },
+    { id:'S3', companyId:'C2', name:'BlueRiver DC-1', address:'12 Harbor Rd', x:52, y:52 },
+    { id:'S4', companyId:'C3', name:'Lakeside Plant Floor', address:'900 Industrial Pkwy', x:44, y:60 }
+  ],
+  systems: [
+    { id:'SYS1', siteId:'S1', name:'Critical Power Block A', status:'normal',
+      generators:[
+        { id:'CPA-GEN-01', name:'CPA-GEN-01', make:'Cummins', model:'C1000D5', status:'RUNNING', fuel:80, hours:413.1, oilPsi:59, waterTemp:82, battV:27.6, vab:414, vbc:413, vca:415, ia:312, ib:309, ic:314, hz:50.02, kw:190, kva:224, pf:0.85, pct:24, ratedKw:1000 },
+        { id:'CPA-GEN-02', name:'CPA-GEN-02', make:'Cummins', model:'C1000D5', status:'RUNNING', fuel:76, hours:398.7, oilPsi:58, waterTemp:81, battV:27.5, vab:415, vbc:414, vca:413, ia:295, ib:293, ic:297, hz:50.01, kw:180, kva:212, pf:0.85, pct:23, ratedKw:1000 },
+        { id:'CPA-GEN-03', name:'CPA-GEN-03', make:'Kirloskar', model:'KG500WS', status:'READY', fuel:91, hours:205.6, oilPsi:0, waterTemp:27, battV:27.6, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0, kva:0, pf:0, pct:0, ratedKw:500 }
+      ],
+      ats:[
+        { id:'CPA-ATS-01', name:'CPA-ATS-01', branch:'critical', status:'EMERGENCY', connected:'GENERATOR', load:'ICU Block', utilAvail:false, genAvail:true, xfer:8, toe:612, vab:415, vbc:414, vca:416, ia:180, ib:178, ic:182, hz:50, kw:128 },
+        { id:'CPA-ATS-02', name:'CPA-ATS-02', branch:'life-safety', status:'READY', connected:'NORMAL', load:'Diagnostic Block', utilAvail:true, genAvail:true, xfer:9, toe:null, vab:415, vbc:415, vca:414, ia:95, ib:94, ic:96, hz:50, kw:68 },
+        { id:'CPA-ATS-03', name:'CPA-ATS-03', branch:'critical', status:'EMERGENCY', connected:'GENERATOR', load:'Emergency Dept Wing', utilAvail:false, genAvail:true, xfer:8, toe:598, vab:415, vbc:414, vca:415, ia:140, ib:139, ic:141, hz:50, kw:98 },
+        { id:'CPA-ATS-04', name:'CPA-ATS-04', branch:'life-safety', status:'READY', connected:'NORMAL', load:'Labor & Delivery', utilAvail:true, genAvail:true, xfer:9, toe:null, vab:416, vbc:415, vca:415, ia:110, ib:109, ic:111, hz:50, kw:77 },
+        { id:'CPA-ATS-05', name:'CPA-ATS-05', branch:'equipment', status:'EMERGENCY', connected:'GENERATOR', load:'General Ward Block', utilAvail:false, genAvail:true, xfer:10, toe:605, vab:414, vbc:415, vca:416, ia:205, ib:203, ic:207, hz:50, kw:145 }
+      ]
+    },
+    { id:'SYS2', siteId:'S1', name:'Emergency Department Annex', status:'normal',
+      generators:[
+        { id:'EDA-GEN-01', name:'EDA-GEN-01', make:'Cummins', model:'C550D5', status:'READY', fuel:85, hours:156.2, oilPsi:0, waterTemp:28, battV:27.5, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0, kva:0, pf:0, pct:0, ratedKw:550 }
+      ],
+      ats:[
+        { id:'EDA-ATS-01', name:'EDA-ATS-01', branch:'critical', status:'READY', connected:'NORMAL', load:'Trauma Bay', utilAvail:true, genAvail:true, xfer:8, toe:null, vab:415, vbc:414, vca:415, ia:88, ib:87, ic:89, hz:50, kw:61 },
+        { id:'EDA-ATS-02', name:'EDA-ATS-02', branch:'life-safety', status:'READY', connected:'NORMAL', load:'Imaging Suite', utilAvail:true, genAvail:true, xfer:9, toe:null, vab:415, vbc:416, vca:414, ia:132, ib:130, ic:133, hz:50, kw:93 }
+      ]
+    },
+    { id:'SYS3', siteId:'S2', name:'Uptown Outpatient Power', status:'normal',
+      generators:[
+        { id:'UOP-GEN-01', name:'UOP-GEN-01', make:'Kirloskar', model:'KG320WS', status:'READY', fuel:73, hours:98.4, oilPsi:0, waterTemp:26, battV:27.2, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0, kva:0, pf:0, pct:0, ratedKw:320 }
+      ],
+      ats:[
+        { id:'UOP-ATS-01', name:'UOP-ATS-01', branch:'equipment', status:'READY', connected:'NORMAL', load:'Outpatient Clinic', utilAvail:true, genAvail:true, xfer:9, toe:null, vab:413, vbc:414, vca:413, ia:76, ib:75, ic:77, hz:50, kw:52 },
+        { id:'UOP-ATS-02', name:'UOP-ATS-02', branch:'critical', status:'READY', connected:'NORMAL', load:'Pharmacy', utilAvail:true, genAvail:true, xfer:8, toe:null, vab:414, vbc:413, vca:415, ia:45, ib:44, ic:46, hz:50, kw:31 }
+      ]
+    },
+    { id:'SYS4', siteId:'S3', name:'DC-1 UPS & Generator Plant', status:'emergency',
+      generators:[
+        { id:'DC1-GEN-01', name:'DC1-GEN-01', make:'Cummins', model:'C2000D5', status:'RUNNING', fuel:76, hours:812.4, oilPsi:61, waterTemp:83, battV:27.6, vab:414, vbc:413, vca:415, ia:2255, ib:2250, ic:2260, hz:50.02, kw:1380, kva:1620, pf:0.85, pct:69, ratedKw:2000 },
+        { id:'DC1-GEN-02', name:'DC1-GEN-02', make:'Cummins', model:'C2000D5', status:'READY', fuel:88, hours:799.9, oilPsi:0, waterTemp:30, battV:27.4, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0, kva:0, pf:0, pct:0, ratedKw:2000 }
+      ],
+      ats:[
+        { id:'DC1-ATS-01', name:'DC1-ATS-01', branch:'critical', status:'EMERGENCY', connected:'GENERATOR', load:'Server Hall A', utilAvail:false, genAvail:true, xfer:9, toe:187, vab:414, vbc:413, vca:415, ia:1120, ib:1115, ic:1125, hz:50.02, kw:805 },
+        { id:'DC1-ATS-02', name:'DC1-ATS-02', branch:'critical', status:'READY', connected:'NORMAL', load:'Server Hall B', utilAvail:true, genAvail:true, xfer:9, toe:null, vab:415, vbc:414, vca:413, ia:640, ib:638, ic:642, hz:50, kw:455 },
+        { id:'DC1-ATS-03', name:'DC1-ATS-03', branch:'equipment', status:'READY', connected:'NORMAL', load:'Cooling Plant', utilAvail:true, genAvail:true, xfer:10, toe:null, vab:414, vbc:415, vca:414, ia:210, ib:208, ic:212, hz:50, kw:149 }
+      ]
+    },
+    { id:'SYS6', siteId:'S3', name:'Administration Block', status:'offline',
+      generators:[
+        { id:'ADM-GEN-01', name:'ADM-GEN-01', make:'Kirloskar', model:'KG125WS', status:'READY', fuel:64, hours:120.3, oilPsi:0, waterTemp:26, battV:27.1, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0, kva:0, pf:0, pct:0, ratedKw:125 }
+      ],
+      ats:[
+        { id:'ADM-ATS-01', name:'ADM-ATS-01', branch:'equipment', status:'READY', connected:'NORMAL', load:'Admin Offices', utilAvail:false, genAvail:true, xfer:9, toe:null, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0 }
+      ]
+    },
+    { id:'SYS5', siteId:'S4', name:'Plant Floor Power', status:'normal',
+      generators:[
+        { id:'PFP-GEN-01', name:'PFP-GEN-01', make:'Kirloskar', model:'KG500WS', status:'READY', fuel:80, hours:341.7, oilPsi:0, waterTemp:27, battV:27.3, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0, kva:0, pf:0, pct:0, ratedKw:500 }
+      ],
+      ats:[
+        { id:'PFP-ATS-01', name:'PFP-ATS-01', branch:'equipment', status:'READY', connected:'NORMAL', load:'Assembly Line 1', utilAvail:true, genAvail:true, xfer:9, toe:null, vab:413, vbc:414, vca:412, ia:310, ib:305, ic:312, hz:50, kw:220 },
+        { id:'PFP-ATS-02', name:'PFP-ATS-02', branch:'equipment', status:'READY', connected:'NORMAL', load:'Assembly Line 2', utilAvail:true, genAvail:true, xfer:9, toe:null, vab:412, vbc:413, vca:414, ia:265, ib:260, ic:268, hz:50, kw:188 }
+      ]
+    }
+  ],
+  alarms: [
+    { id:'A1', systemId:'SYS4', severity:'critical', message:'DC1-ATS-01 transferred to emergency — utility loss detected at Server Hall A', time:'3 min ago', status:'active', ackBy:null },
+    { id:'A2', systemId:'SYS4', severity:'warning', message:'DC1-GEN-02 fuel level below 30%', time:'22 min ago', status:'active', ackBy:null },
+    { id:'A7', systemId:'SYS1', severity:'critical', message:'CPA-ATS-01, CPA-ATS-03 and CPA-ATS-05 transferred to emergency — utility loss at Riverside Campus', time:'10 min ago', status:'active', ackBy:null },
+    { id:'A3', systemId:'SYS1', severity:'warning', message:'CPA-GEN-02 coolant temperature trending high', time:'1 hr ago', status:'active', ackBy:'J. Rivera' },
+    { id:'A4', systemId:'SYS1', severity:'info', message:'Scheduled load test completed successfully on CPA-ATS-03', time:'Yesterday, 14:20', status:'resolved', ackBy:'Auto' },
+    { id:'A5', systemId:'SYS3', severity:'info', message:'Monthly no-load generator test completed', time:'2 days ago', status:'resolved', ackBy:'Auto' },
+    { id:'A6', systemId:'SYS6', severity:'warning', message:'Administration Block gateway offline — no telemetry received', time:'41 min ago', status:'active', ackBy:null }
+  ],
+  users: [
+    { id:'U1', name:'Jordan Rivera', email:'j.rivera@meridianhealth.example', role:'company_admin', resellerId:null, companyId:'C1', scope:'Customer-wide' },
+    { id:'U2', name:'Casey Nolan', email:'c.nolan@meridianhealth.example', role:'system_operator', resellerId:null, companyId:'C1', scope:'Assigned systems' },
+    { id:'U3', name:'Riley Foster', email:'riley.foster@meridianhealth.example', role:null, resellerId:null, companyId:'C1', scope:'—' },
+    { id:'U4', name:'Sam Whitfield', email:'s.whitfield@blueriverdc.example', role:'company_admin', resellerId:null, companyId:'C2', scope:'Customer-wide' },
+    { id:'U5', name:'Alex Chen', email:'alex.chen@blueriverdc.example', role:'system_viewer', resellerId:null, companyId:'C2', scope:'Assigned systems' },
+    { id:'U6', name:'Taylor Brooks', email:'t.brooks@lakesidemfg.example', role:'company_admin', resellerId:null, companyId:'C3', scope:'Customer-wide' },
+    { id:'U7', name:'Morgan Ellis', email:'morgan.ellis@vantagepower.example', role:'reseller_admin', resellerId:'R1', companyId:null, scope:'Reseller-wide' },
+    { id:'U8', name:'Priya Shah', email:'priya.shah@northgrid.example', role:'reseller_admin', resellerId:'R2', companyId:null, scope:'Reseller-wide' },
+    { id:'U9', name:'Dana Ortiz', email:'dana.ortiz@yourcompany.example', role:'superadmin', resellerId:null, companyId:null, scope:'Platform-wide' }
+  ],
+  oncallShifts: [
+    { id:'OC1', companyId:'C1', day:'Monday', date:'2026-08-31', primary:'Jordan Rivera', secondary:'Casey Nolan', shift:'24h' },
+    { id:'OC2', companyId:'C1', day:'Tuesday', date:'2026-09-01', primary:'Casey Nolan', secondary:'Jordan Rivera', shift:'24h' },
+    { id:'OC3', companyId:'C1', day:'Wednesday', date:'2026-09-02', primary:'Jordan Rivera', secondary:'Riley Foster', shift:'Day (8a-8p)' },
+    { id:'OC4', companyId:'C1', day:'Thursday', date:'2026-09-03', primary:'Riley Foster', secondary:'Jordan Rivera', shift:'24h' },
+    { id:'OC5', companyId:'C1', day:'Friday', date:'2026-09-04', primary:'Jordan Rivera', secondary:'Casey Nolan', shift:'24h' },
+    { id:'OC6', companyId:'C1', day:'Saturday', date:'2026-09-05', primary:'Casey Nolan', secondary:'—', shift:'24h' },
+    { id:'OC7', companyId:'C1', day:'Sunday', date:'2026-09-06', primary:'Riley Foster', secondary:'Jordan Rivera', shift:'24h' },
+    { id:'OC8', companyId:'C2', day:'Tuesday', date:'2026-09-01', primary:'Sam Whitfield', secondary:'Alex Chen', shift:'24h' },
+    { id:'OC9', companyId:'C2', day:'Wednesday', date:'2026-09-02', primary:'Alex Chen', secondary:'Sam Whitfield', shift:'24h' }
+  ],
+  reports: [
+    { id:'RPT1', code:'RPT-2026-0142', companyId:'C1', systemId:'SYS1', type:'test', date:'2026-08-25', time:'14:20', initiatingAts:'CPA-ATS-03', durationLabel:'35 min', durationMin:35, ratedKw:1000, peakKw:640, avgKw:512, loadProfile:[0,180,420,580,640,610,590,560,520,480,300,0] },
+    { id:'RPT2', code:'RPT-2026-0139', companyId:'C1', systemId:'SYS1', type:'gen-run', date:'2026-08-18', time:'09:05', initiatingAts:null, durationLabel:'12 min', durationMin:12, ratedKw:1000, peakKw:60, avgKw:40, loadProfile:[0,20,55,60,58,50,40,30,20,10,0] },
+    { id:'RPT3', code:'RPT-2026-0131', companyId:'C1', systemId:'SYS2', type:'test', date:'2026-08-11', time:'10:00', initiatingAts:'EDA-ATS-01', durationLabel:'30 min', durationMin:30, ratedKw:550, peakKw:310, avgKw:265, loadProfile:[0,120,260,310,300,290,270,250,210,150,60,0] },
+    { id:'RPT4', code:'RPT-2026-0128', companyId:'C1', systemId:'SYS1', type:'test', date:'2026-09-01', time:'08:15', initiatingAts:'CPA-ATS-01', durationLabel:'35 min', durationMin:35, ratedKw:1000, peakKw:610, avgKw:498, loadProfile:[0,160,400,560,610,590,570,540,500,460,280,0] },
+    { id:'RPT5', code:'RPT-2026-0151', companyId:'C2', systemId:'SYS4', type:'ats-emergency', date:'2026-08-29', time:'02:14', initiatingAts:'DC1-ATS-01', durationLabel:'3h 07m', durationMin:187, ratedKw:2000, peakKw:1420, avgKw:1180, loadProfile:[0,600,980,1180,1420,1350,1300,1250,1180,1100,900,400,0] },
+    { id:'RPT6', code:'RPT-2026-0119', companyId:'C2', systemId:'SYS4', type:'test', date:'2026-08-04', time:'13:30', initiatingAts:'DC1-ATS-02', durationLabel:'40 min', durationMin:40, ratedKw:2000, peakKw:820, avgKw:700, loadProfile:[0,300,600,780,820,790,760,700,640,500,220,0] }
+  ]
+};
+
+var ROLES = [
+  { value:'superadmin', label:'Superadmin' },
+  { value:'reseller_admin', label:'Reseller Admin' },
+  { value:'company_admin', label:'Customer Admin' },
+  { value:'system_operator', label:'System Operator' },
+  { value:'system_viewer', label:'System Viewer' }
+];
+var SHIFT_TYPES = ['24h','Day (8a-8p)','Night (8p-8a)'];
+var DEMO_ROLES = [
+  { value:'superadmin', label:'Super Admin', desc:'Full platform — all resellers & customers' },
+  { value:'admin', label:'Admin', desc:'Manage one customer — sites, users, reports' },
+  { value:'operator', label:'Operator', desc:'Operate & monitor systems day to day' }
+];
+var TODAY_ISO = '2026-09-01';
+var REPORT_TYPE_LABEL = { 'gen-run':'Generator Run', 'ats-emergency':'ATS Emergency', 'test':'Test' };
+
+/* ---------------------------- state ---------------------------- */
+var state = {
+  authed:false,
+  page:'dashboard',
+  scope:null,          // {level:'reseller'|'company', resellerId, companyId, siteId}
+  systemId:null,
+  systemTab:'details',
+  placeholderTitle:'',
+  modal:null,           // {kind:'faceplate'|'test'|'shift'|'user'|'report', ...}
+  wizard:null,
+  analyticsView:'System overview',
+  reportsTab:'calendar',
+  calMonth:8, calYear:2026,       // September 2026 (0-indexed month)
+  shiftForm:null,
+  userForm:null,
+  atsForm:null,
+  genForm:null,
+  role:'superadmin',
+  userMenuOpen:false
+};
+
+/* ---------------------------- helpers ---------------------------- */
+function byId(arr,id){ for(var i=0;i<arr.length;i++){ if(arr[i].id===id) return arr[i]; } return null; }
+function companiesOfReseller(rid){ return DB.companies.filter(function(c){return c.resellerId===rid;}); }
+function sitesOfCompany(cid){ return DB.sites.filter(function(s){return s.companyId===cid;}); }
+function systemsOfSite(sid){ return DB.systems.filter(function(s){return s.siteId===sid;}); }
+function systemsOfCompany(cid){ var siteIds=sitesOfCompany(cid).map(function(s){return s.id;}); return DB.systems.filter(function(s){return siteIds.indexOf(s.siteId)>-1;}); }
+function systemsOfReseller(rid){ var cids=companiesOfReseller(rid).map(function(c){return c.id;}); var out=[]; cids.forEach(function(cid){ out=out.concat(systemsOfCompany(cid)); }); return out; }
+function siteOf(system){ return byId(DB.sites, system.siteId); }
+function companyOf(system){ return byId(DB.companies, siteOf(system).companyId); }
+function resellerOf(company){ return company.resellerId ? byId(DB.resellers, company.resellerId) : null; }
+function alarmsFor(systemIds){ return DB.alarms.filter(function(a){ return systemIds.indexOf(a.systemId)>-1; }); }
+function fmtHMS(sec){ if(sec===null||sec===undefined) return '—'; var m=Math.floor(sec/60), s=sec%60; return m+'m '+s+'s'; }
+function pad2(n){ n=Math.floor(n); return (n<10?'0':'')+n; }
+
+/* ---------------------------- navigation ---------------------------- */
+function goDashboard(){ state.page='dashboard'; state.scope=null; closeModal(true); render(); }
+function goResellers(){ state.page='resellers'; state.scope=null; closeModal(true); render(); }
+function goCompaniesAll(){ state.page='companies-all'; state.scope=null; closeModal(true); render(); }
+function goReseller(id){ state.page='reseller'; state.scope={level:'reseller', resellerId:id}; closeModal(true); render(); }
+function goCompany(id){
+  var company = byId(DB.companies, id);
+  state.page='company';
+  state.scope={level:'company', resellerId:company.resellerId, companyId:id, siteId:null};
+  closeModal(true); render();
+}
+function goSite(id){
+  if(state.role==='operator' && scopedSystemsOfSite(id).length===0) id='S1';
+  var site = byId(DB.sites, id);
+  state.page='site';
+  state.scope={level:'company', resellerId: byId(DB.companies, site.companyId).resellerId, companyId: site.companyId, siteId:id};
+  closeModal(true); render();
+}
+function openSystem(id){
+  if(!isSystemVisible(id)) id=OPERATOR_SYSTEM_ID;
+  var system = byId(DB.systems, id);
+  var site = siteOf(system), company = companyOf(system);
+  state.page='system'; state.systemId=id; state.systemTab='details';
+  state.scope={level:'company', resellerId: company.resellerId, companyId: company.id, siteId: site.id};
+  closeModal(true); render();
+}
+function setSystemTab(tab){ state.systemTab=tab; render(); }
+function goAlarms(){ state.page='alarms'; closeModal(true); render(); }
+function openPlaceholder(title){ state.page='placeholder'; state.placeholderTitle=title; closeModal(true); render(); }
+function goMapView(){ state.page='map'; closeModal(true); render(); }
+function goOnCall(){ state.page='oncall'; closeModal(true); render(); }
+function goAnalytics(){ state.page='analytics'; state.analyticsView='System overview'; closeModal(true); render(); }
+function setAnalyticsView(v){ state.analyticsView=v; render(); }
+function goUsers(){ state.page='users'; closeModal(true); render(); }
+function goReports(){ state.page='reports'; state.reportsTab='calendar'; closeModal(true); render(); }
+function setReportsTab(t){ state.reportsTab=t; render(); }
+function goSettings(){ state.page='settings'; closeModal(true); render(); }
+function calPrev(){ if(state.calMonth===0){ state.calMonth=11; state.calYear--; } else state.calMonth--; render(); }
+function calNext(){ if(state.calMonth===11){ state.calMonth=0; state.calYear++; } else state.calMonth++; render(); }
+
+function closeModal(skipRender){ state.modal=null; state.wizard=null; if(!skipRender) render(); }
+
+/* ---------------------------- auth / theme ---------------------------- */
+function setLoginRole(v){ state.role=v; render(); }
+function login(){
+  state.authed=true;
+  if(state.role==='superadmin'){ state.page='dashboard'; state.scope=null; }
+  else { state.page='company'; state.scope={level:'company', resellerId:'R1', companyId:'C1', siteId:null}; }
+  render();
+}
+function logout(){ state.authed=false; state.page='dashboard'; state.scope=null; state.userMenuOpen=false; closeModal(true); render(); }
+function toggleDark(){ document.body.classList.toggle('dark'); }
+function toggleUserMenu(){ state.userMenuOpen=!state.userMenuOpen; render(); }
+function roleDef(){ for(var i=0;i<DEMO_ROLES.length;i++){ if(DEMO_ROLES[i].value===state.role) return DEMO_ROLES[i]; } return DEMO_ROLES[0]; }
+function canManage(){ return state.role!=='operator'; }
+function canManageDevices(){ return state.role==='superadmin'; }
+
+/* Operator persona is scoped to a single system for this demo, matching the
+   real app's "assigned systems" access model (see PlatformUsers scope picker). */
+var OPERATOR_SYSTEM_ID = 'SYS1';
+function isSystemVisible(sysId){ return state.role!=='operator' || sysId===OPERATOR_SYSTEM_ID; }
+function scopedSystemsOfCompany(companyId){ return systemsOfCompany(companyId).filter(function(sy){return isSystemVisible(sy.id);}); }
+function scopedSystemsOfSite(siteId){ return systemsOfSite(siteId).filter(function(sy){return isSystemVisible(sy.id);}); }
+function scopedSitesOfCompany(companyId){
+  var sites=sitesOfCompany(companyId);
+  if(state.role!=='operator') return sites;
+  return sites.filter(function(s){ return scopedSystemsOfSite(s.id).length>0; });
+}
+function canLeaveScope(){ return state.role==='superadmin'; }
+
+/* ---------------------------- faceplate modal ---------------------------- */
+function openFaceplate(systemId, kind, id){
+  state.modal={kind:'faceplate', systemId:systemId, type:kind, id:id};
+  render();
+}
+
+/* ---------------------------- standalone one-line modal ---------------------------- */
+function openSldModal(systemId){
+  state.modal={kind:'sld', systemId:systemId};
+  render();
+}
+
+/* ---------------------------- test wizard ---------------------------- */
+function openTestWizard(systemId, type, id){
+  var sys = byId(DB.systems, systemId);
+  state.wizard = {
+    systemId: systemId,
+    step:'setup',
+    testType: type==='ats' ? 'load' : 'no-load',
+    duration:35, startDelay:2, blockSize:2, blockDelay:10,
+    atsIds: type==='ats' ? [id] : sys.ats.map(function(a){return a.id;}),
+    genIds: type==='generator' ? [id] : sys.generators.map(function(g){return g.id;}),
+    initiatingAtsId: type==='ats' ? id : (sys.ats[0] ? sys.ats[0].id : ''),
+    elapsed:0
+  };
+  state.modal={kind:'test'};
+  render();
+}
+function wizardSetType(t){ state.wizard.testType=t; render(); }
+function wizardSetNum(field, val){ state.wizard[field]=Math.max(field==='startDelay'||field==='blockDelay'?0:1, Number(val)||0); render(); }
+function wizardToggleAts(id){
+  var w=state.wizard; var i=w.atsIds.indexOf(id);
+  if(i>-1) w.atsIds.splice(i,1); else w.atsIds.push(id);
+  if(w.initiatingAtsId===id && i>-1) w.initiatingAtsId='';
+  render();
+}
+function wizardToggleGen(id){
+  var w=state.wizard; var i=w.genIds.indexOf(id);
+  if(i>-1) w.genIds.splice(i,1); else w.genIds.push(id);
+  render();
+}
+function wizardSelectAllAts(){ state.wizard.atsIds = byId(DB.systems, state.wizard.systemId).ats.map(function(a){return a.id;}); render(); }
+function wizardClearAts(){ state.wizard.atsIds=[]; state.wizard.initiatingAtsId=''; render(); }
+function wizardSelectAllGen(){ state.wizard.genIds = byId(DB.systems, state.wizard.systemId).generators.map(function(g){return g.id;}); render(); }
+function wizardClearGen(){ state.wizard.genIds=[]; render(); }
+function wizardSetInitiating(id){ state.wizard.initiatingAtsId=id; render(); }
+function wizardGoStep(step){ state.wizard.step=step; render(); }
+function wizardBegin(){ state.wizard.elapsed=0; state.wizard.step='monitor'; render(); }
+function wizardAdvance(){ var w=state.wizard; w.elapsed=Math.min(w.duration*60, w.elapsed+60); render(); }
+function wizardFinish(){ state.wizard.step='result'; render(); }
+
+/* ---------------------------- on-call shift modal ---------------------------- */
+function openShiftEdit(id){
+  var companyId = state.scope.companyId;
+  if(id){
+    var s = byId(DB.oncallShifts, id);
+    state.shiftForm = { id:s.id, companyId:companyId, day:s.day, date:s.date, primary:s.primary, secondary:s.secondary, shift:s.shift };
+  } else {
+    state.shiftForm = { id:null, companyId:companyId, day:'', date:'', primary:'', secondary:'', shift:'24h' };
+  }
+  state.modal = { kind:'shift' };
+  render();
+}
+function shiftField(field, val){ state.shiftForm[field]=val; render(); }
+function saveShift(){
+  var f = state.shiftForm;
+  if(!f.date || !f.primary.trim()) return;
+  if(f.id){
+    var s = byId(DB.oncallShifts, f.id);
+    s.day=f.day; s.date=f.date; s.primary=f.primary; s.secondary=f.secondary; s.shift=f.shift;
+  } else {
+    DB.oncallShifts.push({ id:'OC'+(DB.oncallShifts.length+1)+Math.floor(Math.random()*1000), companyId:f.companyId, day:f.day, date:f.date, primary:f.primary, secondary:f.secondary, shift:f.shift });
+  }
+  closeModal();
+}
+function deleteShift(id){
+  var i = DB.oncallShifts.findIndex(function(s){return s.id===id;});
+  if(i>-1) DB.oncallShifts.splice(i,1);
+  render();
+}
+
+/* ---------------------------- user role modal ---------------------------- */
+function openUserEdit(id){
+  var u = byId(DB.users, id);
+  state.userForm = { id:u.id, role:u.role||'' };
+  state.modal = { kind:'user' };
+  render();
+}
+function userFormSetRole(v){ state.userForm.role=v; render(); }
+function saveUserRole(){
+  var f = state.userForm;
+  if(!f.role) return;
+  var u = byId(DB.users, f.id);
+  u.role = f.role;
+  closeModal();
+}
+
+/* ---------------------------- report modal ---------------------------- */
+function openReport(id){ state.modal={kind:'report', id:id}; render(); }
+
+/* ---------------------------- device manager: ATS ---------------------------- */
+function openNewAts(systemId){
+  state.atsForm={ id:null, systemId:systemId, name:'', manufacturer:'', model:'', serial:'', branch:'equipment', ratedAmps:'', ratedVolts:'' };
+  state.modal={kind:'ats-form'};
+  render();
+}
+function openEditAts(systemId, id){
+  var sys=byId(DB.systems, systemId), a=byId(sys.ats, id);
+  state.atsForm={ id:id, systemId:systemId, name:a.name, manufacturer:a.manufacturer||'', model:a.model||'', serial:a.serial||'', branch:a.branch, ratedAmps:a.ratedAmps||'', ratedVolts:a.ratedVolts||'' };
+  state.modal={kind:'ats-form'};
+  render();
+}
+function atsFormField(field, val){ state.atsForm[field]=val; render(); }
+function saveAtsForm(){
+  var f=state.atsForm;
+  if(!f.name.trim()) return;
+  var sys=byId(DB.systems, f.systemId);
+  if(f.id){
+    var a=byId(sys.ats, f.id);
+    a.name=f.name; a.branch=f.branch; a.manufacturer=f.manufacturer||undefined; a.model=f.model||undefined; a.serial=f.serial||undefined;
+    a.ratedAmps=f.ratedAmps?Number(f.ratedAmps):undefined; a.ratedVolts=f.ratedVolts?Number(f.ratedVolts):undefined;
+  } else {
+    sys.ats.push({
+      id: sys.id+'-ATS-'+Math.floor(Math.random()*9000+1000), name:f.name, branch:f.branch,
+      status:'READY', connected:'NORMAL', load:'Unassigned Load', utilAvail:true, genAvail:true, xfer:9, toe:null,
+      vab:415, vbc:415, vca:415, ia:0, ib:0, ic:0, hz:50, kw:0,
+      manufacturer:f.manufacturer||undefined, model:f.model||undefined, serial:f.serial||undefined,
+      ratedAmps:f.ratedAmps?Number(f.ratedAmps):undefined, ratedVolts:f.ratedVolts?Number(f.ratedVolts):undefined
+    });
+  }
+  closeModal();
+}
+function deleteAtsItem(systemId, id){
+  if(!confirm('Delete this ATS unit?')) return;
+  var sys=byId(DB.systems, systemId);
+  var i=sys.ats.findIndex(function(a){return a.id===id;});
+  if(i>-1) sys.ats.splice(i,1);
+  render();
+}
+
+/* ---------------------------- device manager: generators ---------------------------- */
+function openNewGen(systemId){
+  state.genForm={ id:null, systemId:systemId, name:'', make:'', model:'', serial:'', ratedVolts:'', ratedAmps:'', ratedKw:'' };
+  state.modal={kind:'gen-form'};
+  render();
+}
+function openEditGen(systemId, id){
+  var sys=byId(DB.systems, systemId), g=byId(sys.generators, id);
+  state.genForm={ id:id, systemId:systemId, name:g.name, make:g.make||'', model:g.model||'', serial:g.serial||'', ratedVolts:g.ratedVolts||'', ratedAmps:g.ratedAmps||'', ratedKw:g.ratedKw||'' };
+  state.modal={kind:'gen-form'};
+  render();
+}
+function genFormField(field, val){ state.genForm[field]=val; render(); }
+function saveGenForm(){
+  var f=state.genForm;
+  if(!f.name.trim()) return;
+  var sys=byId(DB.systems, f.systemId);
+  if(f.id){
+    var g=byId(sys.generators, f.id);
+    g.name=f.name; g.make=f.make||undefined; g.model=f.model||undefined; g.serial=f.serial||undefined;
+    g.ratedVolts=f.ratedVolts?Number(f.ratedVolts):undefined; g.ratedAmps=f.ratedAmps?Number(f.ratedAmps):undefined; g.ratedKw=f.ratedKw?Number(f.ratedKw):undefined;
+  } else {
+    sys.generators.push({
+      id: sys.id+'-GEN-'+Math.floor(Math.random()*9000+1000), name:f.name, make:f.make||undefined, model:f.model||undefined, serial:f.serial||undefined,
+      status:'READY', fuel:100, hours:0, oilPsi:0, waterTemp:25, battV:27.5, vab:0, vbc:0, vca:0, ia:0, ib:0, ic:0, hz:0, kw:0, kva:0, pf:0, pct:0,
+      ratedVolts:f.ratedVolts?Number(f.ratedVolts):undefined, ratedAmps:f.ratedAmps?Number(f.ratedAmps):undefined, ratedKw:f.ratedKw?Number(f.ratedKw):undefined
+    });
+  }
+  closeModal();
+}
+function deleteGenItem(systemId, id){
+  if(!confirm('Delete this generator?')) return;
+  var sys=byId(DB.systems, systemId);
+  var i=sys.generators.findIndex(function(g){return g.id===id;});
+  if(i>-1) sys.generators.splice(i,1);
+  render();
+}
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+function render(){
+  var root=document.getElementById('root');
+  if(!state.authed){ root.innerHTML = loginScreen(); return; }
+  root.innerHTML = shell() + (state.modal ? modalHtml() : '');
+}
+
+function loginScreen(){
+  var html='' +
+  '<div class="login-wrap"><div class="login-card">' +
+    '<div class="login-logo"><i>CPC</i><div><b>Critical Power Command</b><span>Solution 61</span></div></div>' +
+    '<h1>Welcome back</h1><p>Sign in to view your emergency power fleet.</p>' +
+    '<div class="login-field"><label>Email</label><input type="text" value="demo@yourcompany.com" readonly></div>' +
+    '<div class="login-field"><label>Password</label><input type="password" value="demopassword"></div>';
+  html+='<div class="login-field"><label>Demo role</label><div class="login-role-group">';
+  DEMO_ROLES.forEach(function(r){
+    html+='<div class="login-role-pill'+(state.role===r.value?' sel':'')+'" onclick="setLoginRole(\''+r.value+'\')"><b>'+r.label+'</b><span>'+r.desc+'</span></div>';
+  });
+  html+='</div></div>';
+  html+='<button class="login-btn" onclick="login()">Continue to Demo</button>' +
+    '<div class="login-note">This is an offline demo build with sample data only. Nothing typed here is sent anywhere.</div>' +
+    '<span class="login-badge">Demo build · Sample data</span>' +
+  '</div></div>';
+  return html;
+}
+
+function shell(){
+  return '' +
+  '<div class="shell">' +
+    '<div class="sidebar">' +
+      '<div class="sidebar-header"><i>CPC</i><div class="sidebar-brand"><b>CPC</b><span>Critical Power Command</span></div></div>' +
+      '<div class="sidebar-nav">' + sidebarNav() + '</div>' +
+      '<div class="sidebar-footer">Demo build · Sample data only<br>v1.0 offline preview</div>' +
+    '</div>' +
+    '<div class="main">' + topbar() + '<div class="content">' + pageContent() + '</div></div>' +
+  '</div>';
+}
+
+function navItem(icon,label,active,onclick,badge){
+  return '<div class="nav-item'+(active?' active':'')+'" onclick="'+onclick+'"><span class="ico">'+icon+'</span>'+label+(badge?'<span class="nav-badge">'+badge+'</span>':'')+'</div>';
+}
+
+function sidebarNav(){
+  var scope=state.scope;
+  if(scope && scope.level==='company'){
+    var company=byId(DB.companies, scope.companyId);
+    var reseller=resellerOf(company);
+    var sites=scopedSitesOfCompany(company.id);
+    var activeSiteId=scope.siteId;
+    var systems= activeSiteId ? scopedSystemsOfSite(activeSiteId) : [];
+    var active=alarmsFor(scopedSystemsOfCompany(company.id).map(function(s){return s.id;})).filter(function(a){return a.status==='active';});
+    var html='';
+    if(canLeaveScope()){
+      html+='<div class="scope-header" onclick="'+(reseller?"goReseller('"+reseller.id+"')":"goDashboard()")+'">&larr; '+(reseller?reseller.name:'Dashboard')+'</div>';
+    }
+    html+='<div class="scope-title">'+company.name+'</div><div class="scope-sub">'+company.address+'</div>';
+    html+='<div class="nav-section"><div class="nav-label">Overview</div>';
+    html+=navItem('&#128202;','Dashboard', state.page==='company', "goCompany('"+company.id+"')");
+    html+=navItem('&#128506;','Map View', state.page==='map', "goMapView()");
+    html+='</div>';
+    html+='<div class="nav-section"><div class="nav-label">'+(activeSiteId?'Systems':'Sites')+'</div>';
+    if(activeSiteId){
+      systems.forEach(function(sy){
+        var syStatus=systemStats(sy).effectiveStatus;
+        html+='<div class="nav-item sub'+(state.systemId===sy.id?' active':'')+'" onclick="openSystem(\''+sy.id+'\')"><span class="dot '+(syStatus==='normal'?'g':syStatus==='offline'?'n':'r')+'"></span>'+sy.name+'</div>';
+      });
+    } else {
+      sites.forEach(function(s){
+        html+='<div class="nav-item sub" onclick="goSite(\''+s.id+'\')"><span class="dot g"></span>'+s.name+'</div>';
+      });
+    }
+    html+='</div>';
+    html+='<div class="nav-section"><div class="nav-label">Monitoring</div>';
+    html+=navItem('&#128276;','Alarms', state.page==='alarms', "goAlarms()", active.length||null);
+    html+=navItem('&#128222;','On-Call', state.page==='oncall', "goOnCall()");
+    html+=navItem('&#128200;','Analytics', state.page==='analytics', "goAnalytics()");
+    html+='</div>';
+    if(canManage()){
+      html+='<div class="nav-section"><div class="nav-label">Administration</div>';
+      html+=navItem('&#128101;','Users', state.page==='users', "goUsers()");
+      html+=navItem('&#128196;','Reports', state.page==='reports', "goReports()");
+      html+='</div>';
+    }
+    return html;
+  }
+  if(scope && scope.level==='reseller'){
+    var r=byId(DB.resellers, scope.resellerId);
+    var alarmsR=alarmsFor(systemsOfReseller(r.id).map(function(s){return s.id;})).filter(function(a){return a.status==='active';});
+    var html2='';
+    html2+='<div class="scope-header" onclick="goResellers()">&larr; All Resellers</div>';
+    html2+='<div class="scope-title">'+r.name+'</div><div class="scope-sub">Reseller Context</div>';
+    html2+='<div class="nav-section"><div class="nav-label">Overview</div>';
+    html2+=navItem('&#128202;','Dashboard', state.page==='reseller', "goReseller('"+r.id+"')");
+    html2+=navItem('&#128506;','Map View', state.page==='map', "goMapView()");
+    html2+='</div>';
+    html2+='<div class="nav-section"><div class="nav-label">Portfolio</div>';
+    html2+=navItem('&#127970;','Customers', state.page==='reseller', "goReseller('"+r.id+"')");
+    html2+=navItem('&#128101;','Users', state.page==='users', "goUsers()");
+    html2+='</div>';
+    html2+='<div class="nav-section"><div class="nav-label">Monitoring</div>';
+    html2+=navItem('&#128276;','Alarms', state.page==='alarms', "goAlarms()", alarmsR.length||null);
+    html2+='</div>';
+    return html2;
+  }
+  var html3='';
+  html3+='<div class="nav-section"><div class="nav-label">Overview</div>';
+  html3+=navItem('&#128202;','Dashboard', state.page==='dashboard', "goDashboard()");
+  html3+=navItem('&#128506;','Map View', state.page==='map', "goMapView()");
+  html3+='</div>';
+  html3+='<div class="nav-section"><div class="nav-label">Hierarchy</div>';
+  html3+=navItem('&#129513;','Resellers', state.page==='resellers', "goResellers()");
+  html3+=navItem('&#127970;','Customers', state.page==='companies-all', "goCompaniesAll()");
+  html3+='</div>';
+  var allActive = DB.alarms.filter(function(a){return a.status==='active';});
+  html3+='<div class="nav-section"><div class="nav-label">Monitoring</div>';
+  html3+=navItem('&#128276;','All Alarms', state.page==='alarms', "goAlarms()", allActive.length||null);
+  html3+=navItem('&#128200;','Analytics', state.page==='analytics', "goAnalytics()");
+  html3+='</div>';
+  html3+='<div class="nav-section"><div class="nav-label">Platform</div>';
+  html3+=navItem('&#128101;','Users', state.page==='users', "goUsers()");
+  html3+=navItem('&#9881;','Settings', state.page==='settings', "goSettings()");
+  html3+='</div>';
+  return html3;
+}
+
+function scopeCrumbItems(){
+  var items=[]; var scope=state.scope;
+  if(scope && scope.level==='company'){
+    var c=byId(DB.companies, scope.companyId); var res=resellerOf(c);
+    if(res && canLeaveScope()) items.push({label:res.name, fn:"goReseller('"+res.id+"')"});
+    items.push({label:c.name, fn:"goCompany('"+c.id+"')"});
+  } else if(scope && scope.level==='reseller'){
+    var r=byId(DB.resellers, scope.resellerId);
+    items.push({label:r.name, fn:"goReseller('"+r.id+"')"});
+  }
+  return items;
+}
+
+function crumb(items){
+  var html='<div class="breadcrumb">';
+  items.forEach(function(it,i){
+    html+='<span class="link" onclick="'+it.fn+'">'+it.label+'</span><span class="sep">&rsaquo;</span>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function topbar(){
+  var title='Dashboard', sub='Welcome back — here is your fleet at a glance.', bc='';
+  if(state.page==='resellers'){ title='Resellers'; sub='View and manage reseller partners across your organization.'; }
+  else if(state.page==='companies-all'){ title='Customers'; sub='View and manage all customers across your organization.'; }
+  else if(state.page==='reseller'){
+    var r=byId(DB.resellers, state.scope.resellerId);
+    title=r.name; sub='Reseller performance overview.';
+    bc=crumb([{label:'All Resellers', fn:'goResellers()'}]);
+  }
+  else if(state.page==='company'){
+    var c=byId(DB.companies, state.scope.companyId); var res=resellerOf(c);
+    title=c.name; sub='Customer sites and system status.';
+    var items=[]; if(res && canLeaveScope()) items.push({label:res.name, fn:"goReseller('"+res.id+"')"});
+    bc=crumb(items);
+  }
+  else if(state.page==='site'){
+    var site=byId(DB.sites, state.scope.siteId); var comp=byId(DB.companies, site.companyId); var res2=resellerOf(comp);
+    title=site.name; sub='Emergency power systems installed at this site.';
+    var items2=[]; if(res2 && canLeaveScope()) items2.push({label:res2.name, fn:"goReseller('"+res2.id+"')"});
+    items2.push({label:comp.name, fn:"goCompany('"+comp.id+"')"});
+    bc=crumb(items2);
+  }
+  else if(state.page==='system'){
+    var sys=byId(DB.systems, state.systemId); var st=siteOf(sys); var co=companyOf(sys); var res3=resellerOf(co);
+    title=sys.name; sub='Utility, generator and transfer-switch status.';
+    var items3=[]; if(res3 && canLeaveScope()) items3.push({label:res3.name, fn:"goReseller('"+res3.id+"')"});
+    items3.push({label:co.name, fn:"goCompany('"+co.id+"')"});
+    items3.push({label:st.name, fn:"goSite('"+st.id+"')"});
+    bc=crumb(items3);
+  }
+  else if(state.page==='alarms'){ title='Alarms'; sub='Review active events and power-system alerts.'; }
+  else if(state.page==='map'){ title='Map View'; sub='Facility locations and live power status.'; bc=crumb(scopeCrumbItems()); }
+  else if(state.page==='oncall'){ title='Alert Management'; sub='On-call rotation and pending acknowledgements.'; bc=crumb(scopeCrumbItems()); }
+  else if(state.page==='analytics'){ title='Analytics'; sub='Live telemetry across monitored equipment.'; bc=crumb(scopeCrumbItems()); }
+  else if(state.page==='users'){ title=state.scope?'Users':'Platform Users'; sub='Manage accounts and role-based access.'; bc=crumb(scopeCrumbItems()); }
+  else if(state.page==='reports'){ title='Reports'; sub='Generator run, ATS emergency and test event reports.'; bc=crumb(scopeCrumbItems()); }
+  else if(state.page==='settings'){ title='Platform Settings'; sub='Integration and platform configuration.'; }
+  else if(state.page==='placeholder'){ title=state.placeholderTitle; sub='This section is part of the full CPC platform.'; }
+
+  var role=roleDef();
+  var initials=role.label.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+  var userMenu='<div class="user-menu-wrap">' +
+    '<div class="user-chip" onclick="toggleUserMenu()"><div class="av">'+initials+'</div><div><b>'+role.label+'</b><small>Demo persona</small></div></div>';
+  if(state.userMenuOpen){
+    userMenu+='<div class="user-menu">' +
+      '<div class="user-menu-role">Signed in as<b>'+role.label+'</b></div>' +
+      '<button class="user-menu-item" onclick="logout()">&#8630; Log out</button>' +
+    '</div>';
+  }
+  userMenu+='</div>';
+
+  return '' +
+  '<div class="topbar"><div>' + bc +
+    '<div class="page-title">'+title+'</div><div class="page-sub">'+sub+'</div>' +
+  '</div>' +
+  '<div class="topbar-right">' +
+    '<span class="demo-pill">&#9679; Demo mode</span>' +
+    '<div class="icon-btn" title="Toggle dark mode" onclick="toggleDark()">&#9789;</div>' +
+    '<div class="icon-btn" title="Notifications">&#128276;</div>' +
+    userMenu +
+  '</div></div>';
+}
+
+function pageContent(){
+  switch(state.page){
+    case 'dashboard': return dashboardPage();
+    case 'resellers': return resellersPage();
+    case 'companies-all': return companiesAllPage();
+    case 'reseller': return resellerPage(state.scope.resellerId);
+    case 'company': return companyPage(state.scope.companyId);
+    case 'site': return sitePage(state.scope.siteId);
+    case 'system': return systemPage(state.systemId);
+    case 'alarms': return alarmsPage();
+    case 'map': return mapViewPage();
+    case 'oncall': return onCallPage();
+    case 'analytics': return analyticsPage();
+    case 'users': return usersPage();
+    case 'reports': return reportsPage();
+    case 'settings': return settingsPage();
+    case 'placeholder': return placeholderPage();
+    default: return dashboardPage();
+  }
+}
+
+/* ---------------------------- pages ---------------------------- */
+function dashboardPage(){
+  var totalSystems=DB.systems.length, normal=DB.systems.filter(function(s){return s.status==='normal';}).length;
+  var activeAlarms=DB.alarms.filter(function(a){return a.status==='active';});
+  var html='<div class="kpi-grid">';
+  html+=kpi('Resellers', DB.resellers.length, 'Active partner accounts');
+  html+=kpi('Customers', DB.companies.length, 'Across all resellers');
+  html+=kpi('Sites', DB.sites.length, 'Facilities monitored');
+  html+=kpi('Systems', totalSystems, normal+' of '+totalSystems+' normal');
+  html+=kpi('Active Alarms', activeAlarms.length, activeAlarms.length? 'Needs attention' : 'All clear', activeAlarms.length?'r':'g');
+  html+='</div>';
+
+  html+='<div class="section-head"><div><span>Portfolio</span><h2>Resellers</h2></div><button class="btn" onclick="goResellers()">View all</button></div>';
+  html+='<div class="grid">'+DB.resellers.map(resellerCardHtml).join('')+'</div>';
+
+  html+='<div style="height:22px"></div>';
+  html+='<div class="section-head"><div><span>Live</span><h2>Recent Alarms</h2></div><button class="btn" onclick="goAlarms()">View all</button></div>';
+  html+=alarmTableHtml(DB.alarms.slice(0,4));
+  return html;
+}
+function kpi(label,value,note,tone){
+  var color = tone==='r' ? 'var(--red)' : tone==='g' ? 'var(--green)' : 'var(--text)';
+  return '<div class="card kpi"><span>'+label+'</span><b style="color:'+color+'">'+value+'</b><small>'+note+'</small></div>';
+}
+
+function resellerCardHtml(r){
+  var comps=companiesOfReseller(r.id);
+  var systems=systemsOfReseller(r.id);
+  var sites=[]; comps.forEach(function(c){ sites=sites.concat(sitesOfCompany(c.id)); });
+  var normal=systems.filter(function(s){return s.status==='normal';}).length;
+  return '<div class="card obj-card" onclick="goReseller(\''+r.id+'\')">' +
+    '<div class="obj-card-top"><div><h3>'+r.name+'</h3><p>'+r.contact+'</p></div><div class="obj-card-icon">&#129513;</div></div>' +
+    '<div class="obj-stats">' +
+      '<div class="obj-stat"><b style="color:var(--accent)">'+comps.length+'</b><span>Customers</span></div>' +
+      '<div class="obj-stat"><b style="color:#0891b2">'+sites.length+'</b><span>Sites</span></div>' +
+      '<div class="obj-stat"><b style="color:var(--green)">'+normal+'</b><span>Normal</span></div>' +
+      '<div class="obj-stat"><b style="color:var(--red)">'+(systems.length-normal)+'</b><span>Events</span></div>' +
+    '</div></div>';
+}
+
+function resellersPage(){
+  return '<div class="grid">'+DB.resellers.map(resellerCardHtml).join('')+'</div>';
+}
+
+function companyCardHtml(c){
+  var sites=sitesOfCompany(c.id); var systems=systemsOfCompany(c.id);
+  var normal=systems.filter(function(s){return s.status==='normal';}).length;
+  var reseller=resellerOf(c);
+  return '<div class="card obj-card" onclick="goCompany(\''+c.id+'\')">' +
+    '<div class="obj-card-top"><div><h3>'+c.name+'</h3><p>'+c.address+'</p></div><div class="obj-card-icon">&#127970;</div></div>' +
+    (reseller? '<div class="fp-tag" style="display:inline-block;margin-bottom:8px">via '+reseller.name+'</div>' : '') +
+    '<div class="obj-stats">' +
+      '<div class="obj-stat"><b>'+sites.length+'</b><span>Sites</span></div>' +
+      '<div class="obj-stat"><b>'+systems.length+'</b><span>Systems</span></div>' +
+      '<div class="obj-stat"><b style="color:var(--green)">'+normal+'</b><span>Normal</span></div>' +
+      '<div class="obj-stat"><b style="color:var(--red)">'+(systems.length-normal)+'</b><span>Events</span></div>' +
+    '</div></div>';
+}
+function companiesAllPage(){
+  return '<div class="grid">'+DB.companies.map(companyCardHtml).join('')+'</div>';
+}
+
+function resellerPage(id){
+  var comps=companiesOfReseller(id);
+  var html='<div class="section-head"><div><span>Portfolio</span><h2>Customers</h2></div></div>';
+  html+='<div class="grid">'+comps.map(companyCardHtml).join('')+'</div>';
+  return html;
+}
+
+function siteCardHtml(s){
+  var systems=scopedSystemsOfSite(s.id);
+  var normal=systems.filter(function(sy){return sy.status==='normal';}).length;
+  return '<div class="card obj-card" onclick="goSite(\''+s.id+'\')">' +
+    '<div class="obj-card-top"><div><h3>'+s.name+'</h3><p>'+s.address+'</p></div><div class="obj-card-icon">&#127959;</div></div>' +
+    '<div class="obj-stats">' +
+      '<div class="obj-stat"><b>'+systems.length+'</b><span>Systems</span></div>' +
+      '<div class="obj-stat"><b style="color:var(--green)">'+normal+'</b><span>Normal</span></div>' +
+      '<div class="obj-stat"><b style="color:var(--red)">'+(systems.length-normal)+'</b><span>Events</span></div>' +
+      '<div class="obj-stat"><b>&#8594;</b><span>Open</span></div>' +
+    '</div></div>';
+}
+function companyPage(id){
+  var sites=scopedSitesOfCompany(id);
+  var html='<div class="section-head"><div><span>Facilities</span><h2>Sites</h2></div></div>';
+  html+='<div class="grid">'+sites.map(siteCardHtml).join('')+'</div>';
+  return html;
+}
+
+function systemStats(sy){
+  var generatorsReady = sy.generators.filter(function(g){return g.status!=='FAULT';}).length;
+  var atsNormal = sy.ats.filter(function(a){return a.status!=='EMERGENCY' && a.status!=='FAULT';}).length;
+  var utilityAvailable = sy.ats.length ? sy.ats.some(function(a){return a.utilAvail;}) : sy.status!=='offline';
+  var onEmergency = sy.ats.some(function(a){return a.connected==='GENERATOR';});
+  var effectiveStatus = onEmergency ? 'emergency' : sy.status;
+  return { generatorsReady:generatorsReady, atsNormal:atsNormal, utilityAvailable:utilityAvailable, effectiveStatus:effectiveStatus };
+}
+function systemCardHtml(sy){
+  var st=systemStats(sy);
+  var tone = st.effectiveStatus==='emergency' ? 'r' : st.effectiveStatus==='offline' ? 'n' : 'g';
+  var label = st.effectiveStatus==='emergency' ? 'EMERGENCY' : st.effectiveStatus==='offline' ? 'OFFLINE' : 'NORMAL';
+  return '<div class="card site-system-card status-'+st.effectiveStatus+'">' +
+    '<div class="site-system-card-head"><h3>'+sy.name+'</h3><span class="pill '+tone+(tone==='r'?' blink':'')+'">'+label+'</span></div>' +
+    '<div class="site-system-card-sub">'+sy.ats.length+' ATS &middot; '+sy.generators.length+' Generators</div>' +
+    '<div class="site-system-stats">' +
+      '<div class="site-system-stat"><span>Utility</span><b class="'+(st.utilityAvailable?'stat-good':'stat-bad')+'">'+(st.utilityAvailable?'Available':'Unavailable')+'</b></div>' +
+      '<div class="site-system-stat"><span>Generators</span><b>'+st.generatorsReady+' / '+sy.generators.length+' Ready</b></div>' +
+      '<div class="site-system-stat"><span>ATS</span><b>'+st.atsNormal+' / '+sy.ats.length+' Normal</b></div>' +
+    '</div>' +
+    '<div class="site-system-card-actions">' +
+      '<button onclick="openSystem(\''+sy.id+'\')">Detail</button>' +
+      '<button onclick="event.stopPropagation();openSldModal(\''+sy.id+'\')">One-Line</button>' +
+      '<button onclick="event.stopPropagation();openTestWizard(\''+sy.id+'\', null, null)">Test</button>' +
+    '</div>' +
+  '</div>';
+}
+function sitePage(id){
+  var systems=scopedSystemsOfSite(id);
+  var html='<div class="section-head"><div><span>Power Topology</span><h2>Systems</h2></div></div>';
+  html+='<div class="site-systems-grid">'+systems.map(systemCardHtml).join('')+'</div>';
+  return html;
+}
+
+/* ---------------------------- system detail ---------------------------- */
+function systemPage(id){
+  var sys=byId(DB.systems, id);
+  var st=systemStats(sys);
+  var heroBg = st.effectiveStatus==='emergency' ? 'var(--red-bg)' : st.effectiveStatus==='offline' ? 'var(--card-2)' : 'var(--green-bg)';
+  var heroColor = st.effectiveStatus==='emergency' ? 'var(--red)' : st.effectiveStatus==='offline' ? 'var(--text-dim)' : 'var(--green)';
+  var heroLabel = st.effectiveStatus==='emergency' ? '&#9888; Emergency' : st.effectiveStatus==='offline' ? '&#9679; Offline' : '&#10003; Normal operation';
+  var sysAlarms = DB.alarms.filter(function(a){return a.systemId===sys.id && a.status==='active';});
+
+  var html='<div class="hero card">';
+  html+='<div class="hero-left"><span class="hero-kicker">Live system overview</span><h1>'+sys.name+'</h1><p>Utility, generator and transfer-switch status</p>';
+  html+='<span class="pill-lg'+(st.effectiveStatus==='emergency'?' blink':'')+'" style="background:'+heroBg+';color:'+heroColor+'">'+heroLabel+'</span>';
+  html+='<div class="tabs">';
+  html+='<div class="tab'+(state.systemTab==='details'?' active':'')+'" onclick="setSystemTab(\'details\')">System Details</div>';
+  html+='<div class="tab'+(state.systemTab==='one-line'?' active':'')+'" onclick="setSystemTab(\'one-line\')">One-Line</div>';
+  html+='</div></div>';
+  html+='<div class="card events-panel"><div class="eh">Active Events</div><ul>';
+  if(sysAlarms.length){
+    sysAlarms.forEach(function(a){
+      html+='<li class="ev-'+a.severity+'"><time>'+a.time+'</time><span>'+a.message+'</span></li>';
+    });
+  } else {
+    html+='<li style="color:var(--text-dim)">No active events for this system.</li>';
+  }
+  html+='</ul></div>';
+  html+='</div>';
+
+  if(state.systemTab==='one-line'){
+    html+=oneLineHtml(sys);
+  } else {
+    html+=systemDetailsHtml(sys);
+  }
+  return html;
+}
+
+function systemDetailsHtml(sys){
+  var html='<div class="op-section"><div class="op-head"><div><span>Emergency power</span><h3>Generators</h3></div></div>';
+  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sl.</th><th>Generator</th><th>Status</th><th>Test</th><th>Fuel</th><th>Hrs</th><th>Oil psi</th><th>H&#8322;O temp</th><th>Batt V</th><th>VAB</th><th>VBC</th><th>VCA</th><th>Amps A</th><th>Amps B</th><th>Amps C</th><th>Hz</th><th>kW</th><th>%kW</th></tr></thead><tbody>';
+  sys.generators.forEach(function(g,i){
+    html+='<tr><td>'+pad2(i+1)+'</td><td><b>'+g.name+'</b></td><td class="'+(g.status==='FAULT'?'state-bad':'state-ok')+'">'+g.status+'</td>' +
+      '<td><button class="btn small" onclick="openTestWizard(\''+sys.id+'\',\'generator\',\''+g.id+'\')">Test Gen</button></td>' +
+      '<td>'+g.fuel+'%</td><td>'+g.hours.toFixed(1)+'</td><td>'+g.oilPsi+'</td><td>'+g.waterTemp+'&deg;C</td><td>'+g.battV+'</td>' +
+      '<td>'+g.vab+'</td><td>'+g.vbc+'</td><td>'+g.vca+'</td><td>'+g.ia+'</td><td>'+g.ib+'</td><td>'+g.ic+'</td><td>'+g.hz+'</td><td>'+g.kw+'</td><td>'+g.pct+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  html+='<div class="op-section"><div class="op-head"><div><span>Power distribution</span><h3>Automatic Transfer Switches</h3></div></div>';
+  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sl.</th><th>ATS name</th><th>Status</th><th>Test</th><th>Connected to</th><th>Source available</th><th>Time to xfer</th><th>Time on emergency</th></tr></thead><tbody>';
+  sys.ats.forEach(function(a,i){
+    var em = a.connected==='GENERATOR';
+    html+='<tr><td>'+pad2(i+1)+'</td><td><b>'+a.name+'</b><br><small style="color:var(--text-dim)">'+a.load+'</small></td>' +
+      '<td class="'+(em?'state-bad':'state-ok')+'">'+a.status+'</td>' +
+      '<td><button class="btn small" onclick="openTestWizard(\''+sys.id+'\',\'ats\',\''+a.id+'\')">Test ATS</button></td>' +
+      '<td class="'+(em?'state-bad':'state-ok')+'">'+a.connected+'</td>' +
+      '<td><span class="pill '+(a.utilAvail?'g':'r')+'">Util</span> <span class="pill '+(a.genAvail?'g':'r')+'">Gen</span></td>' +
+      '<td>'+a.xfer+'s</td><td>'+(a.toe!==null?fmtHMS(a.toe):'—')+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+  html+=devicesManagerHtml(sys);
+  return html;
+}
+
+function devicesManagerHtml(sys){
+  var manage=canManageDevices();
+  var html='<div class="section-head" style="margin-top:26px"><div><span>Administration</span><h2>Devices</h2></div></div>';
+  html+='<p style="font-size:11.5px;color:var(--text-dim);margin:-8px 0 14px">Register the ATS units and generators for this system.</p>';
+  html+='<div class="devices-grid">';
+
+  html+='<div class="card" style="padding:0;overflow:hidden">';
+  html+='<div class="devices-panel-head"><h3>&#128268; ATS Units ('+sys.ats.length+')</h3>'+(manage?'<button class="btn primary small" onclick="openNewAts(\''+sys.id+'\')">+ Add ATS</button>':'')+'</div>';
+  html+='<div class="tbl-wrap" style="border:0;border-radius:0"><table class="tbl"><thead><tr><th>Sl.</th><th>Name</th><th>Branch</th><th></th></tr></thead><tbody>';
+  sys.ats.forEach(function(a,i){
+    html+='<tr><td>'+pad2(i+1)+'</td><td><b>'+a.name+'</b></td><td><span class="branch-tag">'+a.branch+'</span></td>' +
+      '<td><div class="device-row-actions"><button class="btn small" onclick="openFaceplate(\''+sys.id+'\',\'ats\',\''+a.id+'\')">Detail</button>' +
+      (manage?'<button class="btn small" onclick="openEditAts(\''+sys.id+'\',\''+a.id+'\')">Edit</button>' +
+      '<button class="btn small danger" onclick="deleteAtsItem(\''+sys.id+'\',\''+a.id+'\')">Delete</button>':'')+'</div></td></tr>';
+  });
+  if(!sys.ats.length) html+='<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No ATS registered yet.</td></tr>';
+  html+='</tbody></table></div></div>';
+
+  html+='<div class="card" style="padding:0;overflow:hidden">';
+  html+='<div class="devices-panel-head"><h3>&#9881; Generators ('+sys.generators.length+')</h3>'+(manage?'<button class="btn primary small" onclick="openNewGen(\''+sys.id+'\')">+ Add Generator</button>':'')+'</div>';
+  html+='<div class="tbl-wrap" style="border:0;border-radius:0"><table class="tbl"><thead><tr><th>Sl.</th><th>Name</th><th>Make / Model</th><th>Rated kW</th><th></th></tr></thead><tbody>';
+  sys.generators.forEach(function(g,i){
+    html+='<tr><td>'+pad2(i+1)+'</td><td><b>'+g.name+'</b></td><td>'+([g.make,g.model].filter(Boolean).join(' ')||'—')+'</td><td>'+(g.ratedKw!=null?g.ratedKw:'—')+'</td>' +
+      '<td><div class="device-row-actions"><button class="btn small" onclick="openFaceplate(\''+sys.id+'\',\'generator\',\''+g.id+'\')">Detail</button>' +
+      (manage?'<button class="btn small" onclick="openEditGen(\''+sys.id+'\',\''+g.id+'\')">Edit</button>' +
+      '<button class="btn small danger" onclick="deleteGenItem(\''+sys.id+'\',\''+g.id+'\')">Delete</button>':'')+'</div></td></tr>';
+  });
+  if(!sys.generators.length) html+='<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">No generators registered yet.</td></tr>';
+  html+='</tbody></table></div></div>';
+
+  html+='</div>';
+  return html;
+}
+
+function transformerSymbolSvg(size){
+  size = size||20;
+  return '<svg width="'+size+'" height="'+(size*1.1)+'" viewBox="0 0 22 24" fill="none" aria-hidden="true" class="sld-symbol sld-transformer-symbol">' +
+    '<path d="M2 9 a3.2 3.2 0 0 1 6.4 0 a3.2 3.2 0 0 1 6.4 0 a3.2 3.2 0 0 1 6.4 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<path d="M2 15 a3.2 3.2 0 0 0 6.4 0 a3.2 3.2 0 0 0 6.4 0 a3.2 3.2 0 0 0 6.4 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<line x1="11" y1="0" x2="11" y2="6" stroke="currentColor" stroke-width="1.6"/>' +
+    '<line x1="11" y1="17.5" x2="11" y2="24" stroke="currentColor" stroke-width="1.6"/>' +
+  '</svg>';
+}
+function breakerSymbolSvg(tone, size){
+  tone = tone||'normal'; size = size||30;
+  return '<svg width="'+size+'" height="'+(size*1.1)+'" viewBox="0 0 16 18" fill="none" aria-hidden="true" class="sld-symbol sld-breaker-symbol '+tone+'">' +
+    '<circle cx="8" cy="1.8" r="1.7" stroke="currentColor" stroke-width="1.3"/>' +
+    '<circle cx="8" cy="16.2" r="1.7" stroke="currentColor" stroke-width="1.3"/>' +
+    '<path d="M8 3.5 Q13.5 9 8 14.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/>' +
+  '</svg>';
+}
+function oneLineHtml(sys){
+  var html='<section class="system-sld" aria-label="Single line diagram">';
+  html+='<header class="system-sld-header"><div><span>Power topology</span><h3>Single Line Diagram</h3></div>' +
+    '<div class="system-sld-legend"><i class="normal"></i> Normal source <i class="emergency"></i> Emergency source</div></header>';
+  html+='<div class="system-sld-canvas"><div class="system-sld-canvas-inner" style="min-width:'+Math.max(700, sys.ats.length*110+260)+'px">';
+
+  html+='<div class="sld-sources">';
+  html+='<div class="sld-utility-column">' +
+    '<div class="sld-source utility"><i>'+transformerSymbolSvg(27)+'</i><div><b>UTILITY</b><small>Normal source available</small></div></div>' +
+    '<span class="sld-gear-connector lead normal-source" aria-hidden="true"></span>' +
+    '<span class="sld-breaker-with-tag"><span class="sld-gear-icon">'+breakerSymbolSvg('normal',34)+'</span><div class="sld-breaker-tag normal-source">52-M1</div></span>' +
+    '<span class="sld-gear-connector tail normal-source" aria-hidden="true"></span>' +
+  '</div>';
+  html+='<div class="sld-generators">';
+  sys.generators.forEach(function(g,i){
+    var running=g.status==='RUNNING';
+    var tone=running?'emergency-source':'normal-source';
+    html+='<div class="sld-generator-column">' +
+      '<button type="button" class="sld-generator '+tone+'" aria-label="Open '+g.name+'" title="Open '+g.name+'" onclick="openFaceplate(\''+sys.id+'\',\'generator\',\''+g.id+'\')">' +
+        '<i>G</i><span>'+g.name+'</span><small>'+(g.status==='RUNNING'?'Running':g.status==='FAULT'?'Fault':'Ready')+'</small>' +
+      '</button>' +
+      '<span class="sld-gear-connector '+tone+'" aria-hidden="true"></span>' +
+      '<span class="sld-breaker-with-tag">'+breakerSymbolSvg(running?'emergency':'normal',30)+'<div class="sld-breaker-tag '+tone+'">52-G'+(i+1)+'</div></span>' +
+      '<span class="sld-gear-connector tail '+tone+'" aria-hidden="true"></span>' +
+    '</div>';
+  });
+  html+='</div></div>';
+
+  html+='<div class="sld-buses"><div class="sld-bus normal"><span>Normal bus</span></div><div class="sld-bus emergency"><span>Emergency bus</span></div></div>';
+
+  html+='<div class="sld-ats-grid">';
+  sys.ats.forEach(function(a){
+    var em=a.connected==='GENERATOR';
+    html+='<div class="sld-ats '+(em?'on-emergency':'on-normal')+'">' +
+      '<button type="button" class="sld-switch" aria-label="Open '+a.name+': '+(em?'connected to emergency':'connected to normal')+'" onclick="openFaceplate(\''+sys.id+'\',\'ats\',\''+a.id+'\')">' +
+        '<span class="sld-terminal normal-terminal'+(!em?' active':'')+'">N</span>' +
+        '<span class="sld-terminal emergency-terminal'+(em?' active':'')+'">E</span>' +
+        '<i class="sld-arm"></i>' +
+        '<span class="sld-terminal load-terminal" aria-hidden="true"></span>' +
+      '</button>' +
+      '<i class="sld-load-line" aria-hidden="true"></i>' +
+      '<b>'+a.name+'</b><small>'+(em?'Connected to emergency':'Connected to normal')+'</small>' +
+      '<span class="sld-load-label">'+a.load+'</span>' +
+    '</div>';
+  });
+  html+='</div>';
+  if(!sys.ats.length) html+='<p class="placeholder">No ATS units registered for this system.</p>';
+
+  html+='</div></div></section>';
+  return html;
+}
+
+/* ---------------------------- alarms page ---------------------------- */
+function alarmTableHtml(list){
+  var html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Time</th><th>System</th><th>Severity</th><th>Message</th><th>Status</th><th>Ack by</th></tr></thead><tbody>';
+  list.forEach(function(a){
+    var sys=byId(DB.systems, a.systemId);
+    html+='<tr><td>'+a.time+'</td><td>'+(sys?sys.name:'—')+'</td>' +
+      '<td><span class="pill '+(a.severity==='critical'?'r':a.severity==='warning'?'a':'g')+'">'+a.severity+'</span></td>' +
+      '<td style="white-space:normal;min-width:260px">'+a.message+'</td>' +
+      '<td><span class="pill '+(a.status==='active'?'r':'g')+'">'+a.status+'</span></td>' +
+      '<td>'+(a.ackBy||'—')+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  return html;
+}
+function alarmsPage(){
+  var list = state.role==='operator' ? DB.alarms.filter(function(a){return isSystemVisible(a.systemId);}) : DB.alarms;
+  var html='<div class="section-head"><div><span>Monitoring</span><h2>'+(state.role==='operator'?'Alarms':'All Alarms')+'</h2></div></div>';
+  html+=alarmTableHtml(list);
+  return html;
+}
+
+/* ---------------------------- map view ---------------------------- */
+function mapViewPage(){
+  var scope=state.scope, pins=[], facilities, systems;
+  if(scope && scope.level==='company'){
+    var sites=scopedSitesOfCompany(scope.companyId);
+    facilities=sites.length; systems=scopedSystemsOfCompany(scope.companyId);
+    pins=sites.map(function(s){
+      var sy=scopedSystemsOfSite(s.id);
+      var em=sy.some(function(x){return x.status!=='normal';});
+      return {x:s.x,y:s.y,label:s.name,status:em?'emergency':'normal',fn:"goSite('"+s.id+"')"};
+    });
+  } else if(scope && scope.level==='reseller'){
+    var comps=companiesOfReseller(scope.resellerId);
+    facilities=comps.length; systems=systemsOfReseller(scope.resellerId);
+    pins=comps.map(function(c){
+      var sy=systemsOfCompany(c.id);
+      var em=sy.some(function(x){return x.status!=='normal';});
+      return {x:c.x,y:c.y,label:c.name,status:em?'emergency':'normal',fn:"goCompany('"+c.id+"')"};
+    });
+  } else {
+    facilities=DB.companies.length; systems=DB.systems;
+    pins=DB.companies.map(function(c){
+      var sy=systemsOfCompany(c.id);
+      var em=sy.some(function(x){return x.status!=='normal';});
+      return {x:c.x,y:c.y,label:c.name,status:em?'emergency':'normal',fn:"goCompany('"+c.id+"')"};
+    });
+  }
+  var normal=systems.filter(function(s){return s.status==='normal';}).length;
+  var html='<div class="card" style="padding:0;overflow:hidden"><div class="map-wrap"><div class="map-grid-lines"></div>';
+  pins.forEach(function(p){
+    html+='<div class="map-pin '+(p.status==='normal'?'g':'r')+'" style="left:'+p.x+'%;top:'+p.y+'%" onclick="'+p.fn+'"><i></i><b>'+p.label+'</b></div>';
+  });
+  html+='<div class="map-legend"><div style="font-size:10px;font-weight:800;margin-bottom:6px">STATUS</div>' +
+    '<div class="map-legend-item"><span class="map-legend-dot" style="background:#22c55e"></span>Normal</div>' +
+    '<div class="map-legend-item"><span class="map-legend-dot" style="background:#ef4444"></span>Emergency</div></div>';
+  html+='</div></div>';
+  html+='<div class="kpi-grid" style="margin-top:16px">';
+  html+=kpi('Facilities', facilities, 'Plotted on map');
+  html+=kpi('Systems', systems.length, 'Monitored');
+  html+=kpi('Normal', normal, 'Operating on utility', 'g');
+  html+=kpi('Events', systems.length-normal, (systems.length-normal)?'Needs attention':'All clear', (systems.length-normal)?'r':'g');
+  html+='</div>';
+  return html;
+}
+
+/* ---------------------------- on-call ---------------------------- */
+function onCallPage(){
+  var companyId=state.scope.companyId;
+  var shifts=DB.oncallShifts.filter(function(s){return s.companyId===companyId;});
+  var today=shifts.filter(function(s){return s.date===TODAY_ISO;})[0] || shifts[0];
+  var sysIds=scopedSystemsOfCompany(companyId).map(function(s){return s.id;});
+  var active=DB.alarms.filter(function(a){return sysIds.indexOf(a.systemId)>-1 && a.status==='active';});
+  var unacked=active.filter(function(a){return !a.ackBy;});
+
+  var html='<div class="card oncall-banner"><div>' +
+    '<div class="oncall-label">On-Call Now</div>' +
+    '<div class="oncall-primary"><span class="oncall-dot g"></span>'+(today?today.primary:'Not configured')+'<span class="oncall-role">Primary</span></div>' +
+    '<div class="oncall-secondary"><span class="oncall-dot a"></span>'+(today&&today.secondary?today.secondary:'—')+'<span class="oncall-role">Secondary</span></div>' +
+  '</div><div class="oncall-stats">' +
+    '<div class="oncall-stat"><b style="color:'+(unacked.length?'var(--red)':'var(--text)')+'">'+unacked.length+'</b><span>Unacked alarms</span></div>' +
+    '<div class="oncall-stat"><b>'+active.length+'</b><span>Active alarms</span></div>' +
+  '</div></div>';
+
+  var manage=canManage();
+  html+='<div class="section-head"><div><span>Rotation</span><h2>Weekly Schedule</h2></div>'+(manage?'<button class="btn primary" onclick="openShiftEdit(null)">+ Add shift</button>':'')+'</div>';
+  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Day</th><th>Date</th><th>Primary</th><th>Secondary</th><th>Shift</th><th></th></tr></thead><tbody>';
+  shifts.forEach(function(s){
+    html+='<tr class="'+(s.date===TODAY_ISO?'oncall-today':'')+'"><td><b>'+s.day+'</b></td><td>'+s.date+'</td>' +
+      '<td><span class="oncall-dot g"></span> '+s.primary+'</td><td><span class="oncall-dot a"></span> '+(s.secondary||'—')+'</td><td>'+s.shift+'</td>' +
+      '<td>'+(manage?'<button class="btn small" onclick="openShiftEdit(\''+s.id+'\')">Edit</button> <button class="btn small danger" onclick="deleteShift(\''+s.id+'\')">Delete</button>':'—')+'</td></tr>';
+  });
+  if(!shifts.length) html+='<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">No shifts scheduled yet.</td></tr>';
+  html+='</tbody></table></div>';
+
+  if(unacked.length){
+    html+='<div style="height:22px"></div><div class="section-head"><div><span>Needs response</span><h2>Pending Acknowledgement</h2></div></div>';
+    html+=alarmTableHtml(unacked);
+  }
+  return html;
+}
+
+/* ---------------------------- analytics ---------------------------- */
+function analyticsPage(){
+  var companyId=state.scope && state.scope.companyId;
+  var systems= companyId ? scopedSystemsOfCompany(companyId) : DB.systems;
+  var equipment=[];
+  systems.forEach(function(sy){
+    sy.generators.forEach(function(g){
+      var running=g.status==='RUNNING';
+      equipment.push({kind:'generator', name:g.name, status:g.status, kw:g.kw, load:g.pct, fuel:g.fuel, hours:g.hours, online:running, vab:g.vab, hz:g.hz, pf:g.pf});
+    });
+    sy.ats.forEach(function(a){
+      var load=Math.min(100, Math.round(a.kw/300*100));
+      equipment.push({kind:'ats', name:a.name, status:a.status, kw:a.kw, load:load, fuel:null, hours:null, online:a.connected!=='OFFLINE', vab:a.vab, hz:a.hz, pf:null});
+    });
+  });
+  var alarmsCount=equipment.filter(function(e){return e.status==='FAULT'||e.status==='EMERGENCY';}).length;
+  var totalKw=equipment.reduce(function(t,e){return t+(e.kw||0);},0);
+  var avgLoad=equipment.length? Math.round(equipment.reduce(function(t,e){return t+(e.load||0);},0)/equipment.length) : 0;
+
+  var html='<div class="card an-intro"><div><h2>Grafana analytics and live telemetry</h2><p>Live readings refresh automatically. Click a device row for its trend, or open the full Grafana workspace.</p></div>' +
+    '<div class="an-actions"><button class="btn primary" onclick="openPlaceholder(\'Grafana Analytics\')">Open in Grafana &#8599;</button><span class="live-badge">&#9679; Live data</span></div></div>';
+
+  html+='<div class="kpi-grid">';
+  html+=kpi('Monitored assets', equipment.length, 'Generators + ATS');
+  html+=kpi('Healthy assets', equipment.length-alarmsCount, '', 'g');
+  html+=kpi('Active alarms', alarmsCount, alarmsCount?'Needs attention':'All clear', alarmsCount?'r':'g');
+  html+=kpi('Active load', totalKw+' kW', 'Across fleet');
+  html+=kpi('Avg utilisation', avgLoad+'%', 'Of connected capacity');
+  html+='</div>';
+
+  html+='<div class="tabs" style="margin:0 0 14px">';
+  ['System overview','Generator performance','Power quality'].forEach(function(v){
+    html+='<div class="tab'+(state.analyticsView===v?' active':'')+'" onclick="setAnalyticsView(\''+v+'\')">'+v+'</div>';
+  });
+  html+='</div>';
+
+  var mode = state.analyticsView==='Generator performance' ? 'generator' : state.analyticsView==='Power quality' ? 'quality' : 'overview';
+  var rows = mode==='generator' ? equipment.filter(function(e){return e.kind==='generator';}) : equipment;
+  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Equipment</th><th>Status</th>';
+  if(mode==='generator') html+='<th>Load</th><th>Fuel</th><th>Engine hours</th>';
+  else if(mode==='quality') html+='<th>Voltage AB</th><th>Frequency</th><th>Power factor</th><th>Load</th>';
+  else html+='<th>Power</th><th>Load</th><th>Connection</th>';
+  html+='</tr></thead><tbody>';
+  rows.forEach(function(e){
+    var bad = e.status==='FAULT'||e.status==='EMERGENCY';
+    html+='<tr><td><b>'+e.name+'</b></td><td class="'+(bad?'state-bad':'state-ok')+'">'+e.status+'</td>';
+    if(mode==='generator') html+='<td>'+(e.load||0)+'%</td><td>'+(e.fuel!=null?e.fuel+'%':'—')+'</td><td>'+(e.hours!=null?e.hours.toFixed(1):'—')+' h</td>';
+    else if(mode==='quality') html+='<td>'+e.vab+' V</td><td>'+e.hz+' Hz</td><td>'+(e.pf!=null?e.pf:'—')+'</td><td>'+(e.load||0)+'%</td>';
+    else html+='<td>'+e.kw+' kW</td><td>'+(e.load||0)+'%</td><td>'+(e.online?'Connected':'Offline')+'</td>';
+    html+='</tr>';
+  });
+  if(!rows.length) html+='<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">No equipment telemetry available.</td></tr>';
+  html+='</tbody></table></div>';
+  return html;
+}
+
+/* ---------------------------- users ---------------------------- */
+function roleLabel(v){ for(var i=0;i<ROLES.length;i++){ if(ROLES[i].value===v) return ROLES[i].label; } return 'Unassigned'; }
+function usersPage(){
+  var scope=state.scope, list;
+  if(scope && scope.level==='company'){ list=DB.users.filter(function(u){return u.companyId===scope.companyId;}); }
+  else if(scope && scope.level==='reseller'){
+    var cids=companiesOfReseller(scope.resellerId).map(function(c){return c.id;});
+    list=DB.users.filter(function(u){return u.resellerId===scope.resellerId || cids.indexOf(u.companyId)>-1;});
+  } else { list=DB.users; }
+
+  var html='<p style="font-size:12px;color:var(--text-dim);margin-bottom:16px">Every account here signed in at least once via SSO and was auto-provisioned with no role. Assign one to grant access.</p>';
+  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sl.</th><th>Name</th><th>Email</th><th>Role</th><th>Scope</th><th></th></tr></thead><tbody>';
+  var manage=canManage();
+  list.forEach(function(u,i){
+    html+='<tr><td>'+pad2(i+1)+'</td><td><b>'+u.name+'</b></td><td>'+u.email+'</td>' +
+      '<td><span class="role-badge'+(u.role?'':' none')+'">'+(u.role?roleLabel(u.role):'Unassigned')+'</span></td>' +
+      '<td>'+u.scope+'</td><td>'+(manage?'<button class="btn small" onclick="openUserEdit(\''+u.id+'\')">Edit role</button>':'—')+'</td></tr>';
+  });
+  if(!list.length) html+='<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">No users found in this scope.</td></tr>';
+  html+='</tbody></table></div>';
+  return html;
+}
+
+/* ---------------------------- reports ---------------------------- */
+function reportsPage(){
+  var companyId=state.scope.companyId;
+  var reports=DB.reports.filter(function(r){return r.companyId===companyId && isSystemVisible(r.systemId);});
+  var html='<div class="tabs" style="margin:0 0 16px">';
+  [['calendar','Calendar'],['list','All Reports'],['compliance','ATS Compliance']].forEach(function(t){
+    html+='<div class="tab'+(state.reportsTab===t[0]?' active':'')+'" onclick="setReportsTab(\''+t[0]+'\')">'+t[1]+'</div>';
+  });
+  html+='</div>';
+  if(state.reportsTab==='calendar') html+=reportsCalendarHtml(reports, companyId);
+  else if(state.reportsTab==='list') html+=reportsListHtml(reports, companyId);
+  else html+=complianceTabHtml(reports, companyId);
+  return html;
+}
+function reportsCalendarHtml(reports, companyId){
+  var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var y=state.calYear, m=state.calMonth;
+  var first=new Date(y,m,1), last=new Date(y,m+1,0);
+  var dow=first.getDay(); dow = dow===0?6:dow-1;
+  var days=[];
+  for(var p=dow-1;p>=0;p--) days.push({date:new Date(y,m,-p), outside:true});
+  for(var d=1; d<=last.getDate(); d++) days.push({date:new Date(y,m,d), outside:false});
+  while(days.length%7!==0) days.push({date:new Date(y,m+1,days.length-last.getDate()-dow+1), outside:true});
+  function fmt(dt){ return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate()); }
+  var byDate={};
+  reports.forEach(function(r){ (byDate[r.date]=byDate[r.date]||[]).push(r); });
+
+  var html='<div class="cal-nav"><button onclick="calPrev()">&lsaquo;</button><b>'+MONTHS[m]+' '+y+'</b><button onclick="calNext()">&rsaquo;</button></div>';
+  html+='<div class="cal-grid">';
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(dn){ html+='<div class="cal-dow">'+dn+'</div>'; });
+  days.forEach(function(dObj){
+    var key=fmt(dObj.date); var evs=byDate[key]||[];
+    html+='<div class="cal-cell'+(dObj.outside?' outside':'')+(key===TODAY_ISO?' today':'')+'"><div class="cal-day-num">'+dObj.date.getDate()+'</div>';
+    evs.forEach(function(r){
+      html+='<div class="cal-event" onclick="openReport(\''+r.id+'\')">'+r.type+'<small>'+(byId(DB.systems,r.systemId)||{}).name+'</small></div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
+function reportsListHtml(reports, companyId){
+  var html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>System</th><th>Initiating ATS</th><th>Duration</th><th>Peak kW</th><th>Avg kW</th><th></th></tr></thead><tbody>';
+  reports.forEach(function(r){
+    var sys=byId(DB.systems, r.systemId);
+    var tone = r.type==='gen-run'?'a':r.type==='ats-emergency'?'r':'g';
+    html+='<tr style="cursor:pointer" onclick="openReport(\''+r.id+'\')"><td>'+r.date+' '+r.time+'</td>' +
+      '<td><span class="pill '+tone+'">'+REPORT_TYPE_LABEL[r.type]+'</span></td>' +
+      '<td><b>'+(sys?sys.name:'—')+'</b></td><td>'+(r.initiatingAts||'—')+'</td><td>'+r.durationLabel+'</td>' +
+      '<td>'+r.peakKw+' kW</td><td>'+r.avgKw+' kW</td><td style="color:var(--accent)">View &rarr;</td></tr>';
+  });
+  if(!reports.length) html+='<tr><td colspan="8" style="text-align:center;color:var(--text-dim)">No reports recorded yet.</td></tr>';
+  html+='</tbody></table></div>';
+  return html;
+}
+function complianceTabHtml(reports, companyId){
+  var systems=scopedSystemsOfCompany(companyId);
+  var rows=[];
+  systems.forEach(function(sy){
+    sy.ats.forEach(function(a){
+      var count=reports.filter(function(r){return r.systemId===sy.id && r.initiatingAts===a.name;}).length;
+      rows.push({sys:sy.name, ats:a.name, branch:a.branch, count:count, ok:count>0});
+    });
+  });
+  var total=rows.length, ok=rows.filter(function(r){return r.ok;}).length;
+  var pct= total? Math.round(ok/total*100) : 0;
+  var html='<div class="section-head"><div><span>Compliance</span><h2>Annual ATS Initiating Compliance</h2></div></div>';
+  html+='<p style="font-size:11.5px;color:var(--text-dim);margin:-6px 0 14px">Every ATS should be the initiating ATS for at least one test per year.</p>';
+  html+='<div class="kpi-grid">';
+  html+=kpi('Compliant', pct+'%', '', 'g');
+  html+=kpi('ATS compliant', ok, '', 'g');
+  html+=kpi('Outstanding', total-ok, '', (total-ok)?'r':'g');
+  html+=kpi('Total ATS', total, '');
+  html+='</div>';
+  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>System</th><th>ATS</th><th>Branch</th><th>Initiations</th><th>Status</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html+='<tr><td><b>'+r.sys+'</b></td><td>'+r.ats+'</td><td>'+r.branch+'</td><td>'+r.count+'</td>' +
+      '<td><span class="pill '+(r.ok?'g':'r')+'">'+(r.ok?'Compliant':'Outstanding')+'</span></td></tr>';
+  });
+  html+='</tbody></table></div>';
+  return html;
+}
+
+/* ---------------------------- settings ---------------------------- */
+function settingsPage(){
+  var CARDS=[
+    ['MQTT / Ingestion','EMQX broker shards, topic mappings'],
+    ['Zitadel Auth','SSO config, role definitions'],
+    ['InfluxDB','Telemetry retention policies'],
+    ['Report Storage','S3 PDF report storage'],
+    ['Alerting','On-call schedules, notification channels'],
+    ['Report Templates','HTML/CSS templates, PDF rendering']
+  ];
+  var html='<div class="grid">';
+  CARDS.forEach(function(c){
+    html+='<div class="card obj-card" style="cursor:default"><div class="obj-card-top"><div><h3>'+c[0]+'</h3><p>'+c[1]+'</p></div><div class="obj-card-icon">&#9881;</div></div></div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function placeholderPage(){
+  return '<div class="card placeholder"><i>&#9881;</i><h3>'+state.placeholderTitle+'</h3><p>This section is available in the full CPC platform.<br>Ask your rep for a live walkthrough.</p></div>';
+}
+
+/* =========================================================================
+   MODALS
+   ========================================================================= */
+function modalHtml(){
+  var m=state.modal;
+  if(m.kind==='faceplate') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">'+faceplateHtml(m)+'</div></div>';
+  if(m.kind==='test') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal wide">'+testWizardHtml()+'</div></div>';
+  if(m.kind==='sld') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal wide sld-modal"><button class="modal-close" onclick="closeModal()">&times;</button>'+oneLineHtml(byId(DB.systems, m.systemId))+'</div></div>';
+  if(m.kind==='shift') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">'+shiftFormHtml()+'</div></div>';
+  if(m.kind==='user') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">'+userEditHtml()+'</div></div>';
+  if(m.kind==='report') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal wide">'+reportDetailHtml(m.id)+'</div></div>';
+  if(m.kind==='ats-form') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">'+atsFormHtml()+'</div></div>';
+  if(m.kind==='gen-form') return '<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">'+genFormHtml()+'</div></div>';
+  return '';
+}
+
+function faceplateHtml(m){
+  var sys=byId(DB.systems, m.systemId);
+  var isAts = m.type==='ats';
+  var item = isAts ? byId(sys.ats, m.id) : byId(sys.generators, m.id);
+  var banner = isAts ? (item.status==='EMERGENCY'?'EMERGENCY':'READY') : (item.status==='RUNNING'?'RUNNING':'READY');
+  var bannerTone = banner==='EMERGENCY' ? 'emergency' : 'ready';
+  var onNormal = isAts ? item.connected!=='GENERATOR' : true;
+  var vAn=(item.vab/Math.sqrt(3)).toFixed(0), vBn=(item.vbc/Math.sqrt(3)).toFixed(0), vCn=(item.vca/Math.sqrt(3)).toFixed(0);
+
+  var html='<button class="modal-close" onclick="closeModal()">&times;</button><div class="fp">';
+  html+='<div class="fp-head"><div><h3>'+item.name+'</h3><p>'+sys.name+' | '+(isAts?item.load:'Generator '+item.make+' '+item.model)+'</p></div></div>';
+  html+='<div class="fp-tags">';
+  if(!isAts){ html+='<div class="fp-tag">'+item.make+'</div><div class="fp-tag">'+item.model+'</div>'; }
+  else { html+='<div class="fp-tag">Branch: '+item.branch+'</div>'; }
+  html+='</div>';
+  html+='<div class="fp-banner '+bannerTone+'">'+banner+'</div>';
+
+  if(isAts){
+    html+='<div class="fp-section-title">Source Status</div><div class="fp-grid2">' +
+      '<div class="fp-box'+(onNormal?' on normal':'')+'"><span>Normal Source</span><b>'+(item.utilAvail?(onNormal?'Available':'Ready'):'Unavailable')+'</b></div>' +
+      '<div class="fp-box'+(!onNormal?' on emergency':'')+'"><span>Emergency Source</span><b>'+(item.genAvail?(!onNormal?'Available':'Ready'):'Unavailable')+'</b></div>' +
+      '<div class="fp-box"><span>Connected to</span><b class="'+(onNormal?'stat-good':'stat-bad')+'">'+(onNormal?'Normal':'Emergency')+'</b></div>' +
+      '<div class="fp-box"><span>'+(!onNormal?'Time on Emergency':'Last Transfer')+'</span><b>'+(!onNormal?fmtHMS(item.toe):item.xfer+'s')+'</b></div>' +
+    '</div>';
+  } else {
+    html+='<div class="fp-section-title">Engine Data</div><div class="fp-grid2">' +
+      '<div class="fp-box"><span>Fuel</span><b>'+item.fuel+'%</b></div>' +
+      '<div class="fp-box"><span>Hours</span><b>'+item.hours.toFixed(1)+'</b></div>' +
+      '<div class="fp-box"><span>Oil PSI</span><b>'+item.oilPsi+'</b></div>' +
+      '<div class="fp-box"><span>H&#8322;O Temp</span><b>'+item.waterTemp+'&deg;</b></div>' +
+    '</div>';
+  }
+
+  html+='<div class="fp-section-title">Electrical Data</div><div class="fp-elec">';
+  html+='<div><div class="fp-col-title">Voltage</div>' +
+    '<div class="fp-row"><span>VAB</span><b>'+item.vab+' V</b></div>' +
+    '<div class="fp-row"><span>VBC</span><b>'+item.vbc+' V</b></div>' +
+    '<div class="fp-row"><span>VCA</span><b>'+item.vca+' V</b></div>' +
+    '<div class="fp-row"><span>VAN</span><b>'+vAn+' V</b></div>' +
+    '<div class="fp-row"><span>VBN</span><b>'+vBn+' V</b></div>' +
+    '<div class="fp-row"><span>VCN</span><b>'+vCn+' V</b></div></div>';
+  html+='<div><div class="fp-col-title">Current</div>' +
+    '<div class="fp-row"><span>Amps A</span><b>'+item.ia+'</b></div>' +
+    '<div class="fp-row"><span>Amps B</span><b>'+item.ib+'</b></div>' +
+    '<div class="fp-row"><span>Amps C</span><b>'+item.ic+'</b></div>' +
+    '<div class="fp-col-title" style="margin-top:8px">Frequency</div>' +
+    '<div class="fp-row"><span>Hz</span><b>'+item.hz+'</b></div></div>';
+  html+='<div><div class="fp-col-title">Power</div><div class="fp-row"><span>kW</span><b>'+item.kw+'</b></div>';
+  if(!isAts){
+    var kvar=Math.sqrt(Math.max(0,item.kva*item.kva-item.kw*item.kw)).toFixed(0);
+    html+='<div class="fp-row"><span>kVA</span><b>'+item.kva+'</b></div>' +
+      '<div class="fp-row"><span>kVAR</span><b>'+kvar+'</b></div>' +
+      '<div class="fp-row"><span>PF</span><b>'+item.pf+'</b></div>' +
+      '<div class="fp-row"><span>%kW</span><b>'+item.pct+'%</b></div>';
+  }
+  html+='</div></div>';
+
+  if(isAts){ html+='<div class="fp-section-title">Connected Load</div><div class="fp-tag">'+item.load+'</div>'; }
+  html+='</div>';
+  return html;
+}
+
+function testWizardHtml(){
+  var w=state.wizard;
+  var sys=byId(DB.systems, w.systemId);
+  var selectedAts = sys.ats.filter(function(a){return w.atsIds.indexOf(a.id)>-1;});
+  var selectedGen = sys.generators.filter(function(g){return w.genIds.indexOf(g.id)>-1;});
+  var initiating = byId(sys.ats, w.initiatingAtsId);
+  var canContinue = w.testType==='no-load' ? selectedGen.length>0 : (selectedAts.length>0 && !!w.initiatingAtsId);
+  var remaining = Math.max(0, w.duration*60 - w.elapsed);
+  var stepLabel = {setup:'Test Wizard', confirm:'Confirm Test', monitor:'Test Monitoring', result:'Test Completed'}[w.step];
+  var stepIndex = ['setup','confirm','monitor','result'].indexOf(w.step);
+
+  var html='<button class="modal-close" onclick="closeModal()">&times;</button><div class="tw">';
+  html+='<div class="tw-head"><div><span>System test control</span><h2>'+stepLabel+'</h2><p>'+sys.name+'</p></div></div>';
+  html+='<div class="stepper">';
+  ['Setup','Confirm','Monitor','Result'].forEach(function(label,i){
+    html+='<span class="'+(i<=stepIndex?'active':'')+'"><i>'+(i+1)+'</i>'+label+'</span>';
+  });
+  html+='</div>';
+
+  if(w.step==='setup'){
+    html+='<div class="tw-sec"><span>01</span><div><h4>Test type</h4><p>Choose the test sequence to run.</p></div></div>';
+    html+='<div class="tw-types">' +
+      '<div class="tw-type'+(w.testType==='no-load'?' sel':'')+'" onclick="wizardSetType(\'no-load\')"><b>No-load test</b><small>Verify generator start and engine-running feedback without ATS transfer.</small></div>' +
+      '<div class="tw-type'+(w.testType==='load'?' sel':'')+'" onclick="wizardSetType(\'load\')"><b>Load test</b><small>Transfer the selected ATS group to emergency power and record the test window.</small></div>' +
+    '</div>';
+    html+='<div class="tw-settings">' +
+      '<label><span>Test duration</span><div class="tw-num"><input type="number" min="1" value="'+w.duration+'" onchange="wizardSetNum(\'duration\',this.value)"><b>min</b></div></label>' +
+      '<label><span>Start delay</span><div class="tw-num"><input type="number" min="0" value="'+w.startDelay+'" onchange="wizardSetNum(\'startDelay\',this.value)"><b>min</b></div></label>';
+    if(w.testType==='load'){
+      html+='<label><span>Block size</span><div class="tw-num"><input type="number" min="1" value="'+w.blockSize+'" onchange="wizardSetNum(\'blockSize\',this.value)"><b>ATS</b></div></label>' +
+        '<label><span>Block delay</span><div class="tw-num"><input type="number" min="0" value="'+w.blockDelay+'" onchange="wizardSetNum(\'blockDelay\',this.value)"><b>sec</b></div></label>';
+    }
+    html+='</div>';
+
+    if(w.testType==='no-load'){
+      html+='<div class="tw-sec"><span>02</span><div><h4>Generator test group</h4><p>Select the generators that will receive start commands.</p></div></div>';
+      html+='<div class="tw-actions-row"><button class="btn small" onclick="wizardSelectAllGen()">Select all</button><button class="btn small" onclick="wizardClearGen()">Clear all</button></div>';
+      html+='<div class="tw-list">';
+      sys.generators.forEach(function(g){
+        html+='<label class="'+(w.genIds.indexOf(g.id)>-1?'checked':'')+'"><input type="checkbox" '+(w.genIds.indexOf(g.id)>-1?'checked':'')+' onchange="wizardToggleGen(\''+g.id+'\')"><span>'+g.name+'</span><small>'+g.make+'</small></label>';
+      });
+      html+='</div>';
+    } else {
+      html+='<div class="tw-sec"><span>02</span><div><h4>ATS test group</h4><p>Select every ATS included in the transfer sequence.</p></div></div>';
+      html+='<div class="tw-actions-row"><button class="btn small" onclick="wizardSelectAllAts()">Select all</button><button class="btn small" onclick="wizardClearAts()">Clear all</button></div>';
+      html+='<div class="tw-list">';
+      sys.ats.forEach(function(a){
+        html+='<label class="'+(w.atsIds.indexOf(a.id)>-1?'checked':'')+'"><input type="checkbox" '+(w.atsIds.indexOf(a.id)>-1?'checked':'')+' onchange="wizardToggleAts(\''+a.id+'\')"><span>'+a.name+'</span><small>'+a.branch+'</small></label>';
+      });
+      html+='</div>';
+      html+='<div class="tw-sec" style="margin-top:16px"><span>03</span><div><h4>Initiating ATS</h4><p>This ATS receives the first test signal.</p></div></div>';
+      html+='<div class="tw-radio-list">';
+      selectedAts.forEach(function(a){
+        html+='<label><input type="radio" name="initAts" '+(w.initiatingAtsId===a.id?'checked':'')+' onchange="wizardSetInitiating(\''+a.id+'\')"><span>'+a.name+'</span></label>';
+      });
+      html+='</div>';
+    }
+    html+='<footer class="tw-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" '+(canContinue?'':'disabled')+' onclick="wizardGoStep(\'confirm\')">Continue</button></footer>';
+  }
+
+  else if(w.step==='confirm'){
+    html+='<div class="tw-warn"><b>Review before starting</b><span>This will begin the configured '+(w.testType==='load'?'ATS transfer':'generator no-load')+' test sequence.</span></div>';
+    html+='<dl class="tw-summary">' +
+      '<div><dt>Test type</dt><dd>'+(w.testType==='load'?'Load test':'No-load test')+'</dd></div>' +
+      '<div><dt>Duration</dt><dd>'+w.duration+' minutes</dd></div>' +
+      '<div><dt>Start delay</dt><dd>'+w.startDelay+' minutes</dd></div>';
+    if(w.testType==='load'){
+      html+='<div><dt>Initiating ATS</dt><dd>'+(initiating?initiating.name:'Not selected')+'</dd></div>' +
+        '<div><dt>Block sequence</dt><dd>'+w.blockSize+' ATS every '+w.blockDelay+' seconds</dd></div>' +
+        '<div style="grid-column:1/-1"><dt>Included ATS</dt><dd>'+selectedAts.map(function(a){return a.name;}).join(', ')+'</dd></div>';
+    } else {
+      html+='<div style="grid-column:1/-1"><dt>Selected generators</dt><dd>'+selectedGen.map(function(g){return g.name;}).join(', ')+'</dd></div>';
+    }
+    html+='</dl>';
+    html+='<footer class="tw-actions"><button class="btn" onclick="wizardGoStep(\'setup\')">Back to setup</button><button class="btn primary" onclick="wizardBegin()">Start test</button></footer>';
+  }
+
+  else if(w.step==='monitor'){
+    html+='<div class="tw-run-summary">' +
+      '<div><span>Test ID</span><b>TEST-'+new Date().getFullYear()+'-001</b></div>' +
+      '<div><span>Mode</span><b>'+(w.testType==='load'?'Load test':'No-load test')+'</b></div>' +
+      '<div><span>Duration</span><b>'+pad2(Math.floor(w.duration*60/60))+':'+pad2(w.duration*60%60)+'</b></div>' +
+      '<div><span>Remaining</span><b>'+pad2(Math.floor(remaining/60))+':'+pad2(remaining%60)+'</b></div>' +
+      '<button class="btn small" onclick="wizardAdvance()">Advance 1 min</button>' +
+    '</div>';
+    html+='<div class="tw-live"><section><div class="tw-panel-title"><h3>'+(w.testType==='load'?'ATS status':'Generator status')+'</h3><span class="live-badge">Running</span></div>';
+    if(w.testType==='load'){
+      html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ATS</th><th>Test signal</th><th>Position</th><th>Result</th></tr></thead><tbody>';
+      selectedAts.forEach(function(a){
+        html+='<tr><td>'+a.name+'</td><td><span class="pill g">Active</span></td><td><span class="pill r">Emergency</span></td><td><span class="pill g">Passed</span></td></tr>';
+      });
+      html+='</tbody></table></div>';
+    } else {
+      selectedGen.forEach(function(g){
+        html+='<div class="fp-box" style="margin-bottom:8px"><b>'+g.name+'</b><span>Engine running</span></div>';
+      });
+    }
+    html+='</section><section><div class="tw-panel-title"><h3>Event log</h3><span style="color:var(--text-dim);font-size:10px">Live</span></div>';
+    html+='<ol class="evt-log" style="list-style:none;padding-left:0">' +
+      '<li><time>00:00</time>Test started</li>' +
+      '<li><time>00:05</time>Generator start command issued</li>';
+    if(w.testType==='load'){
+      html+='<li><time>00:15</time>'+(initiating?initiating.name:'Initiating ATS')+' test signal active</li>' +
+        '<li><time>00:42</time>ATS group transferred to emergency</li>';
+    }
+    html+='<li><time>01:00</time>Test window recording</li></ol></section></div>';
+    html+='<footer class="tw-actions"><button class="btn danger" onclick="wizardFinish()">Abort test</button><button class="btn primary" onclick="wizardFinish()">Complete test</button></footer>';
+  }
+
+  else if(w.step==='result'){
+    html+='<div class="tw-result-banner"><i>OK</i><div><h3>Test sequence completed</h3><p>Test data has been recorded and the equipment has returned to its normal position.</p></div></div>';
+    html+='<div class="tw-result-grid">' +
+      '<div><span>Test type</span><b>'+(w.testType==='load'?'Load test':'No-load test')+'</b></div>' +
+      '<div><span>Duration</span><b>'+w.duration+' minutes</b></div>' +
+      '<div><span>ATS passed</span><b>'+(w.testType==='load'?selectedAts.length+' / '+selectedAts.length:'Not applicable')+'</b></div>' +
+      '<div><span>Generator status</span><b>'+(sys.generators.length?'Running signals received':'Not available')+'</b></div>' +
+    '</div>';
+    html+='<footer class="tw-actions"><button class="btn" onclick="closeModal()">Close</button><button class="btn primary">Generate report</button></footer>';
+  }
+
+  html+='</div>';
+  return html;
+}
+
+/* ---------------------------- shift / user / report modal bodies ---------------------------- */
+function shiftFormHtml(){
+  var f=state.shiftForm;
+  var html='<button class="modal-close" onclick="closeModal()">&times;</button><div class="fp">';
+  html+='<div class="fp-head"><div><h3>'+(f.id?'Edit On-Call Shift':'Add On-Call Shift')+'</h3><p>Weekly rotation entry</p></div></div>';
+  html+='<div class="frm-row"><label>Day</label><input type="text" value="'+f.day+'" placeholder="e.g. Monday" oninput="shiftField(\'day\', this.value)"></div>';
+  html+='<div class="frm-row"><label>Date</label><input type="date" value="'+f.date+'" onchange="shiftField(\'date\', this.value)"></div>';
+  html+='<div class="frm-row"><label>Primary on-call</label><input type="text" value="'+f.primary+'" placeholder="e.g. Sam Rivera" oninput="shiftField(\'primary\', this.value)"></div>';
+  html+='<div class="frm-row"><label>Secondary on-call</label><input type="text" value="'+f.secondary+'" placeholder="e.g. Alex Chen" oninput="shiftField(\'secondary\', this.value)"></div>';
+  html+='<div class="frm-row"><label>Shift</label><select onchange="shiftField(\'shift\', this.value)">';
+  SHIFT_TYPES.forEach(function(t){ html+='<option value="'+t+'" '+(f.shift===t?'selected':'')+'>'+t+'</option>'; });
+  html+='</select></div>';
+  html+='<footer class="tw-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveShift()">Save</button></footer>';
+  html+='</div>';
+  return html;
+}
+
+function userEditHtml(){
+  var f=state.userForm;
+  var u=byId(DB.users, f.id);
+  var html='<button class="modal-close" onclick="closeModal()">&times;</button><div class="fp">';
+  html+='<div class="fp-head"><div><h3>Assign role</h3><p>'+u.name+' &middot; '+u.email+'</p></div></div>';
+  html+='<div class="frm-row"><label>Role</label><select onchange="userFormSetRole(this.value)"><option value="">Select role...</option>';
+  ROLES.forEach(function(r){ html+='<option value="'+r.value+'" '+(f.role===r.value?'selected':'')+'>'+r.label+'</option>'; });
+  html+='</select></div>';
+  html+='<footer class="tw-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveUserRole()">Save</button></footer>';
+  html+='</div>';
+  return html;
+}
+
+function atsFormHtml(){
+  var f=state.atsForm;
+  var html='<button class="modal-close" onclick="closeModal()">&times;</button><div class="fp">';
+  html+='<div class="fp-head"><div><h3>'+(f.id?'Edit ATS':'Add ATS')+'</h3><p>Register a transfer switch for this system</p></div></div>';
+  html+='<div class="frm-row"><label>Name *</label><input type="text" value="'+f.name+'" placeholder="e.g. ATS-06" oninput="atsFormField(\'name\', this.value)"></div>';
+  html+='<div class="frm-row"><label>Branch *</label><select onchange="atsFormField(\'branch\', this.value)">';
+  [['life-safety','Life Safety'],['critical','Critical'],['equipment','Equipment']].forEach(function(b){
+    html+='<option value="'+b[0]+'" '+(f.branch===b[0]?'selected':'')+'>'+b[1]+'</option>';
+  });
+  html+='</select></div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    '<div class="frm-row"><label>Rated Amps</label><input type="number" min="0" value="'+f.ratedAmps+'" oninput="atsFormField(\'ratedAmps\', this.value)"></div>' +
+    '<div class="frm-row"><label>Rated Volts</label><input type="number" min="0" value="'+f.ratedVolts+'" oninput="atsFormField(\'ratedVolts\', this.value)"></div>' +
+  '</div>';
+  html+='<div class="frm-row"><label>Manufacturer</label><input type="text" value="'+f.manufacturer+'" oninput="atsFormField(\'manufacturer\', this.value)"></div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    '<div class="frm-row"><label>Model</label><input type="text" value="'+f.model+'" oninput="atsFormField(\'model\', this.value)"></div>' +
+    '<div class="frm-row"><label>Serial Number</label><input type="text" value="'+f.serial+'" oninput="atsFormField(\'serial\', this.value)"></div>' +
+  '</div>';
+  html+='<footer class="tw-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveAtsForm()">Save</button></footer>';
+  html+='</div>';
+  return html;
+}
+
+function genFormHtml(){
+  var f=state.genForm;
+  var html='<button class="modal-close" onclick="closeModal()">&times;</button><div class="fp">';
+  html+='<div class="fp-head"><div><h3>'+(f.id?'Edit Generator':'Add Generator')+'</h3><p>Register a generator for this system</p></div></div>';
+  html+='<div class="frm-row"><label>Name *</label><input type="text" value="'+f.name+'" placeholder="e.g. GEN-04" oninput="genFormField(\'name\', this.value)"></div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    '<div class="frm-row"><label>Make</label><input type="text" value="'+f.make+'" oninput="genFormField(\'make\', this.value)"></div>' +
+    '<div class="frm-row"><label>Model</label><input type="text" value="'+f.model+'" oninput="genFormField(\'model\', this.value)"></div>' +
+  '</div>';
+  html+='<div class="frm-row"><label>Serial Number</label><input type="text" value="'+f.serial+'" oninput="genFormField(\'serial\', this.value)"></div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">' +
+    '<div class="frm-row"><label>Rated kW</label><input type="number" min="0" value="'+f.ratedKw+'" oninput="genFormField(\'ratedKw\', this.value)"></div>' +
+    '<div class="frm-row"><label>Rated Volts</label><input type="number" min="0" value="'+f.ratedVolts+'" oninput="genFormField(\'ratedVolts\', this.value)"></div>' +
+    '<div class="frm-row"><label>Rated Amps</label><input type="number" min="0" value="'+f.ratedAmps+'" oninput="genFormField(\'ratedAmps\', this.value)"></div>' +
+  '</div>';
+  html+='<footer class="tw-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveGenForm()">Save</button></footer>';
+  html+='</div>';
+  return html;
+}
+
+function reportDetailHtml(id){
+  var r=byId(DB.reports, id);
+  var sys=byId(DB.systems, r.systemId);
+  var lp=r.loadProfile||[];
+  var threshold=(r.ratedKw||0)*0.3;
+  var perPoint = r.durationMin && lp.length>1 ? r.durationMin/(lp.length-1) : 0;
+  var maxRun=0, curRun=0;
+  lp.forEach(function(kw){ if(kw>=threshold){ curRun+=perPoint; if(curRun>maxRun) maxRun=curRun; } else curRun=0; });
+  var pass=maxRun>=30;
+  var peakVal=Math.max.apply(null, lp.concat([1]));
+
+  var html='<button class="modal-close" onclick="closeModal()">&times;</button><div class="fp">';
+  html+='<div class="fp-head"><div><h3>'+r.code+'</h3><p>'+sys.name+' &middot; '+r.date+' '+r.time+' &middot; '+r.durationLabel+'</p></div>' +
+    '<span class="pill '+(r.type==='gen-run'?'a':r.type==='ats-emergency'?'r':'g')+'">'+REPORT_TYPE_LABEL[r.type]+'</span></div>';
+
+  html+='<div class="fp-grid2" style="grid-template-columns:repeat(5,1fr)">' +
+    '<div class="fp-box"><span>Initiating ATS</span><b>'+(r.initiatingAts||'—')+'</b></div>' +
+    '<div class="fp-box"><span>Rated capacity</span><b>'+r.ratedKw+' kW</b></div>' +
+    '<div class="fp-box"><span>Peak load</span><b style="color:var(--accent)">'+r.peakKw+' kW ('+(r.ratedKw?Math.round(r.peakKw/r.ratedKw*100):0)+'%)</b></div>' +
+    '<div class="fp-box"><span>Avg load</span><b>'+r.avgKw+' kW ('+(r.ratedKw?Math.round(r.avgKw/r.ratedKw*100):0)+'%)</b></div>' +
+    '<div class="fp-box'+(pass?' on':'')+'"><span>&ge;30% for 30m</span><b style="color:'+(pass?'var(--green)':'var(--red)')+'">'+(pass?'Pass':'Fail')+' <small style="font-weight:600;color:var(--text-dim)">('+Math.round(maxRun)+'m)</small></b></div>' +
+  '</div>';
+
+  html+='<div class="fp-section-title">Generator Load Profile</div>';
+  html+='<div class="chart-bars">';
+  lp.forEach(function(kw){
+    var h=Math.max(2, Math.round(kw/peakVal*100));
+    html+='<i class="'+(kw>=threshold?'hi':'')+'" style="height:'+h+'%" title="'+kw+' kW"></i>';
+  });
+  html+='</div>';
+  html+='</div>';
+  return html;
+}
+
+/* ---------------------------- boot ---------------------------- */
+document.body.classList.add('dark');
+render();
+</script>
+</body>
+</html>
