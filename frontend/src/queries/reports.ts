@@ -24,3 +24,17 @@ export function useReport(id: string | undefined) {
     enabled: !!id,
   });
 }
+
+// A plain <a href> can't carry the axios instance's bearer-token header, so the PDF is fetched as a
+// blob (same auth as every other request) and handed to the browser as a local object URL instead.
+export async function downloadReportPdf(id: string, filename: string) {
+  const response = await api.get(`/api/reports/${id}/pdf`, { responseType: "blob" });
+  const url = URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

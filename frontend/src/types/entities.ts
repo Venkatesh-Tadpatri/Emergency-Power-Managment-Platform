@@ -15,6 +15,7 @@ export interface Company {
   lng?: number | null;
   reseller_id: string;
   status: string;
+  logo_data?: string | null;
 }
 
 export interface Site {
@@ -54,6 +55,7 @@ export interface ATS {
   model?: string | null;
   serial_number?: string | null;
   branch: "life-safety" | "critical" | "equipment" | string;
+  source_type?: "utility" | "generator" | string;
   rated_amps?: number | null;
   rated_volts?: number | null;
   panel_id: string;
@@ -83,6 +85,18 @@ export interface Alarm {
   ack_at?: string | null;
 }
 
+export interface AtsTransferDetail {
+  ats_name: string;
+  branch?: string | null;
+  manufacturer?: string | null;
+  serial_number?: string | null;
+  switched_to_emergency?: string | null;
+  switched_to_normal?: string | null;
+  time_to_bus_sec?: number | null;
+  time_to_available_sec?: number | null;
+  on_emergency_duration?: string | null;
+}
+
 export interface ReportListItem {
   id: string;
   company_id: string;
@@ -97,10 +111,36 @@ export interface ReportListItem {
   rated_kw?: number | null;
   peak_kw?: number | null;
   avg_kw?: number | null;
+  event_type?: string | null;
+  ats_details?: AtsTransferDetail[] | null;
+}
+
+export interface TelemetryLogRow {
+  time: string;
+  vab?: number | null;
+  vbc?: number | null;
+  vca?: number | null;
+  ia?: number | null;
+  ib?: number | null;
+  ic?: number | null;
+  kw?: number | null;
+  pct_kw?: number | null;
+  oil_psi?: number | null;
+  water_temp_f?: number | null;
+  batt_v?: number | null;
+  hours?: number | null;
 }
 
 export interface ReportDetail extends ReportListItem {
   load_profile_data?: number[] | null;
+  make?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  rated_voltage?: number | null;
+  rated_amperage?: number | null;
+  start_hours?: number | null;
+  end_hours?: number | null;
+  telemetry_log?: TelemetryLogRow[] | null;
 }
 
 export interface OnCallShift {

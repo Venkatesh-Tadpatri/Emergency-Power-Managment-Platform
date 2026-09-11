@@ -214,3 +214,23 @@ export function useDeleteGenerator() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["generators"] }),
   });
 }
+
+/** The One-Line Wizard's saved equipment/connections model for a system — one row per system, or none yet. */
+export type OneLineRecord = { id: string; system_id: string; data: Record<string, unknown> };
+
+export function useOneLine(systemId: string | undefined) {
+  return useQuery({
+    queryKey: ["one-line", systemId],
+    queryFn: async () => (await api.get<OneLineRecord | null>(`/api/systems/${systemId}/one-line`)).data,
+    enabled: !!systemId,
+  });
+}
+
+export function useSaveOneLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ systemId, data }: { systemId: string; data: Record<string, unknown> }) =>
+      (await api.put<OneLineRecord>(`/api/systems/${systemId}/one-line`, { data })).data,
+    onSuccess: (_result, { systemId }) => qc.invalidateQueries({ queryKey: ["one-line", systemId] }),
+  });
+}

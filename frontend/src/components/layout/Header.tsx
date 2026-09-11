@@ -152,10 +152,16 @@ export function Header() {
             placeholder="Search resellers by name..."
           />
         </div>
-        <div className="header-icon-btn">
+        <button
+          type="button"
+          className="header-icon-btn"
+          onClick={() => navigate("/alarms")}
+          aria-label={unackedCount > 0 ? `View alarms — ${unackedCount} unacknowledged` : "View alarms"}
+          title="View alarms"
+        >
           <IconBell size={16} />
           {unackedCount > 0 && <span className="header-icon-dot">{unackedCount > 9 ? "9+" : unackedCount}</span>}
-        </div>
+        </button>
         <div className="header-user" ref={menuRef} onClick={() => setMenuOpen((v) => !v)}>
           <div className="header-user-avatar">{(displayEmail || "?").slice(0, 1).toUpperCase()}</div>
           <div>

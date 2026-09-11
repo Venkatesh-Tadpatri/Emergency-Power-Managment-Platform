@@ -71,7 +71,7 @@ button { font-family:inherit; }
 .header-greeting { font-size:12px; color:var(--text-dim); margin-bottom:1px; }
 .search-box { display:flex; align-items:center; gap:7px; padding:6px 12px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); font-size:12px; color:var(--text-dim); min-width:220px; }
 .search-box input { background:none; border:none; color:var(--text); font-size:12px; font-family:inherit; outline:none; flex:1; }
-.header-icon-btn { position:relative; width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); background:var(--surface-2); border:1px solid var(--border); cursor:pointer; flex-shrink:0; }
+.header-icon-btn { position:relative; width:34px; height:34px; padding:0; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); background:var(--surface-2); border:1px solid var(--border); cursor:pointer; flex-shrink:0; font:inherit; box-sizing:border-box; }
 .header-icon-btn:hover { background:var(--surface-3); color:var(--text); }
 .header-icon-dot { position:absolute; top:-4px; right:-4px; background:var(--red); color:white; font-size:9px; font-weight:700; min-width:16px; height:16px; border-radius:9px; display:flex; align-items:center; justify-content:center; padding:0 3px; border:2px solid var(--surface); }
 .header-user { position:relative; display:flex; align-items:center; gap:9px; padding-left:12px; border-left:1px solid var(--border); cursor:pointer; }
@@ -91,6 +91,13 @@ button { font-family:inherit; }
 .header-btn:hover { background:var(--surface-2); border-color:var(--border-2); }
 .header-btn.primary { background:var(--blue); border-color:var(--blue); color:white; }
 .header-btn.primary:hover { background:#1d4ed8; }
+/* The wizard/result surface is always-dark regardless of the app theme (like the faceplate tags), but
+   the base .header-btn relies on theme variables — in dark mode those nearly match this background,
+   making "Legend", "View JSON", "Back" etc. almost invisible. Force them to a fixed, visible dark style. */
+.wizard-section .header-btn:not(.primary) { background:#0c1c30; border-color:#2d5073; color:#edf5ff; }
+.wizard-section .header-btn:not(.primary):hover { background:#0f2740; border-color:#3b82f6; }
+.header-btn.danger { background:var(--red); border-color:var(--red); color:white; }
+.header-btn.danger:hover { background:#b91c1c; }
 .content { flex:1; overflow-y:auto; padding:20px 24px; background:linear-gradient(90deg,rgba(248,250,252,.89) 0%,rgba(248,250,252,.76) 49%,rgba(248,250,252,.48) 100%),url('/images/reseller-power-background.png') center right / cover no-repeat,#f8fafc; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -140,6 +147,22 @@ button { font-family:inherit; }
 .analytics-row-clickable:focus-visible { outline:2px solid var(--blue); outline-offset:-2px; }
 .analytics-row-clickable td:first-child strong { color:#1d4ed8; }
 body.dark-dashboard .analytics-row-clickable td:first-child strong { color:#7ab6ff; }
+/* The rest of this page's colors were hardcoded light-theme hex values (not the --surface/--text
+   variables that already flip automatically in dark mode) — e.g. .analytics-metric's light gradient
+   background left its own (correctly dark-mode-aware) text unreadable against it, and the table's
+   hover/header/status colors were the same light blue/green/orange regardless of theme. */
+body.dark-dashboard .analytics-tab.active { background:var(--surface-3); color:#7ab6ff; border-color:var(--border-2); }
+body.dark-dashboard .analytics-live-status { border-color:var(--border-2); color:var(--text-dim); background:var(--surface-2); }
+body.dark-dashboard .analytics-live-status.online { border-color:#1f6b45; color:#4ade80; background:#0f2e1c; }
+body.dark-dashboard .analytics-frame-note { background:var(--surface-2); }
+body.dark-dashboard .analytics-frame { background:#0a1626; }
+body.dark-dashboard .analytics-metric { background:linear-gradient(145deg,var(--surface-2),var(--surface-3)); }
+body.dark-dashboard .analytics-metric.alert { background:#3a2410; }
+body.dark-dashboard .analytics-metric.alert strong { color:#fb923c; }
+body.dark-dashboard .analytics-table th { color:#7ab6ff; background:var(--surface-3); border-bottom-color:var(--border-2); }
+body.dark-dashboard .analytics-table tbody tr:hover { background:var(--surface-2); }
+body.dark-dashboard .analytics-status.healthy { color:#4ade80; background:#0f2e1c; }
+body.dark-dashboard .analytics-status.fault { color:#f87171; background:#3a1414; }
 
 .modal-box.device-analytics-modal { position:relative; width:min(880px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; padding:0; border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:var(--shadow-md); }
 .modal-box.device-analytics-modal > h3 { display:none; }
@@ -323,6 +346,14 @@ body.dark-dashboard .modal-box.device-analytics-modal .equipment-popup-close { b
 .site-system-card-head h3 { margin:0; color:#12213c; font-size:15px; line-height:1.3; }
 .site-system-card-head .status-pill { padding:5px 13px; border-radius:14px; font-size:12px; font-weight:800; gap:5px; }
 .site-system-card-head .status-pill.pill-emergency { animation:emergency-blink 1s steps(2,end) infinite; }
+.site-system-card-menu { position:relative; }
+.site-system-card-menu-btn { display:grid; place-items:center; width:24px; height:24px; padding:0; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--text-dim); font-size:16px; line-height:1; cursor:pointer; }
+.site-system-card-menu-btn:hover { border-color:var(--border); background:var(--surface); color:var(--text); }
+.site-system-card-menu-panel { position:absolute; z-index:2100; top:calc(100% + 4px); right:0; min-width:110px; padding:4px; border:1px solid var(--border); border-radius:8px; background:var(--surface); box-shadow:0 12px 28px rgba(15,23,42,.22); }
+.site-system-card-menu-panel button { display:block; width:100%; padding:7px 10px; border:0; border-radius:6px; background:transparent; color:var(--text); font-size:12.5px; font-weight:600; text-align:left; cursor:pointer; }
+.site-system-card-menu-panel button:hover { background:rgba(37,99,235,.12); }
+.site-system-card-menu-panel button.danger { color:var(--red); }
+.site-system-card-menu-panel button.danger:hover { background:rgba(220,38,38,.12); }
 .site-system-stats { display:flex; flex-direction:column; gap:7px; padding:12px 0; border-top:1px solid #eef2f7; border-bottom:1px solid #eef2f7; }
 .site-system-stat { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; }
 .site-system-stat span { color:#71819a; }
@@ -353,16 +384,22 @@ body.dark-dashboard .modal-box.device-analytics-modal .equipment-popup-close { b
 .system-sld-canvas-inner { width:100%; }
 .sld-sources { display:flex; align-items:flex-start; justify-content:space-between; height:172px; overflow:visible; }.sld-source { position:relative; display:flex; align-items:center; gap:8px; }.sld-source>i { display:grid; place-items:center; width:30px; height:30px; border:none; border-radius:0; color:#15803d; background:transparent; font-style:normal; font-size:16px; }.sld-source b,.sld-source small { display:block; }.sld-source b { color:#1d4f38; font-size:10px; letter-spacing:.06em; }.sld-source small { margin-top:2px; color:#6b8b7b; font-size:8px; }
 .sld-utility-column { display:flex; flex-direction:column; align-items:flex-start; }
-.sld-gear-connector { display:block; width:2px; height:18px; margin:0 0 0 14px; background:#22c55e; }
-.sld-gear-connector.tail { height:80px; }
+.sld-gear-connector { display:block; width:2px; height:26px; margin:0 0 0 14px; background:#22c55e; }
+.sld-gear-connector.tail { height:54px; }
 /* A running generator's line should reach down to (and stop at) the emergency bus; a ready-but-idle
    generator's line should stop at the normal bus, like the utility's — so only the emergency-source
-   (running) tail gets the extra 32px needed to clear the gap between the two bus rows. Ready/idle
-   generators keep the default 80px tail, same as the utility, landing at the normal bus. */
-.sld-generators .sld-generator-column .sld-gear-connector.tail.emergency-source { height:91px; }
-.sld-generators .sld-generator-column .sld-gear-connector.tail.normal-source { height:75px; }
+   (running) tail gets the extra reach needed to clear the gap between the two bus rows. Ready/idle
+   generators get their own (slightly different from the utility's) tail landing at the normal bus. */
+/* Lead (G circle → breaker) and tail (breaker → bus) split the same total reach evenly, so the two
+   marked segments read as equal length while the tail still lands exactly on its bus, not past it. */
+.sld-generators .sld-generator-column .sld-gear-connector.tail.emergency-source { height:54.5px; }
+.sld-generators .sld-generator-column .sld-gear-connector.tail.normal-source { height:46.5px; }
+.sld-generators .sld-generator-column .sld-gear-connector.emergency-source:not(.tail) { height:54.5px; }
+.sld-generators .sld-generator-column .sld-gear-connector.normal-source:not(.tail) { height:46.5px; }
 .sld-gear-connector.lead { height:60px; }
 .sld-gear-connector.emergency-source { background:#ef4444; }
+/* De-energized/standby power-flow tone (Result tab spine): grey wire for a ready-but-not-running generator. */
+.sld-gear-connector.standby { background:#64748b; }
 .sld-gear-row { display:flex; align-items:center; gap:0; margin:0; }
 .sld-gear-icon { display:grid; place-items:center; width:30px; height:30px; flex:0 0 auto; overflow:visible; }
 .sld-gear-label { margin-left:2px; color:#4b6a89; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
@@ -371,12 +408,23 @@ body.dark-dashboard .modal-box.device-analytics-modal .equipment-popup-close { b
 .sld-breaker-symbol.tie { color:#64748b; }
 .sld-breaker-tag { align-self:flex-start; margin:0; padding:0; border:0; border-radius:0; background:transparent; color:#166534; font:800 8px 'JetBrains Mono',monospace; text-transform:uppercase; white-space:nowrap; }
 .sld-breaker-tag.emergency-source { color:#b91c1c; }
+.sld-breaker-tag.standby { color:#64748b; }
 .sld-generators { position:relative; display:flex; flex-wrap:nowrap; align-items:flex-start; gap:40px; margin-right:8px; }.sld-generator { position:relative; display:grid; justify-items:center; width:46px; min-width:46px; text-align:center; }.sld-generator i { position:relative; z-index:2; display:grid; place-items:center; width:29px; height:29px; border:2px solid #111827; border-radius:50%; color:#fff; background:#22c55e; font:800 16px Inter,sans-serif; }.sld-generator.emergency-source i { background:#ef4444; }.sld-generator span { order:-1; margin-bottom:2px; overflow:hidden; max-width:56px; color:#1d4f38; font-size:8px; font-weight:800; line-height:8px; text-align:center; text-overflow:ellipsis; white-space:nowrap; }.sld-generator small { order:-1; margin-bottom:2px; color:#4b7360; font-size:7px; line-height:7px; text-align:center; white-space:nowrap; }.sld-generator.emergency-source small { color:#c92a2a; }
 .sld-generator-column { display:flex; flex-direction:column; align-items:center; width:46px; min-width:46px; }
 .sld-generator-column .sld-gear-connector { margin:0 auto; }
 .sld-breaker-with-tag { position:relative; display:inline-flex; align-items:center; }
 .sld-breaker-with-tag .sld-breaker-tag { position:absolute; left:100%; top:50%; margin-left:5px; transform:translateY(-50%); white-space:nowrap; }
-.sld-buses { position:relative; display:grid; grid-template-rows:16px 16px; margin:0 30px 0 15px; }.sld-bus { position:relative; border-top:2px solid #22c55e; }.sld-bus span { position:absolute; right:0; top:-12px; padding:1px 5px; border-radius:5px; color:#15803d; background:#ecf5f0; font-size:7px; font-weight:800; text-transform:uppercase; }.sld-bus.normal span { top:-13px; right:auto; left:0; }.sld-bus.emergency { border-color:#ef4444; }.sld-bus.emergency::before { content:""; position:absolute; top:-19px; right:0; height:17px; border-left:2px solid #ef4444; }.sld-bus.emergency span { top:3px; color:#c92a2a; background:#fff1f2; }
+/* Clickable hit-area around a breaker glyph — a highlighted ring (matching the paper one-line's
+   click-to-inspect convention) appears on hover/selection without altering the glyph's own size. */
+.sld-breaker-hit { display:inline-flex; align-items:center; justify-content:center; padding:5px; margin:-5px; border:0; border-radius:50%; background:none; color:inherit; cursor:pointer; transition:box-shadow .15s ease; }
+/* A crisp circular outline (not a filled/blurred glow) around the breaker's own glyph — box-shadow
+   rather than border so it doesn't shift the glyph's layout by adding to its box size. Blue on hover
+   (this is clickable), red once actually selected/opened — hover's ring takes priority while both
+   would otherwise apply, so pointing at the currently-open breaker still reads as "hovering here". */
+.sld-breaker-hit.selected { box-shadow:0 0 0 2.5px #ef4444; }
+.sld-breaker-hit:hover { box-shadow:0 0 0 2.5px #3b82f6; }
+.sld-breaker-hit:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
+.sld-buses { position:relative; display:grid; grid-template-rows:16px 16px; margin:0 30px 0 15px; }.sld-bus { position:relative; border-top:2px solid #22c55e; }.sld-bus span { position:absolute; right:0; top:-12px; padding:1px 5px; border-radius:5px; color:#15803d; background:#ecf5f0; font-size:7px; font-weight:800; text-transform:uppercase; }.sld-bus.normal span { top:-16px; right:auto; left:6px; }.sld-bus.emergency { border-color:#ef4444; }.sld-bus.emergency::before { content:""; position:absolute; top:-19px; right:0; height:17px; border-left:2px solid #ef4444; }.sld-bus.emergency span { top:3px; color:#c92a2a; background:#fff1f2; }
 .sld-ats-grid { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(100px,1fr); gap:10px; margin-top:2px; }.sld-ats { position:relative; display:grid; justify-items:center; padding-top:13px; text-align:center; }.sld-ats::before,.sld-ats::after { content:""; position:absolute; z-index:0; left:calc(50% - 12px); width:0; border-left:2px solid #22c55e; }.sld-ats::before { top:-32px; height:45px; }.sld-ats::after { display:none; left:calc(50% + 12px); top:-16px; height:29px; border-color:#ef4444; }.sld-ats.on-emergency::before { display:none; }.sld-ats.on-emergency::after { display:block; }.sld-switch { position:relative; z-index:1; width:62px; height:62px; box-sizing:border-box; border:2px solid #15803d; border-radius:4px; background:#22c55e; box-shadow:0 3px 7px rgba(22,163,74,.2); }.sld-terminal { position:absolute; display:grid; place-items:center; z-index:2; width:17px; height:17px; box-sizing:border-box; border:2px solid #b8c8d9; border-radius:50%; color:#183150; background:#fff; font-size:8px; font-weight:900; }.sld-terminal.normal-terminal { top:7px; left:7px; }.sld-terminal.emergency-terminal { top:7px; right:7px; }.sld-terminal.load-terminal { right:calc(50% - 8.5px); bottom:7px; border-color:#b8c8d9; }.sld-terminal.active { color:#fff; border-color:#fff; background:#15803d; box-shadow:0 0 0 2px rgba(255,255,255,.55); }.sld-ats.on-emergency .sld-terminal.active { background:#dc2626; }.sld-arm { position:absolute; z-index:1; top:14px; left:16px; width:35px; height:3px; border-radius:3px; background:#50647a; transform:rotate(63.5deg); transform-origin:left center; }.sld-ats.on-emergency .sld-arm { top:14px; left:12px; background:#50647a; transform:rotate(-63.5deg); transform-origin:right center; }.sld-load-line { position:relative; z-index:0; display:block; height:10px; margin-top:-1px; border-left:2px solid #22c55e; }.sld-ats b { max-width:100%; margin-top:1px; overflow:hidden; color:#294a6b; font-size:8px; text-overflow:ellipsis; white-space:nowrap; }.sld-ats small { margin-top:2px; color:#16803d; font-size:7px; }.sld-load-label { display:block; margin-top:3px; padding:2px 5px; border:1px solid #86efac; border-radius:4px; color:#166534; background:#f0fdf4; font-size:7px; font-weight:800; text-transform:uppercase; }.sld-ats.on-emergency small { color:#d93636; }.sld-ats.on-normal .sld-switch { border-color:#15803d; background:#22c55e; }.sld-ats.on-emergency .sld-switch { border-color:#dc2626; background:#ef4444; box-shadow:0 3px 7px rgba(239,68,68,.2); }.sld-ats.on-emergency .sld-load-line { border-color:#ef4444; }.sld-ats.on-emergency .sld-load-label { border-color:#fecaca; color:#b91c1c; background:#fff1f2; }
 body.dark-dashboard .system-sld { border-color:#285073; background:linear-gradient(145deg,#0c2036,#081a2d); }.system-sld-header { background:rgba(255,255,255,.7); }body.dark-dashboard .system-sld-header { border-color:#244969; background:#0b1d31; }body.dark-dashboard .system-sld-header h3 { color:#e1efff; }body.dark-dashboard .system-sld-canvas { background-color:#0a192b; background-image:linear-gradient(rgba(148,163,184,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.07) 1px,transparent 1px); }body.dark-dashboard .sld-switch { border-color:#315978; background:#0c2036; }body.dark-dashboard .sld-ats b { color:#d1e6fb; }body.dark-dashboard .sld-generator i { border-color:#7dc4a8; }body.dark-dashboard .sld-generator.emergency-source i { border-color:#f8a8a8; }body.dark-dashboard .sld-generator span { color:#d1e6fb; }body.dark-dashboard .sld-generator small { color:#9eb8d5; }body.dark-dashboard .sld-generator.emergency-source small { color:#fca5a5; }
 body.dark-dashboard .sld-source>i { color:#4ade80; }
@@ -400,6 +448,11 @@ button.sld-generator { padding:0; border:0; background:transparent; cursor:point
 .system-asset-group p { margin:8px 0 0; color:#8398af; font-size:10px; font-style:italic; }
 .site-alarms-heading { margin-top:20px; }
 .site-alarms-empty { padding:18px; border:1px dashed #bfd2e9; border-radius:10px; color:#60748d; background:rgba(255,255,255,.58); font-size:12px; }
+.site-status-banner { margin-bottom:20px; padding:18px 22px; border-radius:12px; border:1px solid rgba(34,197,94,.35); background:linear-gradient(135deg,#0a2e1a,#04140c); box-shadow:0 10px 26px rgba(0,0,0,.25); }
+.site-status-banner h2 { margin:0 0 4px; color:#22c55e; font:800 20px Arial,sans-serif; letter-spacing:.02em; }
+.site-status-banner p { margin:0; color:#a8bed5; font-size:12.5px; font-weight:600; }
+.site-status-banner.emergency { border-color:rgba(239,68,68,.4); background:linear-gradient(135deg,#3a0a0a,#180404); }
+.site-status-banner.emergency h2 { color:#ef4444; }
 body.dark-dashboard .site-system-card { background:linear-gradient(145deg,#0b1d31,#081727); border-color:#1b3b59; box-shadow:0 10px 24px rgba(0,0,0,.2); }
 body.dark-dashboard .site-system-card:hover { background:linear-gradient(145deg,#102943,#0b1d31); border-color:#3273b6; }
 body.dark-dashboard .site-system-card-head h3 { color:#eef6ff; }
@@ -674,14 +727,14 @@ tr.alarm-subgroup-row td { background:rgba(37,99,235,0.05); border-left:3px soli
 /* ─── MAP ─── */
 .map-container { position:relative; width:100%; height:100%; background:var(--surface); border-radius:12px; border:1px solid var(--border); overflow:hidden; }
 .map-legend { position:absolute; bottom:16px; left:16px; background:rgba(255,255,255,0.96); border:1px solid var(--border); border-radius:8px; padding:10px 14px; z-index:1000; box-shadow:var(--shadow-md); }
-.map-legend-item { display:flex; align-items:center; gap:6px; font-size:10px; margin-bottom:4px; color:var(--text-dim); }
+.map-legend-item { display:flex; align-items:center; gap:6px; font-size:10px; margin-bottom:4px; color:#5c7188; }
 .map-legend-dot { width:8px; height:8px; border-radius:50%; }
 .map-stats { position:absolute; top:16px; right:60px; background:rgba(255,255,255,0.96); border:1px solid var(--border); border-radius:8px; padding:10px 14px; z-index:1000; box-shadow:var(--shadow-md); }
 .map-stat-row { display:flex; justify-content:space-between; gap:20px; font-size:11px; margin-bottom:3px; }
 
 .leaflet-container { background:#e7ecf3; font-family:Inter,-apple-system,sans-serif; }
-.leaflet-control-zoom a { background:#ffffff!important; color:var(--text)!important; border-color:var(--border)!important; }
-.leaflet-control-zoom a:hover { background:var(--surface-2)!important; }
+.leaflet-control-zoom a { background:#ffffff!important; color:#0f172a!important; border-color:#d9e2ec!important; }
+.leaflet-control-zoom a:hover { background:#eef2f6!important; }
 .cpc-map-tooltip { background:#ffffff!important; border:1px solid var(--border)!important; border-radius:8px!important; padding:8px 12px!important; box-shadow:var(--shadow-md)!important; color:var(--text)!important; }
 .cpc-map-tooltip .leaflet-tooltip-tip { border-top-color:#ffffff!important; }
 .cpc-map-label { background:none!important; border:none!important; box-shadow:none!important; }
@@ -784,6 +837,97 @@ tr.alarm-subgroup-row td { background:rgba(37,99,235,0.05); border-left:3px soli
 .cal-event-type { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; display:block; }
 .cal-event-sys { font-size:9px; color:var(--text-dim); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
+/* ─── Reporting Calendar upgrade: type filter row, colored-dot events, a selected-day side panel with
+   a Legend — matching the reference design, built on top of the existing calendar grid above. ─── */
+.cal-layout { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
+@media(max-width:900px) { .cal-layout { grid-template-columns:1fr; } }
+.cal-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+.cal-nav { margin-bottom:0; justify-content:flex-start; }
+.cal-today-btn { padding:6px 12px; border-radius:6px; border:1px solid var(--blue); background:transparent; color:var(--blue); font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; }
+.cal-today-btn:hover { background:rgba(37,99,235,.08); }
+.cal-filter-row { display:flex; gap:8px; flex-wrap:wrap; }
+.cal-filter-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:1px solid var(--border); background:var(--surface); color:var(--text-dim); font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
+.cal-filter-dot { width:7px; height:7px; border-radius:50%; background:var(--text-muted); }
+.cal-filter-chip.gen-run .cal-filter-dot { background:var(--blue); }
+.cal-filter-chip.test .cal-filter-dot { background:var(--amber); }
+.cal-filter-chip.ats-emergency .cal-filter-dot { background:var(--red); }
+.cal-filter-chip.active { border-color:var(--blue); color:var(--blue); background:rgba(37,99,235,.08); }
+.cal-cell { cursor:pointer; }
+.cal-cell.selected { outline:2px solid var(--blue); outline-offset:-2px; }
+.cal-event-dot { display:flex; align-items:center; gap:5px; padding:2px 4px; border-radius:4px; margin-bottom:2px; }
+.cal-event-dot .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; background:var(--text-muted); }
+.cal-event-dot.gen-run .dot { background:var(--blue); }
+.cal-event-dot.test .dot { background:var(--amber); }
+.cal-event-dot.ats-emergency .dot { background:var(--red); }
+.cal-event-more { font-size:9px; color:var(--text-dim); font-weight:600; padding:1px 4px; }
+.cal-side { display:flex; flex-direction:column; gap:14px; }
+.cal-side-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; box-shadow:var(--shadow-sm); }
+.cal-side-date { font-size:14px; font-weight:700; }
+.cal-side-count { font-size:11px; color:var(--text-dim); margin-bottom:12px; }
+.cal-side-report { border:1px solid var(--border); border-left-width:3px; border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:pointer; background:var(--surface-2); transition:background .15s; }
+.cal-side-report:hover { background:var(--surface-3); }
+.cal-side-report:last-child { margin-bottom:0; }
+.cal-side-report.gen-run { border-left-color:var(--blue); }
+.cal-side-report.test { border-left-color:var(--amber); }
+.cal-side-report.ats-emergency { border-left-color:var(--red); }
+.cal-side-report-badge { font-size:8.5px; font-weight:800; letter-spacing:.04em; padding:2px 6px; border-radius:4px; color:#fff; }
+.cal-side-report-badge.gen-run { background:var(--blue); }
+.cal-side-report-badge.test { background:var(--amber); }
+.cal-side-report-badge.ats-emergency { background:var(--red); }
+.cal-side-report-time { font-size:10px; color:var(--text-muted); float:right; }
+.cal-side-report-title { font-size:12.5px; font-weight:700; margin-top:6px; }
+.cal-side-report-meta { font-size:10.5px; color:var(--text-dim); margin-top:2px; }
+.cal-side-empty { font-size:11.5px; color:var(--text-muted); font-style:italic; }
+.cal-legend-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; }
+.cal-legend-title { font-size:12px; font-weight:700; margin-bottom:8px; }
+.cal-legend-row { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-dim); padding:4px 0; }
+.cal-legend-row .cal-event-dot { margin-bottom:0; padding:0; }
+
+/* ─── Date-range filter bar shared by the Initiating ATS / Time to Buss analytical reports. ─── */
+.report-filter-bar { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:16px; }
+.report-filter-field { display:flex; flex-direction:column; gap:4px; }
+.report-filter-field label { font-size:9px; font-weight:700; letter-spacing:.05em; color:var(--text-dim); text-transform:uppercase; }
+.report-filter-field input[type="date"] { border:1px solid var(--border); border-radius:7px; padding:7px 10px; font-size:12px; background:var(--surface); color:var(--text); font-family:inherit; }
+.report-filter-preset { padding:8px 12px; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--text-dim); font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
+.report-filter-preset:hover { background:var(--surface-2); }
+.report-generate-btn { margin-left:auto; padding:9px 16px; border-radius:7px; border:0; background:#0f1f33; color:#fff; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+.report-generate-btn:hover { background:#182f4d; }
+
+/* ─── Analytical report tables (Initiating ATS / Time to Buss) reuse the Generator Run / ATS Transfer
+   report's own .report-doc-* card styling, so all the report views share one visual language. ─── */
+/* The Initiating ATS / Time to Buss reports are interactive, in-app tools (filters, presets, a live
+   Generate button) rather than a stand-in for a printed page — so unlike Generator Run/ATS Transfer's
+   deliberately-fixed light "document" look, these follow the app's own light/dark theme via the same
+   --surface/--text variables everything else uses, instead of the .report-doc base's hardcoded white. */
+.report-doc.analytical { padding:16px; background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm); }
+.report-doc.analytical .report-doc-tiles { padding:0 0 4px; }
+.report-doc.analytical .report-doc-tile.light { background:var(--surface-2); border-color:var(--border); }
+.report-doc.analytical .report-doc-tile-value.dark-text { color:var(--text); }
+.report-doc.analytical .report-doc-tile-label.light-label { color:var(--text-muted); }
+.report-doc.analytical .report-doc-info-cell, .report-doc.analytical .report-doc-info-strip { border-color:var(--border); }
+.report-doc.analytical .report-doc-section-title { color:var(--text-dim); }
+.report-doc.analytical .report-doc-section-range { color:var(--text-muted); }
+.report-doc.analytical .report-doc-caption { color:var(--text-muted); }
+.report-doc.analytical .report-doc-table-wrap { border-color:var(--border); }
+.report-doc.analytical .report-doc-table th { background:var(--surface-2); color:var(--text-dim); border-color:var(--border); }
+.report-doc.analytical .report-doc-table td { color:var(--text); border-color:var(--border); }
+.report-doc.analytical .report-doc-empty { color:var(--text-muted); }
+.report-doc.analytical .report-doc-footer { border-color:var(--border); color:var(--text-muted); }
+.report-doc.analytical .report-doc-event-chip { background:var(--surface-3); color:var(--text-dim); }
+.report-doc.analytical .report-doc-event-chip.test { background:rgba(180,83,9,.18); color:#f5b042; }
+.report-doc.analytical .report-doc-event-chip.ats-emergency { background:rgba(220,38,38,.18); color:#f87171; }
+.report-doc.analytical .report-doc-event-chip.gen-run { background:rgba(37,99,235,.18); color:#7ab6ff; }
+.report-doc-section-row { display:flex; align-items:center; justify-content:space-between; padding:0; }
+.report-doc-section-range { font-size:10px; color:#94a3b8; font-weight:600; text-transform:none; letter-spacing:0; }
+.report-doc-caption { padding:0 0 10px; margin:0; font-size:10.5px; color:#94a3b8; }
+.report-doc-table.left th, .report-doc-table.left td { text-align:left; }
+.report-doc-event-chip { display:inline-block; font-size:8.5px; font-weight:800; letter-spacing:.03em; padding:2px 7px; border-radius:10px; background:#e2e8f0; color:#475569; }
+.report-doc-event-chip.test { background:#fef3c7; color:#92400e; }
+.report-doc-event-chip.ats-emergency { background:#fee2e2; color:#b91c1c; }
+.report-doc-event-chip.gen-run { background:#dbeafe; color:#1d4ed8; }
+.report-doc-cell-danger { color:#dc2626; font-weight:700; font-family:'JetBrains Mono',monospace; }
+.report-doc-exceeded { font-size:8.5px; font-weight:800; color:#dc2626; margin-left:4px; }
+
 .report-back-btn { display:inline-flex; align-items:center; gap:4px; padding:5px 12px; border-radius:6px; font-size:11px; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--blue); cursor:pointer; font-family:inherit; margin-bottom:14px; transition:all 0.15s; }
 .report-back-btn:hover { background:var(--surface-2); }
 .report-detail-header { margin-bottom:14px; }
@@ -796,6 +940,92 @@ tr.alarm-subgroup-row td { background:rgba(37,99,235,0.05); border-left:3px soli
 .report-chart-wrap { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:18px; box-shadow:var(--shadow-sm); }
 .report-chart-title { font-size:12px; font-weight:700; margin-bottom:10px; }
 .report-chart-canvas { width:100%; height:260px; display:block; }
+
+/* ─── Generator Run Report / ATS Transfer Report — a print-styled document page (matching the two
+   reference designs), deliberately independent of the app's own dark operator theme, since it's meant
+   to read the same whether viewed on screen or downloaded as the PDF (build_report_pdf in the backend
+   uses this same navy/red/white palette). ─── */
+.report-detail-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.report-detail-toolbar .report-back-btn { margin-bottom:0; }
+.report-download-btn { display:inline-flex; align-items:center; gap:4px; padding:8px 14px; border-radius:7px; font-size:12px; font-weight:700; border:0; background:#dc2626; color:#fff; cursor:pointer; font-family:inherit; }
+.report-download-btn:hover { background:#b91c1c; }
+.report-download-btn:disabled { opacity:.6; cursor:default; }
+
+.report-doc { background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.12); color:#0f172a; }
+.report-doc-header { display:flex; align-items:center; gap:16px; padding:16px 20px; background:#0f1f33; border-bottom:3px solid #dc2626; }
+.report-doc-brand { font:800 15px Arial,sans-serif; color:#fff; border:1px solid rgba(255,255,255,.4); border-radius:6px; padding:4px 8px; }
+.report-doc-brand:has(img) { width:142px; height:64px; padding:5px; background:#fff; border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.report-doc-brand img { display:block; width:100%; height:100%; object-fit:contain; transform:scale(2.4); }
+.company-details-card { max-width:620px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; box-shadow:var(--shadow-sm); }
+.company-details-card h2 { margin:0 0 8px; font-size:18px; }
+.company-details-card p { color:var(--text-dim); font-size:12px; line-height:1.5; }
+.company-logo-preview { width:220px; height:100px; margin:20px 0 14px; padding:10px; border:1px dashed var(--border); border-radius:8px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:12px; }
+.company-logo-preview img { width:100%; height:100%; object-fit:contain; }
+.company-logo-input { display:none; }
+.company-logo-error { color:var(--red) !important; }
+.company-logo-help { margin-bottom:0; color:var(--text-muted) !important; }
+.report-doc-title-block { flex:1; text-align:center; }
+.report-doc-command-title { margin-bottom:4px; font:800 14px Arial,sans-serif; letter-spacing:.04em; color:#fff; text-transform:uppercase; }
+.report-doc-title { font:800 17px Arial,sans-serif; color:#fff; }
+.report-doc-subtitle { font-size:11px; color:#93c5fd; margin-top:2px; }
+.report-doc-date-block { text-align:right; }
+.report-doc-date-label { font-size:8.5px; color:#94a3b8; letter-spacing:.05em; }
+.report-doc-date-value { font:800 13px 'JetBrains Mono',monospace; color:#fff; margin-top:2px; }
+
+.report-doc-info-strip { display:grid; grid-template-columns:repeat(6,1fr); border-bottom:1px solid #e2e8f0; }
+.report-doc-info-cell { padding:12px 14px; border-right:1px solid #e2e8f0; }
+.report-doc-info-cell:last-child { border-right:0; }
+.report-doc-info-label { font-size:8.5px; font-weight:700; letter-spacing:.05em; color:#94a3b8; text-transform:uppercase; }
+.report-doc-info-value { font-size:13px; font-weight:700; color:#0f172a; margin-top:4px; }
+
+.report-doc-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; padding:16px 20px; }
+.report-doc-header + .report-doc-tiles, .report-doc-info-strip + .report-doc-tiles { padding-top:16px; }
+.report-doc-tile { border-radius:10px; padding:16px 18px; }
+.report-doc-tile.dark { background:#0f1f33; }
+.report-doc-tile.red { background:#dc2626; }
+.report-doc-tile.light { background:#f8fafc; border:1px solid #e2e8f0; }
+.report-doc-tile-value { font:800 26px 'JetBrains Mono',monospace; color:#fff; }
+.report-doc-tile-value.dark-text { color:#0f172a; font-size:16px; }
+.report-doc-tile-value.blue-text { color:#2563eb; font-size:16px; }
+.report-doc-tile-label { font-size:9.5px; font-weight:700; letter-spacing:.05em; color:#cbd5e1; margin-top:6px; text-transform:uppercase; }
+.report-doc-tile-label.light-label { color:#94a3b8; }
+
+.report-doc-section-title { padding:0 20px; margin:6px 0 8px; font-size:10px; font-weight:800; letter-spacing:.06em; color:#94a3b8; text-transform:uppercase; }
+.report-doc-chart-wrap { margin:0 20px 16px; border:1px solid #e2e8f0; border-radius:10px; padding:14px; }
+.report-doc-chart-wrap .report-chart-canvas { height:220px; }
+
+.report-doc-table-wrap { margin:0 20px 16px; overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; }
+.report-doc-table { width:100%; min-width:760px; border-collapse:collapse; font-size:11px; }
+.report-doc-table th { padding:8px 10px; background:#f8fafc; color:#64748b; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; text-align:center; border-bottom:1px solid #e2e8f0; }
+.report-doc-table td { padding:7px 10px; text-align:center; border-bottom:1px solid #f1f5f9; color:#334155; }
+.report-doc-table td.mono { font-family:'JetBrains Mono',monospace; }
+.report-doc-table tr:last-child td { border-bottom:0; }
+.report-doc-cell-blue { color:#2563eb; font-weight:700; }
+.report-doc-cell-orange { color:#ea580c; font-weight:700; }
+
+.report-doc-ats-list { padding:0 20px; display:flex; flex-direction:column; gap:10px; }
+.report-doc-ats-card { border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; }
+.report-doc-ats-card-top { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.report-doc-branch-badge { font-size:9px; font-weight:800; letter-spacing:.04em; padding:3px 8px; border-radius:4px; color:#fff; }
+.report-doc-branch-badge.life-safety { background:#f59e0b; }
+.report-doc-branch-badge.critical { background:#f97316; }
+.report-doc-branch-badge.equipment { background:#64748b; }
+.report-doc-ats-name { font-size:14px; font-weight:800; color:#0f172a; flex:1; }
+.report-doc-ats-duration { text-align:right; }
+.report-doc-ats-duration-value { font-size:15px; font-weight:800; color:#dc2626; }
+.report-doc-ats-duration-label { font-size:8px; font-weight:700; color:#94a3b8; letter-spacing:.04em; }
+.report-doc-ats-fields { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; }
+.report-doc-ats-field-value { font-size:11.5px; font-weight:700; color:#0f172a; margin-top:3px; }
+.report-doc-ats-field-value.link { color:#2563eb; }
+
+.report-doc-footer { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-top:1px solid #e2e8f0; font-size:9.5px; color:#94a3b8; }
+.report-doc-empty { padding:24px; text-align:center; color:#94a3b8; font-size:12px; }
+@media(max-width:900px) {
+  .report-doc-info-strip { grid-template-columns:repeat(3,1fr); }
+  .report-doc-info-cell:nth-child(3) { border-right:0; }
+  .report-doc-tiles { grid-template-columns:repeat(2,1fr); }
+  .report-doc-ats-fields { grid-template-columns:repeat(2,1fr); }
+}
 
 .compliance-summary { display:flex; align-items:center; gap:30px; padding:16px 20px; background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:18px; flex-wrap:wrap; box-shadow:var(--shadow-sm); }
 .compliance-ring-wrap { width:100px; height:100px; flex-shrink:0; }
@@ -813,6 +1043,13 @@ tr.alarm-subgroup-row td { background:rgba(37,99,235,0.05); border-left:3px soli
 .form-row label { font-size:11px; color:var(--text-dim); font-weight:600; }
 .form-row input, .form-row select { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:7px 10px; color:var(--text); font-size:12.5px; font-family:inherit; }
 .form-row input:focus, .form-row select:focus { outline:2px solid var(--blue); outline-offset:1px; border-color:var(--blue); }
+/* Custom suggestion panel for the editable combobox (SelectOrCustom) — a plain <input> stays
+   directly typeable, and this popup gives it a height-limited, scrollable list of presets to pick
+   from instead, unlike an OS-rendered <select> listbox which can't be constrained from CSS. */
+.dropdown-panel { position:absolute; z-index:2100; top:100%; left:0; right:0; margin-top:4px; max-height:220px; overflow-y:auto; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:0 12px 28px rgba(15,23,42,.22); padding:4px; }
+.dropdown-item { padding:7px 10px; border-radius:6px; font-size:12.5px; color:var(--text); cursor:pointer; }
+.dropdown-item:hover { background:rgba(37,99,235,.12); }
+.dropdown-item.selected { background:var(--blue); color:#fff; font-weight:700; }
 .modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; z-index:2000; }
 .modal-box { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; width:380px; max-width:90vw; box-shadow:0 10px 30px rgba(15,23,42,0.18); }
 .modal-box h3 { margin-bottom:14px; font-size:14px; }
@@ -845,6 +1082,12 @@ tr.alarm-subgroup-row td { background:rgba(37,99,235,0.05); border-left:3px soli
 }
 .modal-box.modal-ats .header-btn.primary { background:linear-gradient(135deg,#2563eb,#60a5fa); border-color:transparent; }
 .modal-box.modal-gen .header-btn.primary { background:linear-gradient(135deg,#7c3aed,#a78bfa); border-color:transparent; }
+
+/* Add ATS / Add Generator use plain number inputs as editable comboboxes (SelectOrCustom) —
+   hide the native up/down spin buttons since the dropdown suggestion list covers that role. */
+.modal-box.modal-ats .form-row input[type=number], .modal-box.modal-gen .form-row input[type=number] { appearance:textfield; -moz-appearance:textfield; }
+.modal-box.modal-ats .form-row input[type=number]::-webkit-outer-spin-button, .modal-box.modal-gen .form-row input[type=number]::-webkit-outer-spin-button,
+.modal-box.modal-ats .form-row input[type=number]::-webkit-inner-spin-button, .modal-box.modal-gen .form-row input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 
 body.dark-dashboard .modal-box.modal-ats, body.dark-dashboard .modal-box.modal-gen { background:linear-gradient(180deg,#0c2036,#0a192b); border-color:#244969; }
 body.dark-dashboard .modal-box .form-row input, body.dark-dashboard .modal-box .form-row select { background:linear-gradient(180deg,#0d2238,#0b1d31); border-color:#2d5073; color:#edf5ff; }
@@ -1017,6 +1260,534 @@ button.telemetry-ats { width:100%; text-align:left; }
 .operations-events-more:hover { text-decoration:underline; }
 @media (max-width:600px) { .operations-hero { flex-direction:column; } .operations-events-panel { flex-basis:auto; width:100%; box-sizing:border-box; } }
 
+/* One-Line Wizard tab — a self-contained dark surface (independent of the light/dark app theme,
+   like the faceplate tags) so it always matches its own mockup regardless of dashboard theme. */
+.wizard-section { padding:0; border:1px solid #1d3a56; border-radius:12px; overflow:hidden; background:#0a1626; box-shadow:0 12px 30px rgba(0,0,0,.28); }
+.wizard-header-bar { display:flex; align-items:center; gap:14px; padding:16px 22px; border-bottom:1px solid #1d3a56; background:#0c1c30; }
+.wizard-brand { color:#3b82f6; font:800 20px Arial,sans-serif; }
+.wizard-header-label { margin-right:auto; color:#a8bed5; font:700 12px Arial,sans-serif; }
+.wizard-header-bar .header-btn.primary:disabled { opacity:.5; cursor:not-allowed; }
+.wizard-body { display:grid; grid-template-columns:minmax(0,1fr) 220px; gap:16px; padding:22px; }
+/* min-width:0 on the 1fr column — without it, a CSS grid track defaults to its content's own minimum
+   width (not 0), so a wide row of equipment cards inside .wizard-main-card (e.g. many "Available
+   Equipment" cards side by side) could force the whole grid wider than its container instead of
+   wrapping/shrinking, pushing .wizard-side-card (the fixed 260px "Where you are" panel) out past the
+   right edge at typical window widths — only reliably visible again once zooming out shrank everything
+   enough to fit, which was really just narrowly avoiding the overflow rather than fixing it. */
+.wizard-main-card { min-width:0; }
+.wizard-main-card, .wizard-side-card { padding:22px; border:1px solid #1d3a56; border-radius:12px; background:#0e2036; }
+.wizard-kicker { color:#3b82f6; font:800 11px Arial,sans-serif; letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
+.wizard-main-card h2 { margin:0 0 8px; color:#edf5ff; font:800 24px Arial,sans-serif; }
+.wizard-main-card > p { margin:0 0 20px; color:#9eb8d5; font-size:13px; }
+.wizard-options { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+.wizard-option { display:flex; flex-direction:column; gap:6px; padding:18px; border:1px solid #2d5073; border-radius:10px; background:#0c1c30; color:#edf5ff; text-align:left; cursor:pointer; transition:border-color .15s ease,background .15s ease; }
+.wizard-option b { font:700 14px Arial,sans-serif; }
+.wizard-option span { color:#9eb8d5; font-size:11.5px; }
+.wizard-option:hover:not(.disabled) { border-color:#3b82f6; background:#0f2740; }
+.wizard-option.selected { border-color:#3b82f6; background:rgba(59,130,246,.12); box-shadow:0 0 0 1px #3b82f6; }
+.wizard-option.disabled { opacity:.55; cursor:not-allowed; }
+.wizard-test-link { align-self:flex-start; border:0; background:transparent; color:#3b82f6; font:700 12px Arial,sans-serif; cursor:pointer; padding:0; }
+.wizard-test-link:hover { text-decoration:underline; }
+.wizard-side-card p { margin:0; color:#9eb8d5; font-size:13px; }
+.wizard-result-empty { display:flex; align-items:center; justify-content:center; min-height:260px; padding:24px; border:1px dashed #2d5073; border-radius:12px; background:#0e2036; margin-bottom:16px; text-align:center; }
+.wizard-result-empty-text { margin:0; max-width:360px; color:#9eb8d5; font-size:13px; }
+.wizard-breadcrumb { display:flex; align-items:center; gap:8px; margin-bottom:16px; color:#5b7290; font:700 11px Arial,sans-serif; }
+.wizard-breadcrumb .active { color:#3b82f6; }
+.wizard-breadcrumb .done { color:#9eb8d5; }
+.wizard-breadcrumb-sep { color:#3d5670; }
+.wizard-equipment-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+.wizard-equipment-card { position:relative; display:flex; align-items:center; gap:10px; padding:14px; border:1px solid #2d5073; border-radius:10px; background:#0c1c30; color:#edf5ff; text-align:left; cursor:pointer; transition:border-color .15s ease,background .15s ease; }
+.wizard-equipment-card:hover { border-color:#3b82f6; background:#0f2740; }
+.wizard-equipment-icon { display:flex; flex:0 0 auto; color:#3b82f6; }
+.wizard-equipment-text { display:flex; flex-direction:column; gap:2px; }
+.wizard-equipment-text b { font:700 13px Arial,sans-serif; }
+.wizard-equipment-text small { color:#9eb8d5; font-size:10.5px; }
+.wizard-equipment-badge { position:absolute; top:10px; right:12px; color:#5b7290; font-size:10px; font-weight:700; }
+.wizard-equipment-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.wizard-equipment-footer span { color:#9eb8d5; font-size:12px; }
+@media (max-width:800px) { .wizard-equipment-grid { grid-template-columns:1fr 1fr; } }
+.wizard-form-row { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+.wizard-form-error { margin:-2px 0 0; color:#ef4444; font-size:11.5px; }
+.wizard-form-row label { color:#9eb8d5; font:700 10px Arial,sans-serif; letter-spacing:.05em; text-transform:uppercase; }
+.wizard-form-row input, .wizard-form-row select { padding:10px 12px; border:1px solid #2d5073; border-radius:8px; background:#0c1c30; color:#edf5ff; font:13px Arial,sans-serif; }
+.wizard-form-row input::placeholder { color:#5b7290; }
+.wizard-form-row input:focus, .wizard-form-row select:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.18); }
+.wizard-form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:600px) { .wizard-form-grid-2 { grid-template-columns:1fr; } }
+.wizard-style-cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.wizard-style-card { display:flex; flex-direction:column; align-items:center; gap:6px; padding:20px 14px; border:1px solid #2d5073; border-radius:10px; background:#0c1c30; color:#edf5ff; text-align:center; cursor:pointer; transition:border-color .15s ease,background .15s ease; }
+.wizard-style-card:hover { border-color:#3b82f6; background:#0f2740; }
+.wizard-style-card.selected { border-color:#3b82f6; background:rgba(59,130,246,.12); box-shadow:0 0 0 1px #3b82f6; }
+.wizard-style-card-icon { color:#9eb8d5; margin-bottom:4px; }
+.wizard-style-card-fixed-icon { display:flex; flex-direction:column; align-items:center; }
+.wizard-style-card-wire { display:block; width:3px; height:19px; background:#64748b; }
+.wizard-style-card.selected .wizard-style-card-icon { color:#3b82f6; }
+.wizard-style-card b { font:700 13px Arial,sans-serif; }
+.wizard-style-card small { color:#9eb8d5; font-size:10.5px; }
+.wizard-form-actions { display:flex; gap:10px; }
+.wizard-bus-grid { grid-template-columns:repeat(3,1fr); }
+.wizard-bus-card { flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:20px 14px; text-align:center; }
+.wizard-bus-card b { font:800 20px Arial,sans-serif; }
+.wizard-bus-card small { color:#9eb8d5; font-size:11px; }
+.wizard-connections-section-title { margin:18px 0 10px; color:#5b7290; font:800 10px Arial,sans-serif; letter-spacing:.06em; text-transform:uppercase; }
+.wizard-connections-section-title:first-of-type { margin-top:0; }
+.wizard-connections-hint { margin:-6px 0 10px; color:#5b7290; font-size:11px; }
+/* One of these per equipment type under the Equipment section (Container, Breaker, Transformer, Panel,
+   Equipment, Area Served) — a smaller sub-heading nested under that section's own title, same blue
+   accent as the Created Equipment review table's group headings so the two read as the same grouping
+   convention, just applied to a card grid here instead of a table. */
+.wizard-connections-piece-group { margin-top:14px; }
+.wizard-connections-piece-group:first-of-type { margin-top:6px; }
+.wizard-connections-piece-group-title { margin:0 0 8px; color:#3b82f6; font:800 10px Arial,sans-serif; letter-spacing:.05em; text-transform:uppercase; }
+.wizard-connections-grid { grid-template-columns:repeat(4,1fr); margin-bottom:0; }
+.wizard-connection-card { display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid #2d5073; border-radius:10px; background:#0c1c30; color:#edf5ff; text-align:left; cursor:pointer; transition:border-color .15s ease,background .15s ease; }
+.wizard-connection-card:hover { border-color:#3b82f6; background:#0f2740; }
+.wizard-connection-card.selected { border-color:#3b82f6; background:rgba(59,130,246,.14); box-shadow:0 0 0 1px #3b82f6; }
+.wizard-connection-badge { display:grid; place-items:center; flex:0 0 auto; width:24px; height:24px; border-radius:50%; color:#fff; }
+.wizard-connection-badge.generator { background:#22c55e; }
+.wizard-connection-badge.utility { background:#22c55e; }
+.wizard-connection-badge.ats { background:#22c55e; }
+.wizard-connection-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.wizard-connection-text b { font:700 12.5px Arial,sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wizard-connection-text small { color:#3b82f6; font-size:10.5px; }
+@media (max-width:900px) { .wizard-connections-grid { grid-template-columns:repeat(2,1fr); } }
+.wizard-end-here { display:block; width:100%; margin:16px 0; padding:14px; border:1px solid #2d5073; border-radius:10px; background:#0c1c30; color:#9eb8d5; font:700 12.5px Arial,sans-serif; text-align:center; cursor:pointer; }
+.wizard-end-here:hover { border-color:#3b82f6; color:#edf5ff; }
+.wizard-end-here.selected { border-color:#3b82f6; background:rgba(59,130,246,.14); color:#edf5ff; box-shadow:0 0 0 1px #3b82f6; }
+.wizard-chain { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.wizard-chain-node { display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; padding:14px; border:1px solid #3b82f6; border-radius:10px; background:#0c1c30; box-sizing:border-box; }
+/* Only the "you're connecting from X" node (the one actually mid-selection) needs a way out — picking
+   the wrong source shouldn't require scrolling down to the form's own Back button. */
+.wizard-chain-node-active { position:relative; }
+.wizard-chain-node-close { position:absolute; top:6px; right:6px; width:20px; height:20px; border:0; border-radius:50%; background:rgba(255,255,255,.08); color:#a8bed5; font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.wizard-chain-node-close:hover { background:rgba(239,68,68,.2); color:#f87171; }
+.wizard-chain-node b { color:#edf5ff; font:700 12.5px Arial,sans-serif; }
+.wizard-chain-node small { color:#9eb8d5; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+.wizard-chain-node.placeholder { border-color:#2d5073; border-style:dashed; color:#5b7290; }
+.wizard-chain-node.placeholder span { font:700 16px Arial,sans-serif; color:#5b7290; }
+.wizard-chain-arrow { color:#3b82f6; font-size:16px; }
+@media (max-width:600px) { .wizard-style-cards { grid-template-columns:1fr; } }
+@media (max-width:800px) { .wizard-body { grid-template-columns:1fr; } .wizard-options { grid-template-columns:1fr; } }
+
+/* Panel Schedule circuit builder (inside the Panel equipment form) */
+.wizard-circuit-builder { border:1px solid #2d5073; border-radius:10px; background:#0c1c30; padding:10px; }
+.wizard-circuit-list { max-height:180px; overflow-y:auto; margin-bottom:8px; }
+.wizard-circuit-row { display:flex; align-items:center; gap:10px; padding:6px 4px; border-bottom:1px solid #1d3a56; }
+.wizard-circuit-row:last-child { border-bottom:0; }
+.wizard-circuit-ckt { flex:0 0 auto; width:20px; color:#5b7290; font:700 11px 'JetBrains Mono',monospace; text-align:center; }
+.wizard-circuit-load { flex:1; color:#edf5ff; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wizard-circuit-load-input { flex:1; min-width:0; padding:3px 6px; border:1px solid transparent; border-radius:5px; background:transparent; color:#edf5ff; font:inherit; font-size:12px; }
+.wizard-circuit-load-input:hover { border-color:#2d5073; }
+.wizard-circuit-load-input:focus { outline:none; border-color:#3b82f6; background:#0c1c30; }
+.wizard-circuit-remove { flex:0 0 auto; border:0; background:transparent; color:#5b7290; font-size:16px; line-height:1; cursor:pointer; padding:0 4px; }
+.wizard-circuit-remove:hover { color:#ef4444; }
+.wizard-circuit-empty { margin:0; padding:6px 4px; color:#5b7290; font-size:12px; font-style:italic; }
+.wizard-circuit-add { display:flex; gap:8px; }
+.wizard-circuit-add input { flex:1; padding:8px 10px; border:1px solid #2d5073; border-radius:7px; background:#09192b; color:#edf5ff; font-size:12px; }
+.wizard-circuit-add input::placeholder { color:#5b7290; }
+
+.wizard-json-view { margin:0 22px 0; padding:16px; border:1px solid #1d3a56; border-radius:10px; background:#050d18; color:#9eb8d5; font:11px 'JetBrains Mono',monospace; line-height:1.5; max-height:320px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+
+/* Generated one-line diagram (Result tab) */
+.result-spine-wrap { padding:22px; }
+.result-spine-header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.result-spine-sub { margin:0 0 20px; color:#9eb8d5; font-size:12.5px; }
+/* Bigger icons push the spine wider than the page for a system with several generators/ATS — scroll
+   it horizontally instead of clipping or squeezing everything back down to fit. */
+.result-spine { display:flex; flex-direction:column; align-items:center; width:100%; overflow-x:auto; padding-bottom:6px; }
+/* The G icon, scaled up the same way as the ATS switch above — .sld-generator's 46px column already
+   has enough slack around the 29px circle for this without touching a neighboring generator.
+   transform-origin:top keeps its growth entirely downward (into the plain connector wire below, which
+   tolerates a little overlap fine) instead of the default center origin's symmetric growth, which crept
+   upward into the name/status text sitting right above it (order:-1 puts them first, see .sld-generator
+   span/small) and visually merged with it. */
+.result-gen-lead-row .sld-generator i { transform:scale(1.3); transform-origin:center top; }
+/* The base .sld-generator span truncates at 56px with an ellipsis — tuned for the compact Single Line
+   Diagram tab elsewhere, where the generator column is much tighter — but on this full-width Result
+   spine there's plenty of room in the 40px gap between columns, so let full names like "ASTER-GEN-001"
+   wrap onto a second line instead of cutting off into "ASTER-GE...". */
+.result-gen-row .sld-generator span { max-width:100px; overflow:visible; white-space:normal; line-height:9px; }
+.wizard-legend-rows { display:flex; flex-direction:column; gap:4px; margin-bottom:20px; padding:6px; border:1px solid #1d3a56; border-radius:10px; background:#0c1c30; }
+.wizard-legend-row { display:flex; align-items:center; gap:12px; padding:8px 10px; border-radius:7px; color:#edf5ff; font-size:12.5px; font-weight:600; transition:background .15s ease; }
+.wizard-legend-row:hover { background:rgba(59,130,246,.1); }
+.wizard-legend-dot { flex:0 0 auto; width:13px; height:13px; border-radius:50%; box-shadow:0 0 0 3px rgba(255,255,255,.06); }
+.wizard-legend-dot.ready { background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.18); }
+.wizard-legend-dot.running { background:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.18); }
+.wizard-legend-dot.standby { background:#64748b; box-shadow:0 0 0 3px rgba(100,116,139,.18); }
+.wizard-legend-line { flex:0 0 auto; width:28px; height:4px; border-radius:2px; }
+.wizard-legend-line.running { background:#ef4444; box-shadow:0 0 8px rgba(239,68,68,.5); }
+.wizard-legend-line.standby { background:#64748b; }
+.wizard-legend-note { margin:0; padding:12px 14px; border:1px solid #1d3a56; border-radius:10px; background:#0c1c30; color:#9eb8d5; font-size:12px; line-height:1.6; }
+.result-gen-row { justify-content:center; flex-wrap:wrap; width:100%; }
+/* Taller so the switchgear box's bottom border (right after the second one of these, before the ATS
+   row) lands clearly on the plain wire below the breaker glyph, not at the breaker's own height. */
+.result-connector { display:block; width:2px; height:56px; background:#2d5073; }
+.result-connector.emergency { background:#ef4444; }
+.result-breaker { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.result-breaker-tag { font:700 9px 'JetBrains Mono',monospace; }
+.result-breaker-tag.normal { color:#22c55e; }
+.result-breaker-tag.emergency { color:#ef4444; }
+/* Reserves the draw-out breaker's exact footprint (its SVG is 52px tall) whether or not this particular
+   generator has a matching Draw-Out breaker piece — otherwise generators without one render a shorter
+   column than their neighbors and their line falls short of the shared bus below. */
+.result-drawout-slot { display:flex; align-items:center; justify-content:center; height:50px; }
+/* No second breaker wired for this generator (see entryBreaker in ResultTab) — this slot still reserves
+   the full 50px so the column stays the same height as its neighbors, but the fallback plain wire (26px
+   by default) was only centered inside that taller box, leaving a blank gap above and below it instead
+   of reading as one continuous line from the crossing-wire above down to the tail wire below. */
+/* !important needed here — the global .sld-generators .sld-generator-column .sld-gear-connector.
+   emergency-source:not(.tail)/.normal-source:not(.tail) rules (tuned for a different context) carry more
+   class-level specificity than this nesting despite being scoped narrower, and were winning over a plain
+   height here, the same conflict .result-gen-lead-row's own override below already had to work around. */
+.result-drawout-slot .sld-gear-connector { height:55px !important; transform:translateX(-4px); }
+/* The drawout breaker glyph plus the wire immediately above it (crossing the GEN SWBD box's dashed
+   border) and below it (down to the shared bus) all shifted together, so the whole column reads as one
+   straight vertical run instead of jogging left only at the breaker itself. */
+.result-drawout-slot .sld-breaker-with-tag,
+.result-gen-entry-row .result-crossing-wire,
+.result-gen-entry-row .sld-gear-connector.tail { transform:translateX(-3.5px); }
+/* No horizontal padding here — its width must exactly match .result-ats-row's so the feeder breakers
+   inside it line up with the ATS boxes below, across the dashed border between them. */
+/* Generators render above this box (see .result-gen-lead-row), flush against its top border — same as
+   the bottom border sitting flush against the feeder row below, with no padding gap on either side of
+   it. The border crosses the middle of a plain 40px wire on each side (.result-crossing-wire, used both
+   just above the border and just inside it) — same as the bus-to-feeder crossing at the bottom. */
+.result-switchgear-box { position:relative; width:100%; margin-bottom:0; padding:0; border:1px dashed #3b82f6; border-radius:10px; }
+/* A standalone wire style (not .sld-gear-connector) so it isn't caught by that class's many other
+   height overrides tuned for other contexts — this one only ever needs a plain, fixed 40px. No margin
+   here, same as .result-connector below — centering comes entirely from the column's align-items, so
+   both wires above and below the border land at the identical x-position instead of drifting apart. */
+.result-crossing-wire { display:block; width:2px; height:40px; background:#22c55e; }
+.result-crossing-wire.emergency-source { background:#ef4444; }
+.result-crossing-wire.standby { background:#64748b; }
+/* The real One-Line diagram deliberately gives a running generator's connector extra reach — it
+   travels to a lower emergency-bus row than a ready generator's normal-bus row. This Result spine has
+   only one shared bus, so both must be the same length here, or a "ready" generator's shorter, cooler
+   segments fall short of it and leave a visible gap. Color still differs; height no longer does. */
+.result-switchgear-box .sld-generator-column .sld-gear-connector.tail.emergency-source,
+.result-switchgear-box .sld-generator-column .sld-gear-connector.tail.normal-source { height:50px !important; }
+/* The generator lead-in (G icon → output breaker) now sits above the switchgear box, in its own row —
+   same uniform-height fix as above, so a "ready" generator's shorter wire doesn't sit at a different
+   level than a running one before either reaches its breaker. */
+.result-gen-lead-row .sld-generator-column .sld-gear-connector { height:50px !important; }
+.result-switchgear-box.unlabeled { border-style:solid; border-color:#2d5073; padding-top:12px; }
+.result-switchgear-label { position:absolute; z-index:5; top:7px; left:9px; padding:3px 7px; border:0; border-radius:6px; background:none; color:#3b82f6; font:800 11px Arial,sans-serif; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; transition:box-shadow .15s ease; }
+.result-switchgear-label.selected { box-shadow:0 0 0 2.5px #ef4444; }
+.result-switchgear-label:hover { box-shadow:0 0 0 2.5px #3b82f6; }
+.result-switchgear-label:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
+/* Same clickable-container treatment for a distribution-gear box's own label and for a plain container's
+   generic chain-node box, wherever either appears in a downstream branch tree (see WizardDistGearNode
+   and WizardTreeNodeView) — one consistent look for "this container can be clicked for details". */
+.wizard-dist-gear-label { appearance:none; margin:0; padding:2px 6px; border:0; border-radius:6px; background:none; font-family:inherit; cursor:pointer; transition:box-shadow .15s ease; }
+.wizard-dist-gear-label.selected { box-shadow:0 0 0 2.5px #ef4444; }
+.wizard-dist-gear-label:hover { box-shadow:0 0 0 2.5px #3b82f6; }
+.wizard-dist-gear-label:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
+button.wizard-chain-node.wizard-chain-node-clickable.selected { border-color:#ef4444; box-shadow:0 0 0 2.5px #ef4444; }
+button.wizard-chain-node.wizard-chain-node-clickable:hover { box-shadow:0 0 0 2.5px #3b82f6; }
+/* The spine's single shared bus, styled red/thick like the real Emergency bus line. */
+.result-bus { width:100%; height:6px; margin:0; background:#ef4444; border-radius:3px; box-shadow:0 0 10px rgba(239,68,68,.4); }
+.result-ats-row { display:flex; justify-content:center; gap:14px; flex-wrap:wrap; width:100%; }
+.result-feeder-row { margin-top:0; }
+/* Reusing the real one-line diagram's N/E switch box here — suppress its bus-connector pseudo-lines
+   since this diagram already draws its own connector + breaker above each ATS. */
+.result-ats-node { padding-top:0; }
+.result-ats-node::before, .result-ats-node::after { display:none !important; }
+.result-ats-node .sld-load-label { margin-top:6px; }
+button.sld-load-label { appearance:none; font-family:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+button.sld-load-label:hover { filter:brightness(0.94); }
+/* Reference mockup shows both terminal dots permanently color-coded (N always green, E always red) —
+   the arm's position is what actually shows which is connected — scoped so it doesn't touch the real SLD. */
+.result-ats-node .sld-terminal.normal-terminal { background:#22c55e; border-color:#fff; color:#fff; }
+.result-ats-node .sld-terminal.emergency-terminal { background:#ef4444; border-color:#fff; color:#fff; }
+/* Scaled up in place — the 104px-wide .result-ats-col already has plenty of slack around the 62px
+   switch horizontally, but the transform doesn't reserve any extra VERTICAL layout space for that
+   growth, so at the default center origin it grew symmetrically up and down and visually crushed the
+   ATS's own name (the very next element below it) under its now-bigger bottom edge — the same issue
+   .wizard-branch-ats-glyph's switch had. transform-origin:top keeps the connector wire above landing
+   exactly on the switch's (unmoved) top edge, growing only downward — see the name's own margin-top
+   below for the matching clearance that growth needs. */
+.result-ats-node .sld-switch { border-width:3px; border-color:#fff; transform:scale(1.3); transform-origin:center top; }
+/* 62px unscaled height * (1.3 scale - 1) = ~19px of extra height added below the switch's original
+   bottom edge by the transform above — cleared here so the name renders fully below it instead of
+   overlapping, plus a little normal breathing room on top of that. */
+.result-ats-node b { margin-top:24px; }
+/* Fixed width on every column — shared by the feeder-breaker row and the ATS-box row below it — so an
+   F# breaker (icon-only, narrow) and its ATS box (icon+name+label, wide) land at the exact same x
+   regardless of content width; otherwise the two independently-centered rows drift out of alignment. */
+.result-ats-col { display:flex; flex-direction:column; align-items:center; gap:0; width:104px; }
+
+/* Drill-down popups (ATS status, branch view, panel schedule) rendered on top of the Result diagram */
+/* position:relative is required here — the close button (position:absolute) has nothing else in this
+   modal to anchor to, and without it falls back to the full-screen overlay, floating in the page corner. */
+.modal-box.wizard-result-modal { position:relative; width:min(560px,calc(100vw - 32px)); padding:0; border:1px solid #1d3a56; border-radius:14px; background:#0a1626; box-shadow:0 24px 70px rgba(0,0,0,.5); }
+.modal-box.wizard-result-modal > h3 { display:none; }
+.wizard-result-modal-body { padding:26px; color:#edf5ff; }
+.wizard-result-modal-body h3 { margin:0 0 4px; color:#edf5ff; font:800 20px Arial,sans-serif; }
+.wizard-result-modal-meta { margin:0 0 16px; color:#9eb8d5; font-size:11.5px; }
+.wizard-result-banner { margin:0 0 18px; padding:12px; border-radius:10px; text-align:center; font:800 14px Arial,sans-serif; letter-spacing:.04em; text-transform:uppercase; }
+.wizard-result-banner.ready { background:linear-gradient(135deg,#22c55e,#15803d); color:#fff; }
+.wizard-result-banner.emergency { background:linear-gradient(135deg,#f87171,#dc2626); color:#fff; }
+.wizard-result-source { padding:12px; border:1px solid #2d5073; border-radius:9px; background:#0c1c30; }
+.wizard-result-source b { display:block; margin-bottom:4px; color:#9eb8d5; font-size:9.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+.wizard-result-source span { color:#5b7290; font:700 12px Arial,sans-serif; }
+.wizard-result-source.on { border-color:#22c55e; background:rgba(34,197,94,.1); }
+.wizard-result-source.on span { color:#4ade80; }
+.wizard-result-source.on.emergency { border-color:#ef4444; background:rgba(239,68,68,.1); }
+.wizard-result-source.on.emergency span { color:#f87171; }
+.wizard-result-source span.wizard-result-normal-text { color:#4ade80; }
+.wizard-result-source span.wizard-result-emergency-text { color:#f87171; }
+.wizard-downstream-link { display:block; width:100%; padding:14px; border:1px solid #2d5073; border-radius:10px; background:#0c1c30; color:#3b82f6; font:700 12.5px Arial,sans-serif; text-align:center; cursor:pointer; }
+.wizard-downstream-link:hover { border-color:#3b82f6; background:#0f2740; }
+/* Full-page rather than a small centered card — a branch can be a wide multi-feeder tree that needs
+   real room, and this is a drill-down destination people spend time reading, not a quick confirm. */
+.modal-box.wizard-result-modal.wizard-branch-modal { width:calc(100vw - 40px); height:calc(100vh - 40px); max-width:none; max-height:none; display:flex; flex-direction:column; }
+/* auto, not hidden — useFitScale's floor (see the component) means an extreme browser/OS zoom level can
+   leave the diagram larger than .wizard-branch-diagram's available space on purpose (rather than
+   shrinking it further), so this needs to be able to scroll in that case instead of clipping it. It
+   stays invisible at any normal zoom level, where the clamped scale still fits without overflowing. */
+.wizard-branch-modal .wizard-result-modal-body { flex:1; overflow:auto; display:flex; flex-direction:column; }
+/* Header stays pinned at the top, fixed size; the diagram area below it fills the rest of the page and
+   never scrolls — .wizard-branch-diagram-fit inside it (see useFitScale) is measured at its natural,
+   un-scaled size and shrunk (never grown) to whatever fits here, so a tree with several feeders and
+   nested distribution-gear boxes still lands on one screen instead of needing to scroll for it. */
+/* overflow:visible, not hidden — useFitScale's floor can leave the (still-scrollable, see
+   .wizard-result-modal-body above) content taller/wider than this flex item's own allotted space at an
+   extreme zoom level; clipping it here would defeat that fallback before the scroll container ever
+   gets a chance to show it. */
+/* align-items/justify-content: flex-start, not center — when useFitScale's floor leaves content bigger
+   than this box, centering it means the overflow splits both ways: some goes negative (up/left of this
+   box's own top-left corner), which a scroll container can never reach (scrollTop/scrollLeft can't go
+   below 0) — that's exactly why FDR-1/FDR-2 were unreachable while FDR-5/FDR-6 (positive/right overflow)
+   scrolled into view fine, and why the diagram bled upward into the header above it. Anchoring to the
+   top-left instead means all overflow is positive (right/down), which .wizard-result-modal-body's
+   scroll can always reach. Centering when there's room to spare (a single ATS feeding one load, say) is
+   instead handled by useFitScale's own `offset` — a plain pixel translate on .wizard-branch-diagram-fit
+   itself, computed straight from the same natural/available sizes already measured for scale, clamped to
+   never go negative — rather than by this container's own align-items/justify-content, which fought with
+   the scale transform (flexbox centers a transformed item using its pre-transform layout box, not its
+   real post-scale size, so it could still center content that was actually too big). */
+.wizard-branch-diagram { flex:1; display:flex; align-items:flex-start; justify-content:flex-start; min-height:0; overflow:visible; }
+.wizard-branch-diagram-fit { display:flex; flex-direction:column; align-items:center; }
+.wizard-branch-tree-root { display:flex; justify-content:center; margin-bottom:6px; }
+.wizard-branch-tree-node { display:inline-flex; flex-direction:column; align-items:center; }
+.wizard-branch-tree-node > .wizard-chain-node { width:140px; }
+.wizard-branch-tree-children { display:flex; gap:24px; margin-top:0; }
+.wizard-branch-tree-branch { display:flex; flex-direction:column; align-items:center; }
+.wizard-branch-connector { display:flex; flex-direction:column; align-items:center; }
+.wizard-branch-connector .sld-gear-connector { margin:0 auto; }
+/* Sub-branch wires only (MCC-ICU/XFMR-ICU → AHU/ICU loads, this popup only) — nudged right, separate
+   from the FDR feeder row's own left-shifted wires above. */
+.wizard-branch-diagram .wizard-branch-connector .sld-gear-connector { height:50px; transform:translateX(2px); }
+/* Used instead of the wire+breaker+wire combo when the target is itself an explicit breaker piece (see
+ * WizardBranchConnector) — sized to roughly the same total length as that combo, so a chain mixing
+ * explicit breakers and plain pass-through pieces doesn't visibly change rhythm partway down. */
+/* align-self:center — as a bare span (unlike .wizard-branch-connector, a flex column that centers its
+   own children regardless of its parent), this needs its own centering when used directly inside
+   .wizard-branch-bus-group, whose align-items:stretch otherwise left it pinned to the left edge instead
+   of centered on the bus — exactly the XFMR CH1 lead-in misalignment this was causing. */
+.wizard-branch-connector-plain-wire { display:block; align-self:center; width:2px; height:64px; background:#22c55e; }
+.wizard-branch-connector-plain-wire.emergency-source { background:#ef4444; }
+/* Any wire feeding straight into a nested Distribution Gear box — a breaker's own downstream
+   (P-ICU-DIST → ICU DIST GEAR, 52-CHILL 2 → CHILLER DIST 2), a feeder's own downstream load when that
+   load is itself another dist-gear box (F5 → MCC-CHILLAR, via .wizard-dist-gear-tail-out), or the ATS's
+   own direct feed when it lands straight on a dist-gear box with no breaker in between at all (via
+   .sld-gear-connector) — every one of these wires is a sibling that stops exactly at the box's own
+   dashed border, but the bus line it's actually feeding sits 38px further in (the box's own top padding,
+   see .wizard-branch-diagram .wizard-dist-gear-box), leaving a visible gap the same shape as every other
+   "invisible padding gap" bug in this diagram. The box itself paints no background, so pulling it up to
+   overlap each wire's own (unchanged) height just extends the wire visually through the border and a
+   little past the bus's own midpoint, instead of stopping short of it. */
+.wizard-branch-diagram .wizard-branch-connector-plain-wire + .wizard-dist-gear,
+.wizard-branch-diagram .wizard-dist-gear-tail-out + .wizard-dist-gear,
+.wizard-branch-diagram .sld-gear-connector + .wizard-dist-gear {
+  margin-top:-42px;
+}
+.wizard-branch-bus-group { display:inline-flex; flex-direction:column; align-items:stretch; }
+.wizard-branch-bus { height:4px; margin:0 30px; border-radius:2px; background:#22c55e; }
+.wizard-branch-bus.emergency-source { background:#ef4444; }
+/* A panel with a schedule renders .wizard-chain-node as a <button> instead of a <div> so the whole
+   box opens it — reset the default button chrome and add a hover cue so it still reads as clickable
+   without a separate "View Panel Schedule" label inside it. */
+button.wizard-chain-node.wizard-chain-node-clickable { appearance:none; font-family:inherit; cursor:pointer; }
+button.wizard-chain-node.wizard-chain-node-clickable:hover { border-color:#60a5fa; background:#0f2740; }
+/* A terminal load (equipment/panel/area) — small icon box, name below it, matching the reference
+   instead of the bigger text-only chain-node card. */
+.wizard-load-box-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; background:none; border:0; padding:0; font-family:inherit; }
+button.wizard-load-box-wrap.wizard-load-box-clickable { appearance:none; cursor:pointer; }
+.wizard-load-box { display:flex; align-items:center; justify-content:center; width:60px; height:44px; border:2px solid #edf5ff; border-radius:8px; color:#edf5ff; background:#0c1c30; }
+button.wizard-load-box-wrap.wizard-load-box-clickable:hover .wizard-load-box { border-color:#60a5fa; background:#0f2740; }
+.wizard-load-box-label { max-width:130px; color:#edf5ff; font-size:13px; text-align:center; }
+/* A transformer's bare two-circle symbol — no bordered box, matching the reference. */
+.wizard-symbol-node { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.wizard-symbol-icon { color:#edf5ff; }
+.wizard-symbol-label { max-width:130px; color:#edf5ff; font-size:13px; text-align:center; }
+/* A container feeding multiple things (see WizardDistGearNode) renders as an actual distribution-gear
+   box — dashed enclosure, a bus, a breaker per feeder — instead of the generic chain-node tree. Colors
+   are hardcoded (not theme variables) since this modal always uses a fixed dark palette regardless of
+   the app's own light/dark toggle — .sld-breaker-tag's default colors assume a light background and
+   only get a readable dark-theme color via "body.dark-dashboard", which may not be present here. */
+.wizard-dist-gear { display:inline-flex; flex-direction:column; align-items:center; }
+.wizard-dist-gear-box { position:relative; padding:24px 20px 18px; border:1px dashed #3b82f6; border-radius:10px; }
+.wizard-dist-gear-label { position:absolute; top:6px; left:8px; color:#3b82f6; font:800 10px Arial,sans-serif; letter-spacing:.04em; text-transform:uppercase; }
+.wizard-dist-gear-bus { width:100%; height:5px; margin:0 0 10px; background:#22c55e; border-radius:3px; box-shadow:0 0 8px rgba(34,197,94,.4); }
+.wizard-dist-gear-bus.emergency-source { background:#ef4444; box-shadow:0 0 8px rgba(239,68,68,.4); }
+.wizard-dist-gear-row { display:flex; gap:22px; }
+.wizard-dist-gear-col { display:flex; flex-direction:column; align-items:center; width:88px; }
+/* No margin on the wire itself — align-items:center above already centers it, and having both at once
+   (an explicit margin AND the parent's own centering) is exactly what caused the wire to land a hair
+   off from the breaker's own center in the Result spine's generator columns earlier in this build; the
+   working fix there was the same: drop the redundant margin, matching how .result-connector — the
+   one column style that's never had this problem — never sets one either. */
+.wizard-dist-gear-col .sld-breaker-tag { color:#6ee7a3; }
+.wizard-dist-gear-col .sld-breaker-tag.emergency-source { color:#fca5a5; }
+/* Same left/right padding as .wizard-dist-gear-box, so each load lines up under its own breaker above —
+   without it, the box's padding would shift the breaker row inward relative to this unpadded row. */
+.wizard-dist-gear-loads { margin-top:16px; padding:0 20px 4px; }
+.wizard-dist-gear-empty { margin:0; color:#8ba3c2; font-size:10px; text-align:center; }
+/* Barely legible at the compact 10px/dim-color default (tuned for small contexts elsewhere) once this
+   view's other labels were bumped up for readability — matches that same larger, brighter treatment. */
+.wizard-branch-diagram .wizard-dist-gear-empty { font-size:14px; color:#c3d3e8; }
+.wizard-dist-gear-load-row { display:flex; gap:16px; }
+.wizard-dist-gear-load-branch { display:flex; flex-direction:column; align-items:center; }
+/* This view now opens full-page (see .wizard-branch-modal) — the compact sizing above is shared with
+   small contexts elsewhere (the wizard's own preview chain, the compact Result spine), so it's scaled
+   up here specifically rather than changed at the source, to actually fill the much larger page. */
+.wizard-branch-diagram .wizard-branch-tree-node > .wizard-chain-node { width:190px; padding:18px; border-radius:12px; }
+.wizard-branch-diagram .wizard-chain-node b { font-size:16px; }
+.wizard-branch-diagram .wizard-chain-node small { font-size:13px; }
+/* Load/symbol/feeder labels default to a small size shared with compact contexts elsewhere (the
+   wizard's own preview chain) — bumped up here specifically, same reasoning as the chain-node box
+   above, since this view has the whole page to work with and the smaller size was hard to read. */
+.wizard-branch-diagram .wizard-load-box-label, .wizard-branch-diagram .wizard-symbol-label { font-size:16px; }
+.wizard-branch-diagram .wizard-branch-tree-children { gap:52px; }
+/* Sized at a comfortable, natural (readable-at-1x) size — .wizard-branch-diagram-fit (see useFitScale)
+   scales the whole diagram, box included, up or down to fill the page, so this no longer needs to
+   force its own width against the viewport to "look full" the way it did before that existed. */
+/* No bottom padding — the breaker sits at the very bottom of the box's content on purpose, so nothing
+   but the box's own border sits between it and the load wire below (that wire, and the .wizard-dist-
+   gear-loads margin, are what actually provide the visual gap now — see below). Padding here used to
+   add a second, blank gap on top of that, wide enough that the connection looked broken instead of
+   just crossing the border, the same "invisible padding gap" bug fixed elsewhere in this diagram. */
+.wizard-branch-diagram .wizard-dist-gear-box { box-sizing:border-box; padding:38px 36px 0; border-width:2px; border-radius:14px; box-shadow:0 0 24px rgba(59,130,246,.12); }
+.wizard-branch-diagram .wizard-dist-gear-label { font-size:15px; top:10px; left:12px; }
+/* No margin either, for the same reason — the wire below the bus (see next rule) is what visually
+   connects it to the breaker; blank margin on top of that just widened the same gap. */
+.wizard-branch-diagram .wizard-dist-gear-bus { height:7px; margin-bottom:0; transform:translateX(-7px); }
+/* Taller wire so the bus → breaker connection reads as one solid run at this larger scale — the 26px
+   default (tuned for the small breaker glyphs elsewhere) looked like a thin, disconnected sliver next
+   to the bigger 28px breaker icon and 7px bus here. */
+.wizard-branch-diagram .wizard-dist-gear-row .sld-gear-connector { height:34px; transform:translateX(-7px); }
+/* Real wire on both sides of the box's bottom border — a dedicated class (not .sld-gear-connector,
+   which has other height rules tuned for other contexts that kept colliding with this one) so the
+   border reliably crosses the middle of a continuous-looking wire instead of landing right at the
+   breaker's own bottom edge. tail-out is deliberately the longer of the two, per request. */
+.wizard-dist-gear-tail-in { display:block; width:2px; height:20px; background:#22c55e; }
+.wizard-dist-gear-tail-in.emergency-source { background:#ef4444; }
+/* A feeder with no breaker piece (see the isBreaker check in WizardDistGearNode) still needs to cross
+   the same vertical run a breaker column would — bus, past the box's bottom border, into the load below
+   — just as one continuous plain wire instead of the connector+glyph+tail-in sequence a real breaker
+   gets. Sized to the sum of that sequence's default heights so the border still crosses its middle. */
+.wizard-dist-gear-plain-drop { display:block; width:2px; height:92px; margin:0 auto; background:#22c55e; }
+.wizard-dist-gear-plain-drop.emergency-source { background:#ef4444; }
+.wizard-dist-gear-tail-out { display:block; width:2px; height:56px; background:#22c55e; }
+.wizard-dist-gear-tail-out.emergency-source { background:#ef4444; }
+/* Wider gap between feeders — more breathing room per breaker, and stretches the dashed box out
+   further, matching the reference's proportions better than the tighter spacing used elsewhere. */
+.wizard-branch-diagram .wizard-dist-gear-row { gap:38px; }
+/* Wide enough to comfortably hold the compact chain-node box (190px) a nested multi-output device
+   (an MCC, a transformer) renders as below a feeder, so it can't overflow into a neighboring column —
+   the overall row's total width no longer matters now that the whole diagram auto-fits the page. */
+.wizard-branch-diagram .wizard-dist-gear-col { width:200px; }
+.wizard-branch-diagram .sld-breaker-tag { font-size:16px; }
+/* The breaker curve itself is nudged well right of center in this view (see BreakerSymbol's centered
+   cx) — push the tag out further too, or its own default 5px clearance from the icon's box overlaps
+   the now-shifted curve. */
+.wizard-branch-diagram .sld-breaker-with-tag .sld-breaker-tag { margin-left:10px; }
+.wizard-branch-diagram .wizard-dist-gear-loads { box-sizing:border-box; padding:0 36px 6px; margin-top:0; }
+.wizard-branch-diagram .wizard-dist-gear-load-row { gap:38px; }
+/* A feeder whose own downstream is itself another Distribution Gear box (e.g. F3 -> 52 CHILL-2 ->
+   CHILLER DIST 2, or F5 -> MCC CHILLER) gets its column's width set explicitly (see colWidth in
+   WizardDistGearNode) to exactly fit that nested box, instead of the fixed 200px below — so it grows in
+   normal document flow, pushing later feeders further along the row exactly as far as it needs, with no
+   overlap possible in either direction. That column still centers its own (now wider) content via the
+   align-items:center already on .wizard-dist-gear-col. */
+.wizard-branch-header { margin-bottom:6px; }
+.wizard-branch-header h3 { margin:0 0 4px; }
+/* No bottom padding — the connector wire (WizardBranchConnector) renders as the very next sibling
+   below this glyph and needs to touch the switch's bottom edge directly, not sit behind a blank
+   padding gap with no wire drawn in it. */
+.wizard-branch-ats-glyph { display:flex; justify-content:center; padding:12px 0 0; }
+/* This standalone glyph has no bus above it to connect to — the base .sld-ats rules draw a stub
+   line up into empty space regardless, so it's suppressed here the same way it already is in the
+   Result spine's own ATS row. Rendered at natural (62px) size, not scaled up on top of that here —
+   .wizard-branch-diagram-fit (see useFitScale) already scales the whole diagram uniformly to fill the
+   page, so a small single-load tree (which the fit-scale grows toward its own 1.6x ceiling) and a wide
+   multi-feeder one (which it shrinks to fit) both end up sized consistently with everything else in
+   their own diagram. An extra local scale on just this switch used to compound with that outer scale —
+   blowing it up disproportionately on a simple tree — and, since it never reserved the extra layout
+   space it visually grew into, also crowded the connector wire right below it out of alignment. */
+.wizard-branch-ats-glyph .sld-ats::before, .wizard-branch-ats-glyph .sld-ats::after { display:none !important; }
+.wizard-branch-ats-glyph .sld-ats b { margin:0 0 28px; color:#edf5ff; font-size:16px; }
+/* A smaller, safer bump than the 1.7x tried before (which compounded with useFitScale's own 1.6x ceiling
+   into a wildly oversized switch on a small tree) — 1.35x still leaves headroom before that combination
+   gets out of hand, while making the N/E terminals noticeably easier to read than natural size once a
+   wider/taller tree has scaled the whole diagram down. transform-origin:center bottom keeps the growth
+   entirely upward into the margin just reserved above, leaving the bottom edge exactly where the
+   connector wire below (the very next sibling) already touches it. */
+.wizard-branch-ats-glyph .sld-switch { transform:scale(1.35); transform-origin:center bottom; }
+/* Both terminal dots permanently color-coded (N always green, E always red) — the arm's position is what
+   actually shows which is connected — same convention already used for the Result spine's own ATS boxes
+   (.result-ats-node), instead of the base .sld-terminal default where an inactive terminal just stays
+   plain white/grey and reads as "missing" rather than "not currently connected". */
+.wizard-branch-ats-glyph .sld-terminal.normal-terminal { background:#22c55e; border-color:#fff; color:#fff; }
+.wizard-branch-ats-glyph .sld-terminal.emergency-terminal { background:#ef4444; border-color:#fff; color:#fff; }
+.wizard-panel-schedule-header { text-align:center; }
+.wizard-panel-schedule-header h3 { margin:0 0 4px; }
+.wizard-panel-schedule-title { text-align:center; }
+.wizard-panel-schedule-info { margin:0 0 18px; border:1px solid #1d3a56; border-radius:10px; overflow:hidden; }
+.wizard-panel-schedule-info-row { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #1d3a56; }
+.wizard-panel-schedule-info-row:last-child { border-bottom:0; }
+.wizard-panel-schedule-info-row span { color:#9eb8d5; font-size:12px; }
+.wizard-panel-schedule-info-row b { color:#edf5ff; font-size:12.5px; }
+.wizard-panel-schedule-wrap { overflow-x:auto; }
+.wizard-panel-schedule { width:100%; border-collapse:collapse; font-size:11.5px; }
+.wizard-panel-schedule th { padding:7px 10px; border-bottom:1px solid #2d5073; color:#5b7290; font-size:9.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; text-align:left; }
+.wizard-panel-schedule td { padding:6px 10px; border-bottom:1px solid #1d3a56; color:#edf5ff; }
+.wizard-panel-schedule td.mono { color:#5b7290; font-family:'JetBrains Mono',monospace; }
+@media (max-width:600px) { .result-gen-row, .result-ats-row { gap:14px; } }
+
+/* Review tables — everything created / wired so far, so mistakes are visible and removable
+   right in the wizard instead of only showing up (wrongly) in the generated diagram. */
+.wizard-review-table-wrap { margin-bottom:16px; }
+/* A real grid — border on every cell, not just a bottom rule — plus header shading and zebra
+   striping, so each group reads as a proper spreadsheet-style table rather than a bare list. */
+.wizard-review-group { margin-top:20px; border:1px solid #1d3a56; border-radius:10px; overflow:hidden; background:#0c1c30; }
+.wizard-review-group:first-of-type { margin-top:4px; }
+.wizard-review-group-title { margin:0; padding:9px 12px; border-bottom:1px solid #1d3a56; background:#0a1626; color:#3b82f6; font:800 10.5px Arial,sans-serif; letter-spacing:.05em; text-transform:uppercase; }
+.wizard-review-table-scroll { overflow-x:auto; }
+.wizard-review-table { width:100%; min-width:520px; border-collapse:collapse; font-size:12px; }
+.wizard-review-table th { padding:8px 12px; border:1px solid #1d3a56; background:#0a1626; color:#5b7290; font-size:9.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; text-align:left; }
+.wizard-review-table td { padding:8px 12px; border:1px solid #1d3a56; color:#edf5ff; vertical-align:middle; }
+.wizard-review-table tbody tr:nth-child(even) { background:rgba(59,130,246,.05); }
+.wizard-review-table th:last-child, .wizard-review-table td:last-child { width:120px; }
+.wizard-review-details { color:#9eb8d5; }
+.wizard-review-actions { display:flex; gap:14px; }
+.wizard-review-edit { border:0; background:transparent; color:#3b82f6; font:700 11px Arial,sans-serif; cursor:pointer; padding:0; }
+.wizard-review-edit:hover { text-decoration:underline; }
+.wizard-review-remove { border:0; background:transparent; color:#f87171; font:700 11px Arial,sans-serif; cursor:pointer; padding:0; }
+.wizard-review-remove:hover { text-decoration:underline; }
+.wizard-bulk-toolbar { display:flex; align-items:center; gap:16px; margin:0 0 12px; padding:10px 12px; border:1px solid #1d3a56; border-radius:8px; background:#0c1c30; flex-wrap:wrap; }
+.wizard-bulk-select-all { display:flex; align-items:center; gap:7px; color:#a8bed5; font:700 11.5px Arial,sans-serif; cursor:pointer; }
+.wizard-bulk-btn { border:1px solid #334155; background:transparent; color:#cbd5e1; font:700 11px Arial,sans-serif; cursor:pointer; padding:6px 12px; border-radius:6px; }
+.wizard-bulk-btn:hover:not(:disabled) { background:#132338; border-color:#3b82f6; color:#7ab6ff; }
+.wizard-bulk-btn.danger { border-color:#7f1d1d; color:#f87171; }
+.wizard-bulk-btn.danger:hover:not(:disabled) { background:#2a1010; border-color:#ef4444; color:#fca5a5; }
+.wizard-bulk-btn:disabled { opacity:.4; cursor:not-allowed; }
+/* Checkbox column (no header text) that precedes From/To in every "Connections Made" table — scoped to
+   this modifier class (not plain .wizard-review-table, which the Created Equipment tables above also
+   use without a checkbox column) so only these tables' first column gets squeezed narrow. */
+.wizard-review-table-checkable th:first-child, .wizard-review-table-checkable td:first-child { width:28px; text-align:center; }
+
 .equipment-detail-link { appearance:none; display:inline; border:0 !important; background:transparent !important; color:inherit !important; padding:0 !important; box-shadow:none !important; cursor:pointer; font:inherit; text-align:inherit; }
 .equipment-detail-link:hover { color:#1d63c6 !important; text-decoration:underline; }
 .modal-box.equipment-detail-modal { position:relative; width:min(720px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; padding:0; border:1px solid #c4d5e8; border-radius:14px; background:#f8fbff; box-shadow:0 24px 70px rgba(4,18,36,.38); }
@@ -1055,7 +1826,8 @@ button.telemetry-ats { width:100%; text-align:left; }
 .faceplate-v2-source-box.on.normal span,.faceplate-v2-source-box.on.normal b { color:#fff; }
 .faceplate-v2-source-box.on.emergency { background:#ef4444; border-color:#dc2626; }
 .faceplate-v2-source-box.on.emergency span,.faceplate-v2-source-box.on.emergency b { color:#fff; }
-.faceplate-v2-source-box.off span,.faceplate-v2-source-box.off b { color:#94a3b8; }
+.faceplate-v2-source-box.off { background:#64748b; border-color:#475569; }
+.faceplate-v2-source-box.off span,.faceplate-v2-source-box.off b { color:#f1f5f9; }
 .faceplate-v2-info-box b.normal { color:#16a34a; }
 .faceplate-v2-info-box b.emergency { color:#dc2626; }
 .faceplate-v2-electrical-grid { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:12px; margin-bottom:22px; }
@@ -1082,7 +1854,10 @@ body.dark-dashboard .faceplate-v2-line2 { color:#9eb8d5; }
 body.dark-dashboard .faceplate-v2-source-box,body.dark-dashboard .faceplate-v2-info-box,body.dark-dashboard .faceplate-v2-load-box,body.dark-dashboard .faceplate-v2-electrical-col { border-color:#244969; background:#0d2238; }
 body.dark-dashboard .faceplate-v2-source-box span,body.dark-dashboard .faceplate-v2-info-box span { color:#9eb8d5; }
 body.dark-dashboard .faceplate-v2-source-box b,body.dark-dashboard .faceplate-v2-info-box b,body.dark-dashboard .faceplate-v2-row b { color:#edf5ff; }
-body.dark-dashboard .faceplate-v2-source-box.off span,body.dark-dashboard .faceplate-v2-source-box.off b { color:#7691ae; }
+body.dark-dashboard .faceplate-v2-source-box.off { background:#3f4b5c; border-color:#5b6b80; }
+body.dark-dashboard .faceplate-v2-source-box.off span,body.dark-dashboard .faceplate-v2-source-box.off b { color:#cbd5e1; }
+body.dark-dashboard .faceplate-v2-info-box b.normal { color:#4ade80; }
+body.dark-dashboard .faceplate-v2-info-box b.emergency { color:#f87171; }
 body.dark-dashboard .faceplate-v2-row { border-top-color:#244969; color:#9eb8d5; }
 body.dark-dashboard .faceplate-v2-load-box { color:#7db5ff; }
 body.dark-dashboard .faceplate-v2-engine-box { border-color:#244969; background:#0d2238; }
@@ -1311,10 +2086,14 @@ body.dark-dashboard .header-user { border-left-color:#1c3d5a; }
 body.dark-dashboard .header-user-name, body.dark-dashboard .header-user-menu-name, body.dark-dashboard .header-user-menu-value { color:#eef6ff; }
 body.dark-dashboard .header-user-menu { background:#0b1d31; border-color:#254a6b; }
 body.dark-dashboard .header-user-menu-info, body.dark-dashboard .header-user-menu-actions { border-color:#1b3b59; }
-body.dark-dashboard .reseller-card-shell .info-card, body.dark-dashboard .companies-directory .info-card { background:linear-gradient(145deg,#0b2036,#081827); border-color:#245072; box-shadow:0 10px 22px rgba(0,0,0,.24); }
-body.dark-dashboard .reseller-card-shell .info-card:hover, body.dark-dashboard .companies-directory .info-card:hover { background:linear-gradient(145deg,#102b48,#0b1d31); border-color:#4586c2; }
-body.dark-dashboard .reseller-card-shell .info-card-body, body.dark-dashboard .card-grid > .info-card .info-card-body, body.dark-dashboard .companies-directory .info-card-body { border-color:#1d4262; }
-body.dark-dashboard .reseller-card-shell .info-card-stat + .info-card-stat, body.dark-dashboard .card-grid > .info-card .info-card-stat + .info-card-stat, body.dark-dashboard .companies-directory .info-card-stat + .info-card-stat { border-color:#1d4262; }
+body.dark-dashboard .reseller-card-shell .info-card, body.dark-dashboard .companies-directory .info-card, body.dark-dashboard .reseller-company-card-shell .info-card { background:linear-gradient(145deg,#0b2036,#081827); border-color:#245072; box-shadow:0 10px 22px rgba(0,0,0,.24); }
+/* .reseller-company-card-shell (Resellers -> a reseller's own Customers list) has its own separate
+   hover rule (a hardcoded white/light-blue gradient) that the similarly-named .reseller-card-shell
+   already had a dark-mode override for — this one didn't, so hovering here still won a light background
+   over the dark base above via specificity, leaving the card's own text unreadable against it. */
+body.dark-dashboard .reseller-card-shell .info-card:hover, body.dark-dashboard .companies-directory .info-card:hover, body.dark-dashboard .reseller-company-card-shell .info-card:hover { background:linear-gradient(145deg,#102b48,#0b1d31); border-color:#4586c2; }
+body.dark-dashboard .reseller-card-shell .info-card-body, body.dark-dashboard .card-grid > .info-card .info-card-body, body.dark-dashboard .companies-directory .info-card-body, body.dark-dashboard .reseller-company-card-shell .info-card-body { border-color:#1d4262; }
+body.dark-dashboard .reseller-card-shell .info-card-stat + .info-card-stat, body.dark-dashboard .card-grid > .info-card .info-card-stat + .info-card-stat, body.dark-dashboard .companies-directory .info-card-stat + .info-card-stat, body.dark-dashboard .reseller-company-card-shell .info-card-stat + .info-card-stat { border-color:#1d4262; }
 body.dark-dashboard .reseller-card-actions .header-btn { background:rgba(16,42,69,.94); color:#eaf4ff; border-color:#39729f; }
 body.dark-dashboard .reseller-card-actions .header-btn:hover { background:#1a4b79; color:#fff; border-color:#65adf3; }
 body.dark-dashboard .data-table { color:#eaf4ff; background:#091b2f; border-color:#245072; }

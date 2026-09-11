@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import base64
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -55,6 +57,24 @@ def update_company(
     if not can_write_company(user, db, company.id, company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this company")
     return crud.update_company(db, company, data)
+
+
+@router.post("/{company_id}/logo", response_model=CompanyRead)
+async def upload_company_logo(company_id: str, logo: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    company = crud.get_company(db, company_id)
+    if not company:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "company not found")
+    if not can_write_company(user, db, company.id, company.reseller_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this company")
+    if logo.content_type not in {"image/png", "image/jpeg"}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "logo must be a PNG or JPEG image")
+    content = await logo.read()
+    if not content or len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "logo must be smaller than 2 MB")
+    company.logo_data = f"data:{logo.content_type};base64,{base64.b64encode(content).decode('ascii')}"
+    db.commit()
+    db.refresh(company)
+    return company
 
 
 @router.delete("/{company_id}", response_model=CompanyRead)

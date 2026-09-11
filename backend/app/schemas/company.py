@@ -26,3 +26,4 @@ class CompanyUpdate(BaseModel):
 class CompanyRead(CompanyBase):
     model_config = ConfigDict(from_attributes=True)
     id: str
+    logo_data: str | None = None

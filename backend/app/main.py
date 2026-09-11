@@ -10,6 +10,7 @@ from app.routers import (
     me,
     meters,
     oncall,
+    one_lines,
     panels,
     reports,
     resellers,
@@ -41,6 +42,7 @@ app.include_router(alarms.router)
 app.include_router(reports.router)
 app.include_router(oncall.router)
 app.include_router(me.router)
+app.include_router(one_lines.router)
 
 
 @app.get("/health")

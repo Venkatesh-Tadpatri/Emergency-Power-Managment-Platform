@@ -7,6 +7,7 @@ class ATSBase(BaseModel):
     model: str | None = None
     serial_number: str | None = None
     branch: str = "equipment"
+    source_type: str = "utility"
     rated_amps: float | None = None
     rated_volts: float | None = None
     panel_id: str
@@ -22,6 +23,7 @@ class ATSUpdate(BaseModel):
     model: str | None = None
     serial_number: str | None = None
     branch: str | None = None
+    source_type: str | None = None
     rated_amps: float | None = None
     rated_volts: float | None = None
     panel_id: str | None = None

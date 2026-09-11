@@ -44,6 +44,10 @@ export const getAllAts = (token) => api("/api/ats", token);
 export const getAllGenerators = (token) => api("/api/generators", token);
 export const createAts = (token, data) => api("/api/ats", token, { method: "POST", body: JSON.stringify(data) });
 export const createGenerator = (token, data) => api("/api/generators", token, { method: "POST", body: JSON.stringify(data) });
+// Same system_one_lines row the web app's One-Line Wizard reads/writes — a wizard built on one
+// platform shows up identically on the other.
+export const getOneLine = (systemId, token) => api(`/api/systems/${systemId}/one-line`, token);
+export const saveOneLine = (systemId, data, token) => api(`/api/systems/${systemId}/one-line`, token, { method: "PUT", body: JSON.stringify({ data }) });
 export const getReports = (token, companyId, isSuperAdmin) =>
   companyId ? api(`/api/reports?company_id=${companyId}`, token) : isSuperAdmin ? api("/api/reports", token) : Promise.resolve([]);
 export const getOnCall = (companyId, token) => companyId ? api(`/api/oncall?company_id=${companyId}`, token) : Promise.resolve([]);

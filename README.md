@@ -156,6 +156,20 @@ Devices outside those ID ranges show placeholder values (`—` / `WAITING`) — 
 
 **Careful with `mobile/src/data/`**: the root `.gitignore` has a broad `data/` rule (it matches any directory named `data` at any depth) with explicit negation exceptions carved out for the paths above. If you add another `data/` directory anywhere in the repo, it will be silently gitignored — and critically, silently **excluded from EAS Build's upload archive** too, which fails the mobile build with a "module not found" error that gives no hint it's a gitignore problem. Add a matching `!path/to/your/data/` negation if you hit this.
 
+## Customer branding and generated one-lines
+
+- Each customer has a **Company Details** page where an administrator can upload a PNG or JPEG logo (maximum 2 MB).
+- The uploaded customer logo is used in the report preview and in downloaded Generator Run and ATS Transfer PDFs. Reports fall back to the CPC label when a customer logo has not been uploaded.
+- System pages include **System Details**, **One-Line Wizard**, and **One-Line**. The wizard saves the equipment and wiring configuration; the One-Line tab displays the generated interactive diagram.
+- In generated diagrams, switchgear, distribution gear, breakers, ATS units, and generators expose contextual detail popups.
+
+When upgrading an existing installation, apply the migrations before using these features:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
 ## Troubleshooting
 
 **Grafana container stuck restarting / crash-looping.** Usually stale internal SQLite state left over from a previous run conflicting with datasource provisioning (`data source with the same uid already exists` in `docker compose logs grafana`). Since Grafana's data directory isn't a mounted volume, recreating the container gives it a clean state:

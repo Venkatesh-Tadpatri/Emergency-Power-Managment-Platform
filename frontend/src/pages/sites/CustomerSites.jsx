@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { IconAlert, IconBuilding, IconCheckCircle, IconMap, IconPanel } from "../../components/common/Icons";
+import { LeafletMap } from "../../components/map/LeafletMap";
 import { Modal } from "../../components/common/Modal";
 import { PageHero } from "../../components/common/PageHero";
 import { StatsGrid } from "../../components/common/StatCard";
@@ -22,19 +23,24 @@ export function CustomerSites() {
   const updateSite = useUpdateSite();
   const archiveSite = useArchiveSite();
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", address: "" });
+  const [form, setForm] = useState({ name: "", address: "", lat: "", lng: "" });
   const canManage = me?.role === "superadmin";
   const activeSites = (sites || []).filter((site) => site.status !== "archived");
   const normal = (systems || []).filter((system) => system.status === "normal").length;
 
   usePageHeader(customer?.name || "Customer", [{ label: "Resellers", onClick: () => navigate("/resellers") }]);
 
-  function openNew() { setForm({ name: "", address: "" }); setEditing("new"); }
-  function openEdit(site, event) { event.stopPropagation(); setForm({ name: site.name, address: site.address || "" }); setEditing(site); }
+  function openNew() { setForm({ name: "", address: "", lat: "", lng: "" }); setEditing("new"); }
+  function openEdit(site, event) { event.stopPropagation(); setForm({ name: site.name, address: site.address || "", lat: site.lat?.toString() || "", lng: site.lng?.toString() || "" }); setEditing(site); }
   function submit(event) {
     event.preventDefault();
     if (!form.name.trim() || !companyId) return;
-    const data = { name: form.name.trim(), address: form.address.trim() || undefined };
+    const data = {
+      name: form.name.trim(),
+      address: form.address.trim() || undefined,
+      lat: form.lat ? Number(form.lat) : undefined,
+      lng: form.lng ? Number(form.lng) : undefined,
+    };
     if (editing === "new") createSite.mutate({ ...data, customer_id: companyId });
     else updateSite.mutate({ id: editing.id, data });
     setEditing(null);
@@ -61,6 +67,14 @@ export function CustomerSites() {
         </tr>;
       })}</tbody>
     </table>
-    {editing && <Modal title={editing === "new" ? "New Site" : "Edit Site"} onClose={() => setEditing(null)}><form onSubmit={submit}><div className="form-row"><label>Site Name *</label><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="e.g. Ameerpet Hospital" autoFocus /></div><div className="form-row"><label>Address / Area</label><input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} placeholder="e.g. Ameerpet, Hyderabad" /></div><div className="modal-actions"><button type="button" className="header-btn" onClick={() => setEditing(null)}>Cancel</button><button type="submit" className="header-btn primary">Save</button></div></form></Modal>}
+    <div className="section-header"><div><div className="section-title">Site Locations</div><div className="section-sub">{activeSites.filter((site) => site.lat != null && site.lng != null).length} of {activeSites.length} sites plotted on the map</div></div></div>
+    <div style={{ position: "relative", height: 420, borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
+      <LeafletMap
+        markers={activeSites.filter((site) => site.lat != null && site.lng != null).map((site) => ({ id: site.id, lat: site.lat, lng: site.lng, status: site.status, label: site.name }))}
+        onMarkerClick={(id) => navigate(`/companies/${companyId}/sites/${id}`)}
+        singleMarkerZoom={12}
+      />
+    </div>
+    {editing && <Modal title={editing === "new" ? "New Site" : "Edit Site"} onClose={() => setEditing(null)}><form onSubmit={submit}><div className="form-row"><label>Site Name *</label><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="e.g. Ameerpet Hospital" autoFocus /></div><div className="form-row"><label>Address / Area</label><input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} placeholder="e.g. Ameerpet, Hyderabad" /></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}><div className="form-row"><label>Latitude</label><input type="number" step="any" min={-90} max={90} value={form.lat} onChange={(event) => setForm({ ...form, lat: event.target.value })} placeholder="e.g. 17.4239" /></div><div className="form-row"><label>Longitude</label><input type="number" step="any" min={-180} max={180} value={form.lng} onChange={(event) => setForm({ ...form, lng: event.target.value })} placeholder="e.g. 78.4738" /></div></div><div className="modal-actions"><button type="button" className="header-btn" onClick={() => setEditing(null)}>Cancel</button><button type="submit" className="header-btn primary">Save</button></div></form></Modal>}
   </>;
 }

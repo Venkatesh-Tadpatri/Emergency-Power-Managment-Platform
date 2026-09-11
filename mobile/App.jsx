@@ -11,6 +11,8 @@ import { Customers, CustomerDetail, PlatformUsers, Resellers, ResellerDetail, Si
 import { Analytics } from "./src/Analytics";
 import { Drawer } from "./src/Drawer";
 import { SLD } from "./src/SLD";
+import { OneLineWizard } from "./src/OneLineWizard";
+import { OneLineResult } from "./src/OneLineResult";
 import { DeviceFaceplateScreen, EquipmentDetailModal } from "./src/DeviceFaceplates";
 import { TestWizard } from "./src/TestWizard";
 import { roleName } from "./src/roles";
@@ -337,10 +339,12 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
     <ScrollView contentContainerStyle={styles.screen}>
       {(system.address || system.lat) && <Pressable style={styles.directionsButton} onPress={openDirections}><Text style={styles.directionsText}>Open directions</Text></Pressable>}
 
-      <View style={styles.viewTabRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.viewTabRow}>
         <Pressable style={[styles.viewTab, view === "details" && styles.viewTabActive]} onPress={() => setView("details")}><Text style={[styles.viewTabText, view === "details" && styles.viewTabTextActive]}>System Details</Text></Pressable>
         <Pressable style={[styles.viewTab, view === "one-line" && styles.viewTabActive]} onPress={() => setView("one-line")}><Text style={[styles.viewTabText, view === "one-line" && styles.viewTabTextActive]}>One-Line</Text></Pressable>
-      </View>
+        <Pressable style={[styles.viewTab, view === "wizard" && styles.viewTabActive]} onPress={() => setView("wizard")}><Text style={[styles.viewTabText, view === "wizard" && styles.viewTabTextActive]}>Wizard</Text></Pressable>
+        <Pressable style={[styles.viewTab, view === "result" && styles.viewTabActive]} onPress={() => setView("result")}><Text style={[styles.viewTabText, view === "result" && styles.viewTabTextActive]}>Result</Text></Pressable>
+      </ScrollView>
 
       {view === "one-line" ? (
         loading ? <Loading /> : (
@@ -350,6 +354,14 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
             onSelectAts={(item) => setSelectedDevice({ kind: "ats", item })}
             onSelectGenerator={(item) => setSelectedDevice({ kind: "generator", item })}
           />
+        )
+      ) : view === "wizard" ? (
+        loading ? <Loading /> : (
+          <OneLineWizard systemId={system.id} systemName={system.name} ats={devices.ats} generators={devices.generators} token={token} />
+        )
+      ) : view === "result" ? (
+        loading ? <Loading /> : (
+          <OneLineResult systemId={system.id} ats={devices.ats} generators={devices.generators} token={token} />
         )
       ) : (
         <>
@@ -765,7 +777,7 @@ function makeStyles(theme) {
     directionsButton: { borderWidth: 1, borderColor: theme.blue, backgroundColor: theme.blueSoft, padding: 12, borderRadius: 10, alignItems: "center", marginBottom: 16 },
     directionsText: { color: theme.blue, fontWeight: "700" },
     viewTabRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-    viewTab: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: "center", borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface },
+    viewTab: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 9, alignItems: "center", borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface },
     viewTabActive: { backgroundColor: theme.blue, borderColor: theme.blue },
     viewTabText: { fontSize: 12, fontWeight: "700", color: theme.textDim },
     viewTabTextActive: { color: "#fff" },

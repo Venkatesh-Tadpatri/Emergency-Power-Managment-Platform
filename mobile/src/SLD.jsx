@@ -51,13 +51,11 @@ function generatorPositions(count, width) {
   return Array.from({ length: count }, (_, i) => rightEdge - (count - 1 - i) * GEN_GAP);
 }
 
-/** Vertical circuit-breaker glyph — two terminal dots joined by a curved contact arm, matching the web app's breaker symbol. */
+/** Vertical circuit-breaker glyph — an open semicircle bulging off the wire, matching the web app's breaker symbol. */
 function BreakerSymbol({ x, y, color }) {
   return (
     <G>
-      <Circle cx={x} cy={y - 7} r={1.8} stroke={color} strokeWidth={1.3} fill="none" />
-      <Circle cx={x} cy={y + 7} r={1.8} stroke={color} strokeWidth={1.3} fill="none" />
-      <Path d={`M${x} ${y - 5.3} Q${x + 5.5} ${y} ${x} ${y + 5.3}`} stroke={color} strokeWidth={1.4} fill="none" />
+      <Path d={`M${x} ${y - 8} A8 8 0 0 1 ${x} ${y + 8}`} stroke={color} strokeWidth={2.2} fill="none" />
     </G>
   );
 }

@@ -1,4 +1,4 @@
-from sqlalchemy import Float, ForeignKey, String
+from sqlalchemy import Boolean, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPKMixin
@@ -15,6 +15,8 @@ class System(Base, UUIDPKMixin, TimestampMixin):
     site_id: Mapped[str] = mapped_column(ForeignKey("sites.id"), nullable=False)
     # Display-only status snapshot (normal/emergency/alarm/test/offline) — not live telemetry.
     status: Mapped[str] = mapped_column(String(20), default="normal", nullable=False)
+    # Soft-deleted: hidden from system lists but kept (with its panels/ATS/generators) for recovery.
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     company: Mapped["Customer"] = relationship(back_populates="systems")
     site: Mapped["Site"] = relationship(back_populates="systems")

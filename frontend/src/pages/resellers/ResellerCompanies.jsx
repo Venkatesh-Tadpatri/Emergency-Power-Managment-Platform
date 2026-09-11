@@ -22,30 +22,36 @@ export function ResellerCompanies() {
     const updateCompany = useUpdateCompany();
     const archiveCompany = useArchiveCompany();
     const [editing, setEditing] = useState(null);
-    const [form, setForm] = useState({ name: "", address: "" });
+    const [form, setForm] = useState({ name: "", address: "", lat: "", lng: "" });
     usePageHeader("Customers", [
         { label: "Resellers", onClick: () => navigate("/resellers") },
         { label: reseller?.name || "", onClick: () => navigate(`/resellers/${resellerId}`) },
     ]);
     const canManage = !!me?.permissions.create_company;
     const openNew = () => {
-        setForm({ name: "", address: "" });
+        setForm({ name: "", address: "", lat: "", lng: "" });
         setEditing("new");
     };
     const openEdit = (c, e) => {
         e.stopPropagation();
-        setForm({ name: c.name, address: c.address || "" });
+        setForm({ name: c.name, address: c.address || "", lat: c.lat?.toString() || "", lng: c.lng?.toString() || "" });
         setEditing(c);
     };
     const submit = (e) => {
         e.preventDefault();
         if (!form.name.trim() || !resellerId)
             return;
+        const data = {
+            name: form.name,
+            address: form.address,
+            lat: form.lat ? Number(form.lat) : undefined,
+            lng: form.lng ? Number(form.lng) : undefined,
+        };
         if (editing === "new") {
-            createCompany.mutate({ name: form.name, address: form.address, reseller_id: resellerId });
+            createCompany.mutate({ ...data, reseller_id: resellerId });
         }
         else if (editing) {
-            updateCompany.mutate({ id: editing.id, data: { name: form.name, address: form.address } });
+            updateCompany.mutate({ id: editing.id, data });
         }
         setEditing(null);
     };
@@ -60,5 +66,5 @@ export function ResellerCompanies() {
                                             e.stopPropagation();
                                             archiveCompany.mutate(c.id);
                                         }, children: "Archive" }))] }))] }, c.id));
-                }) }), editing && (_jsx(Modal, { title: editing === "new" ? "New Customer" : "Edit Customer", onClose: () => setEditing(null), children: _jsxs("form", { onSubmit: submit, children: [_jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Customer Name *" }), _jsx("input", { required: true, minLength: 2, maxLength: 120, value: form.name, onChange: (e) => setForm({ ...form, name: e.target.value }), placeholder: "e.g. Riverside Medical Center", autoFocus: true })] }), _jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Address / City" }), _jsx("input", { value: form.address, onChange: (e) => setForm({ ...form, address: e.target.value }), placeholder: "e.g. 200 Main St, Springfield" })] }), _jsxs("div", { className: "modal-actions", children: [_jsx("button", { type: "button", className: "header-btn", onClick: () => setEditing(null), children: "Cancel" }), _jsx("button", { type: "submit", className: "header-btn primary", children: "Save" })] })] }) }))] }));
+                }) }), editing && (_jsx(Modal, { title: editing === "new" ? "New Customer" : "Edit Customer", onClose: () => setEditing(null), children: _jsxs("form", { onSubmit: submit, children: [_jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Customer Name *" }), _jsx("input", { required: true, minLength: 2, maxLength: 120, value: form.name, onChange: (e) => setForm({ ...form, name: e.target.value }), placeholder: "e.g. Riverside Medical Center", autoFocus: true })] }), _jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Address / City" }), _jsx("input", { value: form.address, onChange: (e) => setForm({ ...form, address: e.target.value }), placeholder: "e.g. 200 Main St, Springfield" })] }), _jsxs("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }, children: [_jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Latitude" }), _jsx("input", { type: "number", step: "any", min: -90, max: 90, value: form.lat, onChange: (e) => setForm({ ...form, lat: e.target.value }), placeholder: "e.g. 17.4239" })] }), _jsxs("div", { className: "form-row", children: [_jsx("label", { children: "Longitude" }), _jsx("input", { type: "number", step: "any", min: -180, max: 180, value: form.lng, onChange: (e) => setForm({ ...form, lng: e.target.value }), placeholder: "e.g. 78.4738" })] })] }), _jsxs("div", { className: "modal-actions", children: [_jsx("button", { type: "button", className: "header-btn", onClick: () => setEditing(null), children: "Cancel" }), _jsx("button", { type: "submit", className: "header-btn primary", children: "Save" })] })] }) }))] }));
 }

@@ -43,6 +43,7 @@ ID_PREFIXES = {
     "oncall_shifts": "ONC",
     "alert_schedules": "ASC",
     "alert_rules": "ARL",
+    "system_one_lines": "OLN",
 }
 
 

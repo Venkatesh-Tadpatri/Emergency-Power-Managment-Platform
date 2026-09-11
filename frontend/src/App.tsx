@@ -13,6 +13,7 @@ import { AlarmsList } from "./pages/alarms/AlarmsList";
 import { Analytics } from "./pages/analytics/Analytics";
 import { CompanyAlarms } from "./pages/companies/CompanyAlarms";
 import { CompanyDashboard } from "./pages/companies/CompanyDashboard";
+import { CompanyDetails } from "./pages/companies/CompanyDetails";
 import { CompaniesList } from "./pages/companies/CompaniesList";
 import { CompanyMap } from "./pages/companies/CompanyMap";
 import { CompanyOnCall } from "./pages/companies/CompanyOnCall";
@@ -74,6 +75,7 @@ function Gate() {
 
         <Route path="companies" element={<CompaniesList />} />
         <Route path="companies/:companyId" element={<CustomerSites />} />
+        <Route path="companies/:companyId/details" element={<CompanyDetails />} />
         <Route path="companies/:companyId/sites/:siteId" element={<SiteSystems />} />
         <Route path="companies/:companyId/map" element={<CompanyMap />} />
         <Route path="companies/:companyId/alarms" element={<CompanyAlarms />} />

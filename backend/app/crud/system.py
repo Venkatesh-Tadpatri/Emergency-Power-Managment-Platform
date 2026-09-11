@@ -6,7 +6,7 @@ from app.schemas.system import SystemCreate, SystemUpdate
 
 
 def list_systems(db: Session, company_id: str | None = None, site_id: str | None = None) -> list[System]:
-    q = db.query(System)
+    q = db.query(System).filter(System.archived.is_(False))
     if company_id:
         q = q.filter(System.company_id == company_id)
     if site_id:
@@ -51,6 +51,7 @@ def update_system(db: Session, system: System, data: SystemUpdate) -> System:
 
 def archive_system(db: Session, system: System) -> System:
     system.status = "offline"
+    system.archived = True
     db.commit()
     db.refresh(system)
     return system

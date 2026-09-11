@@ -137,6 +137,7 @@ export function Sidebar() {
         <div className="nav-section">
           <div className="nav-section-label">Administration</div>
           <NavItem icon={IconUsers} color="#7c3aed" label="Users" active={path.endsWith("/users")} onClick={() => navigate(`/companies/${companyId}/users`)} />
+          <NavItem icon={IconBuilding} color="#16a34a" label="Company Details" active={path.endsWith("/details")} onClick={() => navigate(`/companies/${companyId}/details`)} />
           <NavItem icon={IconReport} color="#2563eb" label="Reports" active={path.includes("/reports")} onClick={() => navigate(`/companies/${companyId}/reports`)} />
         </div>
       </div>

@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { IconAlert, IconBell, IconCheckCircle } from "../common/Icons";
+import { IconAlert, IconATS, IconBell, IconBolt, IconCheckCircle, IconGenerator } from "../common/Icons";
 import { Modal } from "../common/Modal";
 import { TestWizard } from "./TestWizard";
 import type { ATS, Generator } from "../../types/entities";
 import { telemetryFor, useTelemetrySnapshot, type AtsTelemetry, type GeneratorTelemetry } from "../../hooks/useTelemetry";
 import { demoAtsTelemetry, demoGeneratorTelemetry } from "../../data/mepstraTelemetry";
 import { useAlarms } from "../../queries/alarms";
+import { useOneLine, useSaveOneLine } from "../../queries/systems";
 
 type EquipmentSelection = { type: "ats"; id: string } | { type: "generator"; id: string };
 type TestTarget = EquipmentSelection;
@@ -62,7 +63,7 @@ function EventsPanel({ alarms }: { alarms: Alarm[] }) {
   </div>;
 }
 
-function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generatorTelemetry, onClose }: { systemName: string; ats?: ATS; generator?: Generator; atsTelemetry?: Partial<AtsTelemetry>; generatorTelemetry?: Partial<GeneratorTelemetry>; onClose: () => void }) {
+function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generatorTelemetry, onClose, extraSection, alwaysShowSourceAvailability, fedFromLabel }: { systemName: string; ats?: ATS; generator?: Generator; atsTelemetry?: Partial<AtsTelemetry>; generatorTelemetry?: Partial<GeneratorTelemetry>; onClose: () => void; extraSection?: React.ReactNode; alwaysShowSourceAvailability?: boolean; fedFromLabel?: string }) {
   const isAts = Boolean(ats);
   const telemetry = isAts ? atsTelemetry : generatorTelemetry;
   const name = ats?.name || generator?.name || "Equipment";
@@ -77,7 +78,7 @@ function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generato
   const bannerText = isAts
     ? (atsTelemetry?.status === "EMERGENCY" ? "EMERGENCY" : atsTelemetry?.status === "FAULT" ? "FAULT" : atsTelemetry?.status === "TRANSFERING" ? "TRANSFERRING" : atsTelemetry?.status === "OFFLINE" ? "OFFLINE" : "READY")
     : (generatorTelemetry?.status === "RUNNING" ? "RUNNING" : generatorTelemetry?.status === "FAULT" ? "FAULT" : generatorTelemetry?.status === "TEST" ? "TEST MODE" : generatorTelemetry?.status === "OFFLINE" ? "OFFLINE" : "READY");
-  const bannerTone = bannerText === "EMERGENCY" || bannerText === "FAULT" ? "emergency" : bannerText === "TRANSFERRING" || bannerText === "TEST MODE" ? "warning" : bannerText === "OFFLINE" ? "offline" : "ready";
+  const bannerTone = bannerText === "EMERGENCY" || bannerText === "FAULT" || bannerText === "RUNNING" ? "emergency" : bannerText === "TRANSFERRING" || bannerText === "TEST MODE" ? "warning" : bannerText === "OFFLINE" ? "offline" : "ready";
 
   const voltAn = telemetry?.voltage_ab !== undefined ? telemetry.voltage_ab / Math.sqrt(3) : undefined;
   const voltBn = telemetry?.voltage_bc !== undefined ? telemetry.voltage_bc / Math.sqrt(3) : undefined;
@@ -116,14 +117,31 @@ function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generato
           <div className="faceplate-v2-section-title">Source Status</div>
           <div className="faceplate-v2-source-grid">
             <div className="faceplate-v2-source-col">
-              <div className={`faceplate-v2-source-box ${onNormal ? "on normal" : "off"}`}>
-                <span>Normal Source</span>
-                <b>{!atsTelemetry?.utility_available ? "Unavailable" : onNormal ? "Available" : "Ready"}</b>
-              </div>
-              <div className={`faceplate-v2-source-box ${!onNormal ? "on emergency" : "off"}`}>
-                <span>Emergency Source</span>
-                <b>{!atsTelemetry?.generator_available ? "Unavailable" : !onNormal ? "Available" : "Ready"}</b>
-              </div>
+              {alwaysShowSourceAvailability ? (
+                <>
+                  {/* Both boxes always read "Available" here — the switchgear always has both a utility
+                      feed and a generator feed present; only "Connected To" says which one is in use. */}
+                  <div className="faceplate-v2-source-box on normal">
+                    <span>Normal Source</span>
+                    <b>Available</b>
+                  </div>
+                  <div className="faceplate-v2-source-box on emergency">
+                    <span>Emergency Source</span>
+                    <b>Available</b>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={`faceplate-v2-source-box ${onNormal ? "on normal" : "off"}`}>
+                    <span>Normal Source</span>
+                    <b>{!atsTelemetry?.utility_available ? "Unavailable" : onNormal ? "Available" : "Ready"}</b>
+                  </div>
+                  <div className={`faceplate-v2-source-box ${!onNormal ? "on emergency" : "off"}`}>
+                    <span>Emergency Source</span>
+                    <b>{!atsTelemetry?.generator_available ? "Unavailable" : !onNormal ? "Available" : "Ready"}</b>
+                  </div>
+                </>
+              )}
             </div>
             <div className="faceplate-v2-source-col">
               <div className="faceplate-v2-info-box">
@@ -131,8 +149,8 @@ function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generato
                 <b className={onNormal ? "normal" : "emergency"}>{onNormal ? "Normal" : "Emergency"}</b>
               </div>
               <div className="faceplate-v2-info-box">
-                <span>{emergencyConnected ? "Time on Emergency" : "Last Transfer"}</span>
-                <b>{emergencyConnected ? formatDuration(atsTelemetry?.time_on_emergency_seconds) : "—"}</b>
+                <span>{fedFromLabel ? "Fed From" : emergencyConnected ? "Time on Emergency" : "Last Transfer"}</span>
+                <b>{fedFromLabel || (emergencyConnected ? formatDuration(atsTelemetry?.time_on_emergency_seconds) : "—")}</b>
               </div>
             </div>
           </div>
@@ -198,6 +216,8 @@ function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generato
         <div className="faceplate-v2-section-title">Connected Load</div>
         <div className="faceplate-v2-load-box">{branchText}</div>
       </>}
+
+      {extraSection}
     </div>
   </Modal>;
 }
@@ -211,11 +231,26 @@ function TransformerSymbol({ size = 20 }: { size?: number }) {
   </svg>;
 }
 
-function BreakerSymbol({ tone = "normal", size = 30 }: { tone?: "normal" | "emergency" | "tie"; size?: number }) {
-  return <svg width={size} height={size * 1.1} viewBox="0 0 16 18" fill="none" aria-hidden="true" className={`sld-symbol sld-breaker-symbol ${tone}`}>
-    <circle cx="8" cy="1.8" r="1.7" stroke="currentColor" strokeWidth="1.3" />
-    <circle cx="8" cy="16.2" r="1.7" stroke="currentColor" strokeWidth="1.3" />
-    <path d="M8 3.5 Q13.5 9 8 14.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+function BreakerSymbol({ tone = "normal", size = 30, strokeWidthPx = 2, centered = false }: { tone?: "normal" | "emergency" | "tie"; size?: number; strokeWidthPx?: number; centered?: boolean }) {
+  // .sld-gear-connector (the straight wire above/below) is a fixed 2px-wide CSS bar; convert that
+  // to viewBox units at this icon's own scale so the arc reads as the same thickness as the wire by
+  // default. A bigger, more prominent breaker (strokeWidthPx above 2) needs a bolder stroke to match —
+  // otherwise a bigger size alone actually reads as thinner/weaker, not bolder, since this keeps the
+  // rendered stroke at a constant pixel width regardless of size unless told to scale it up too.
+  const strokeWidth = (strokeWidthPx * 12) / size;
+  // Rigid shift right (same shape, no stretch): 4px on screen, converted to this icon's viewBox units.
+  // This matches the *old* wire convention (.sld-gear-connector's default margin:0 0 0 14px, a fixed
+  // left offset, not centered) — still correct for the untouched real SingleLineDiagram, which still
+  // uses that. Everywhere the wire is centered instead (margin:0 auto / align-items:center, no fixed
+  // offset — the Result spine and this branch view, after fixing the same misalignment there earlier
+  // this session), this rigid shift creates exactly that same offset all over again, just baked into
+  // the icon itself instead of a stray margin — pass centered to draw the curve on the icon's true
+  // center instead, matching a wire with no offset of its own.
+  // Nudged 6px right of true center (rather than dead-on 6) — the wire itself still runs through the
+  // exact center; only the curve's own peak shifts slightly, matching the requested visual balance.
+  const cx = centered ? 6 + (6 * 12) / size : 6 + (4 * 12) / size;
+  return <svg width={size} height={size} viewBox="0 0 12 12" fill="none" aria-hidden="true" style={{ overflow: "visible" }} className={`sld-symbol sld-breaker-symbol ${tone}`}>
+    <path d={`M${cx} 0.5 A5.5 5.5 0 0 1 ${cx} 11.5`} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" fill="none" />
   </svg>;
 }
 
@@ -270,10 +305,1937 @@ export function SingleLineDiagram({ ats, generators, atsTelemetry, generatorTele
   </section>;
 }
 
-export function SystemOperationsOverview({ systemId, systemName, ats, generators, view, onViewChange }: { systemId: string; systemName: string; ats: ATS[]; generators: Generator[]; view: "details" | "one-line"; onViewChange: (view: "details" | "one-line") => void }) {
+const WIZARD_EQUIPMENT_TYPES: { key: string; label: string; sub?: string; badge?: string; icon: JSX.Element }[] = [
+  { key: "container", label: "Container", sub: "Switchgear / Switchboard", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="3.5" width="15" height="13" rx="2" stroke="currentColor" strokeWidth="1.4" /><line x1="4.5" y1="7.5" x2="15.5" y2="7.5" stroke="currentColor" strokeWidth="1.4" /><line x1="4.5" y1="11" x2="15.5" y2="11" stroke="currentColor" strokeWidth="1.4" /></svg> },
+  { key: "breaker", label: "Breaker", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2 L4 11 H9 L8 18 L16 8 H11 Z" fill="#ef4444" /></svg> },
+  { key: "transformer", label: "Transformer", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="7.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.4" /><circle cx="12.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.4" /></svg> },
+  { key: "panel", label: "Panel", badge: "Load", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="2.5" width="14" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><line x1="7" y1="2.5" x2="7" y2="17.5" stroke="currentColor" strokeWidth="1.4" /><line x1="11.5" y1="2.5" x2="11.5" y2="17.5" stroke="currentColor" strokeWidth="1.4" /></svg> },
+  { key: "equipment", label: "Equipment", badge: "Load", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="6" width="15" height="8" rx="3" stroke="currentColor" strokeWidth="1.4" /><circle cx="7" cy="10" r="1.1" fill="currentColor" /><circle cx="10" cy="10" r="1.1" fill="currentColor" /><circle cx="13" cy="10" r="1.1" fill="currentColor" /></svg> },
+  { key: "area", label: "Area Served", badge: "Load", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2 L17 6 V14 L10 18 L3 14 V6 Z" stroke="currentColor" strokeWidth="1.4" /></svg> },
+];
+
+type WizardField =
+  | { kind: "text"; key: string; label: string; placeholder?: string }
+  | { kind: "select"; key: string; label: string; options: string[] }
+  | { kind: "cards"; key: string; label: string; options: { value: string; label: string; sub: string; icon: JSX.Element }[] }
+  | { kind: "circuits"; key: string; label: string };
+
+type WizardFormConfig = { kicker: string; heading: string; subtitle?: string; rows: WizardField[][] };
+
+// The exact same glyphs the branch diagram draws for each style (BreakerSymbol's arc for Fixed-Mount,
+// DrawoutBreakerGlyph's square-with-arrows for Draw-Out), not a separate simplified pair — so picking a
+// style here shows the real symbol you'll actually see once this breaker is wired into a one-line,
+// instead of a lookalike that doesn't quite match. Neutral "tie" tone since nothing is energized yet at
+// equipment-creation time.
+const BREAKER_STYLE_ICONS = {
+  // BreakerSymbol only ever draws the arc itself — in the real diagram the wire above/below it is a
+  // separate element (.sld-gear-connector) that doesn't exist in this isolated card, so without these
+  // it reads as a floating curve instead of a breaker sitting on a line. DrawoutBreakerGlyph doesn't
+  // need this — it already draws its own wire-breaker-wire in one self-contained SVG.
+  fixedMount: (
+    <div className="wizard-style-card-fixed-icon">
+      <span className="wizard-style-card-wire" aria-hidden="true" />
+      <BreakerSymbol tone="tie" size={28} strokeWidthPx={3} centered />
+      <span className="wizard-style-card-wire" aria-hidden="true" />
+    </div>
+  ),
+  drawOut: <DrawoutBreakerGlyph tone="tie" />,
+};
+
+const WIZARD_EQUIPMENT_FORMS: Record<string, WizardFormConfig> = {
+  container: {
+    kicker: "Container", heading: "Define the container", subtitle: "Switchgear, Main Switchboard, Paralleling Gear, or Distribution Gear.",
+    rows: [
+      [{ kind: "text", key: "name", label: "Name", placeholder: "e.g. Emergency Switchgear" }],
+      [{ kind: "select", key: "containerType", label: "Container Type", options: ["Switchgear", "Main Switchboard", "Paralleling Gear", "Distribution Gear"] }, { kind: "text", key: "voltage", label: "Voltage", placeholder: "480V" }],
+      [{ kind: "text", key: "description", label: "Description", placeholder: "Optional" }],
+    ],
+  },
+  breaker: {
+    kicker: "Breaker", heading: "Define the breaker", subtitle: "Style is picked visually — match it to the symbol on the paper one-line.",
+    rows: [
+      [{ kind: "cards", key: "style", label: "Style", options: [
+        { value: "fixed-mount", label: "Fixed-Mount", sub: "Bolted in, no withdrawn state", icon: BREAKER_STYLE_ICONS.fixedMount },
+        { value: "draw-out", label: "Draw-Out", sub: "Can be racked out", icon: BREAKER_STYLE_ICONS.drawOut },
+      ] }],
+      [{ kind: "text", key: "name", label: "Name", placeholder: "e.g. GEN-1 Breaker" }],
+      [{ kind: "text", key: "frameSize", label: "Frame Size (AF)", placeholder: "800" }, { kind: "text", key: "tripRating", label: "Trip Rating (AT)", placeholder: "700" }],
+    ],
+  },
+  transformer: {
+    kicker: "Transformer", heading: "Define the transformer", subtitle: "Transformers stand on their own — no Incomer/Feeder classification.",
+    rows: [
+      [{ kind: "text", key: "name", label: "Name", placeholder: "e.g. XFMR-1" }],
+      [{ kind: "text", key: "primaryVoltage", label: "Primary Voltage", placeholder: "480V" }, { kind: "text", key: "secondaryVoltage", label: "Secondary Voltage", placeholder: "208Y/120V" }],
+      [{ kind: "text", key: "kva", label: "kVA Rating", placeholder: "300" }],
+    ],
+  },
+  panel: {
+    kicker: "Panel", heading: "Name the panel",
+    rows: [
+      [{ kind: "text", key: "name", label: "Name", placeholder: "e.g. LP-1" }],
+      [{ kind: "text", key: "voltage", label: "Voltage", placeholder: "208Y/120V" }, { kind: "text", key: "mainAmps", label: "Main Amps", placeholder: "100" }],
+      [{ kind: "circuits", key: "circuits", label: "Panel Schedule" }],
+    ],
+  },
+  equipment: {
+    kicker: "Equipment", heading: "Name the equipment",
+    rows: [
+      [{ kind: "text", key: "name", label: "Name", placeholder: "e.g. Chiller, Boiler, Elevator, Fire Pump" }],
+    ],
+  },
+  area: {
+    kicker: "Area Served", heading: "Name the area served",
+    rows: [
+      [{ kind: "text", key: "name", label: "Name", placeholder: "e.g. ICU, Radiology, OR Suite" }],
+    ],
+  },
+};
+
+type WizardCircuit = { ckt: number; load: string };
+type WizardPiece = { type: string; name: string; meta?: Record<string, string | WizardCircuit[]> };
+
+/** A short, human-readable summary of a piece's extra fields for the review table — e.g. a panel
+ * shows its voltage/main amps/circuit count, a breaker shows its style and ratings. */
+function summarizeWizardPieceMeta(piece: WizardPiece): string {
+  const meta = piece.meta || {};
+  const parts: string[] = [];
+  if (piece.type === "container") {
+    if (meta.containerType) parts.push(String(meta.containerType));
+    if (meta.voltage) parts.push(String(meta.voltage));
+    if (meta.busCount) parts.push(`${meta.busCount} bus${meta.busCount === "1" ? "" : "es"}`);
+  } else if (piece.type === "breaker") {
+    if (meta.style) parts.push(meta.style === "draw-out" ? "Draw-Out" : "Fixed-Mount");
+    if (meta.frameSize) parts.push(`${meta.frameSize} AF`);
+    if (meta.tripRating) parts.push(`${meta.tripRating} AT`);
+  } else if (piece.type === "transformer") {
+    if (meta.primaryVoltage || meta.secondaryVoltage) parts.push(`${meta.primaryVoltage || "?"} / ${meta.secondaryVoltage || "?"}`);
+    if (meta.kva) parts.push(`${meta.kva} kVA`);
+  } else if (piece.type === "panel") {
+    if (meta.voltage) parts.push(String(meta.voltage));
+    if (meta.mainAmps) parts.push(`${meta.mainAmps}A Main`);
+    const circuits = meta.circuits as WizardCircuit[] | undefined;
+    if (circuits?.length) parts.push(`${circuits.length} circuit${circuits.length === 1 ? "" : "s"}`);
+  }
+  return parts.join(" · ") || "—";
+}
+
+type WizardConnectKind = "generator" | "utility" | "ats" | "piece";
+// Pass-through equipment must feed something further (a breaker or sub-switchgear can't be a dead end);
+// picking one of these auto-continues the chain instead of ending the connection right there.
+const WIZARD_PASS_THROUGH_TYPES = ["breaker", "container", "transformer"];
+
+function OneLineWizardTab({
+  systemName, ats, generators, pieces, addPiece, removePiece, updatePiece,
+  sourceLinks, setSourceLink, removeSourceLink, atsDownstream, setAtsDownstreamLink, removeAtsLink, pieceDownstream, setPieceDownstreamLink, removePieceLink,
+  onGenerate,
+}: {
+  systemName: string; ats: ATS[]; generators: Generator[];
+  pieces: WizardPiece[]; addPiece: (piece: WizardPiece) => void; removePiece: (name: string) => void; updatePiece: (oldName: string, piece: WizardPiece) => void;
+  sourceLinks: Record<string, string>; setSourceLink: (id: string, destination: string) => void; removeSourceLink: (id: string) => void;
+  atsDownstream: Record<string, string>; setAtsDownstreamLink: (id: string, destination: string) => void; removeAtsLink: (id: string) => void;
+  pieceDownstream: Record<string, string[]>; setPieceDownstreamLink: (name: string, destination: string) => void; removePieceLink: (name: string, destination: string) => void;
+  onGenerate: () => void;
+}) {
+  const [step, setStep] = useState<"start" | "equipment" | "connections">("start");
+  const [activeType, setActiveType] = useState<string | null>(null);
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [formCircuits, setFormCircuits] = useState<string[]>([]);
+  const [circuitDraft, setCircuitDraft] = useState("");
+  const [pendingContainer, setPendingContainer] = useState<{ name: string; meta: Record<string, string> } | null>(null);
+  // The piece being edited, if any — set by clicking "Edit" on an existing piece in the review table.
+  // Kept separate from activeType/formValues (which the form itself reads/writes either way) purely to
+  // know, on submit, whether to update this piece in place or add a new one.
+  const [editingPiece, setEditingPiece] = useState<WizardPiece | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<{ id: string; name: string; kind: WizardConnectKind } | null>(null);
+  const [selectedDownstream, setSelectedDownstream] = useState<string | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<
+    | { kind: "piece" | "source" | "ats" | "piece-link"; key: string; destination?: string; label: string }
+    | { kind: "bulk"; items: { kind: "source" | "ats" | "piece-link"; key: string; destination?: string }[]; label: string }
+    | null
+  >(null);
+  // Checkbox selection across every "Connections Made" table below — a composite string key per row
+  // (matching a connKey(...) call at that row) so one Set can track rows from four differently-shaped
+  // tables (generator/utility, ATS, and one per piece type) at once.
+  const [selectedConnections, setSelectedConnections] = useState<Set<string>>(new Set());
+  const connKey = (kind: "source" | "ats" | "piece-link", key: string, destination?: string) => `${kind}:${key}:${destination ?? ""}`;
+  const toggleConnection = (key: string) => setSelectedConnections((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  // Every row currently rendered across the "Connections Made" tables below, in the same shape
+  // confirmRemove's "bulk" branch expects — the single source of truth for both "Select All"/"Remove
+  // All" (which need the full list) and resolving a checked-off selection back into real remove calls.
+  const allConnectionItems: { kind: "source" | "ats" | "piece-link"; key: string; destination?: string; label: string }[] = [
+    ...Object.entries(sourceLinks).map(([id, destination]) => {
+      const fromLabel = id === "utility" ? "Utility" : generators.find((generator) => generator.id === id)?.name || id;
+      return { kind: "source" as const, key: id, label: `${fromLabel} → ${destination === "End" ? "End of line" : destination}` };
+    }),
+    ...Object.entries(atsDownstream).map(([id, destination]) => {
+      const fromLabel = ats.find((item) => item.id === id)?.name || id;
+      return { kind: "ats" as const, key: id, label: `${fromLabel} → ${destination === "End" ? "End of line" : destination}` };
+    }),
+    ...Object.entries(pieceDownstream).flatMap(([name, destinations]) =>
+      destinations.map((destination) => ({ kind: "piece-link" as const, key: name, destination, label: `${name} → ${destination === "End" ? "End of line" : destination}` }))
+    ),
+  ];
+  const selectedConnectionItems = allConnectionItems.filter((item) => selectedConnections.has(connKey(item.kind, item.key, item.destination)));
+  const allConnectionsSelected = allConnectionItems.length > 0 && selectedConnections.size === allConnectionItems.length;
+  const toggleSelectAllConnections = () => setSelectedConnections(allConnectionsSelected ? new Set() : new Set(allConnectionItems.map((item) => connKey(item.kind, item.key, item.destination))));
+
+  const confirmRemove = () => {
+    if (!removeConfirm) return;
+    if (removeConfirm.kind === "bulk") {
+      removeConfirm.items.forEach((item) => {
+        if (item.kind === "source") removeSourceLink(item.key);
+        else if (item.kind === "ats") removeAtsLink(item.key);
+        else if (item.destination) removePieceLink(item.key, item.destination);
+      });
+      setSelectedConnections(new Set());
+      setRemoveConfirm(null);
+      return;
+    }
+    if (removeConfirm.kind === "piece") removePiece(removeConfirm.key);
+    else if (removeConfirm.kind === "source") removeSourceLink(removeConfirm.key);
+    else if (removeConfirm.kind === "ats") removeAtsLink(removeConfirm.key);
+    else if (removeConfirm.destination) removePieceLink(removeConfirm.key, removeConfirm.destination);
+    setRemoveConfirm(null);
+  };
+
+  const beginNew = () => { setStep("equipment"); };
+
+  const startConnecting = (target: { id: string; name: string; kind: WizardConnectKind }) => {
+    setSelectedDownstream(null);
+    setConnectingFrom(target);
+  };
+
+  const confirmDownstream = () => {
+    if (!connectingFrom || !selectedDownstream) return;
+    if (connectingFrom.kind === "generator" || connectingFrom.kind === "utility") {
+      setSourceLink(connectingFrom.id, selectedDownstream);
+    } else if (connectingFrom.kind === "ats") {
+      setAtsDownstreamLink(connectingFrom.id, selectedDownstream);
+    } else {
+      setPieceDownstreamLink(connectingFrom.name, selectedDownstream);
+    }
+    if (selectedDownstream !== "End") {
+      const picked = pieces.find((piece) => piece.name === selectedDownstream);
+      if (picked && WIZARD_PASS_THROUGH_TYPES.includes(picked.type)) {
+        // Breakers, sub-switchgear and transformers are pass-through — immediately ask what they feed next,
+        // so a chain like Generator/ATS → Breaker → Container → Transformer → Panel can go as deep as it
+        // needs to, same as picking a breaker for an ATS or another piece already does.
+        setConnectingFrom({ id: `piece:${picked.name}`, name: picked.name, kind: "piece" });
+        setSelectedDownstream(null);
+        return;
+      }
+    }
+    setConnectingFrom(null);
+    setSelectedDownstream(null);
+  };
+
+  const downstreamOptions = !connectingFrom ? [] :
+    connectingFrom.kind === "generator" || connectingFrom.kind === "utility"
+      // A generator/utility can feed an ATS directly, or a breaker/container/transformer first (see the
+      // pass-through chain above) — same equipment list a piece or ATS gets, plus the ATS units.
+      ? [
+          ...ats.map((item) => ({ key: item.id, name: item.name, sub: "ATS" })),
+          ...pieces.filter((piece) => piece.name !== connectingFrom.name).map((piece) => ({ key: piece.name, name: piece.name, sub: piece.type })),
+        ]
+      // A container/breaker/transformer piece can terminate straight at an ATS too (e.g. GEN SWBD's own
+      // feeders reaching ATS-1) — not just another piece — so it isn't stuck only ever chaining to more
+      // equipment with no way to actually reach a real transfer switch.
+      : [
+          ...ats.filter((item) => !(pieceDownstream[connectingFrom.name] || []).includes(item.name)).map((item) => ({ key: item.id, name: item.name, sub: "ATS" })),
+          ...pieces
+              .filter((piece) => piece.name !== connectingFrom.name && !(pieceDownstream[connectingFrom.name] || []).includes(piece.name))
+              .map((piece) => ({ key: piece.name, name: piece.name, sub: piece.type })),
+        ];
+
+  const openEquipmentForm = (key: string) => {
+    setEditingPiece(null);
+    setFormValues({});
+    setFormCircuits([]);
+    setCircuitDraft("");
+    setActiveType(key);
+  };
+
+  // Pre-fills the form from an existing piece's own fields (meta values are already the same strings
+  // the form itself writes) and opens it in edit mode — submitting updates this piece in place instead
+  // of adding a new one.
+  const openEditForm = (piece: WizardPiece) => {
+    setEditingPiece(piece);
+    const stringFields = Object.fromEntries(
+      Object.entries(piece.meta || {}).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    );
+    setFormValues({ name: piece.name, ...stringFields });
+    setFormCircuits(piece.type === "panel" ? ((piece.meta?.circuits as WizardCircuit[] | undefined) || []).map((circuit) => circuit.load) : []);
+    setCircuitDraft("");
+    setPendingContainer(null);
+    setActiveType(piece.type);
+    setStep("equipment");
+  };
+
+  const setField = (key: string, value: string) => setFormValues((current) => ({ ...current, [key]: value }));
+  const addCircuit = () => {
+    if (!circuitDraft.trim()) return;
+    setFormCircuits((current) => [...current, circuitDraft.trim()]);
+    setCircuitDraft("");
+  };
+  const removeCircuit = (index: number) => setFormCircuits((current) => current.filter((_, i) => i !== index));
+  const updateCircuit = (index: number, load: string) => setFormCircuits((current) => current.map((existing, i) => (i === index ? load : existing)));
+
+  // Two pieces sharing a name silently corrupts the whole wizard downstream — every pieceDownstream/
+  // sourceLinks/atsDownstream lookup finds only the FIRST match by name, so the second one becomes an
+  // unreachable duplicate that still renders (the Equipment grid just lists every piece, not deduplicated
+  // by name), showing up twice with no way to individually pick either. Nothing previously stopped the
+  // form from creating one.
+  const nameTaken = (name: string) => pieces.some((piece) => piece.name === name && piece.name !== editingPiece?.name);
+
+  const submitEquipmentForm = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeType || !formValues.name?.trim()) return;
+    if (nameTaken(formValues.name.trim())) return;
+    if (activeType === "container") {
+      setPendingContainer({ name: formValues.name.trim(), meta: { containerType: formValues.containerType || "", voltage: formValues.voltage || "" } });
+      return;
+    }
+    const meta: Record<string, string | WizardCircuit[]> = {};
+    if (activeType === "breaker") { meta.style = formValues.style || ""; meta.frameSize = formValues.frameSize || ""; meta.tripRating = formValues.tripRating || ""; }
+    if (activeType === "transformer") { meta.primaryVoltage = formValues.primaryVoltage || ""; meta.secondaryVoltage = formValues.secondaryVoltage || ""; meta.kva = formValues.kva || ""; }
+    if (activeType === "panel") { meta.voltage = formValues.voltage || ""; meta.mainAmps = formValues.mainAmps || ""; meta.circuits = formCircuits.map((load, i) => ({ ckt: i + 1, load })); }
+    if (editingPiece) updatePiece(editingPiece.name, { type: activeType, name: formValues.name.trim(), meta });
+    else addPiece({ type: activeType, name: formValues.name.trim(), meta });
+    setEditingPiece(null);
+    setActiveType(null);
+  };
+
+  const chooseBusCount = (busCount: string) => {
+    if (!pendingContainer) return;
+    const piece: WizardPiece = { type: "container", name: pendingContainer.name, meta: { ...pendingContainer.meta, busCount } };
+    if (editingPiece) updatePiece(editingPiece.name, piece);
+    else addPiece(piece);
+    setEditingPiece(null);
+    setPendingContainer(null);
+    setActiveType(null);
+  };
+
+  // At least one real connection made (a source, an ATS's feed, or a piece's feed) before the Result
+  // tab is allowed to generate anything — otherwise clicking this straight from Phase 1 would "finish"
+  // a diagram that's really still just a pile of unconnected equipment.
+  const hasAnyConnection = Object.keys(sourceLinks).length > 0 || Object.keys(atsDownstream).length > 0 || Object.keys(pieceDownstream).length > 0;
+  const headerBar = (
+    <div className="wizard-header-bar">
+      <span className="wizard-brand">CPC</span>
+      <span className="wizard-header-label">One-Line Wizard</span>
+      <button type="button" className="header-btn primary" disabled={step === "start" || !hasAnyConnection} onClick={onGenerate}>Finish &amp; Generate</button>
+    </div>
+  );
+
+  if (step === "equipment" || step === "connections") {
+    const activeForm = activeType ? WIZARD_EQUIPMENT_FORMS[activeType] : null;
+    return (
+      <section className="operations-section wizard-section">
+        {headerBar}
+        <div className="wizard-body">
+          <div className="wizard-main-card">
+            <div className="wizard-breadcrumb">
+              <span className={step === "equipment" ? "active" : "done"} onClick={() => { setActiveType(null); setEditingPiece(null); setStep("equipment"); }} role="button" tabIndex={0}>1 · Create Equipment</span>
+              <span className="wizard-breadcrumb-sep">→</span>
+              <span className={step === "connections" ? "active" : ""}>2 · Connections</span>
+            </div>
+            {step === "equipment" && pendingContainer ? (
+              <>
+                <div className="wizard-kicker">{pendingContainer.name}</div>
+                <h2>How many buses?</h2>
+                <p>Most containers have one common bus. Multiples (rare) get a tie breaker between them.</p>
+                <div className="wizard-equipment-grid wizard-bus-grid">
+                  <button type="button" className="wizard-equipment-card wizard-bus-card" onClick={() => chooseBusCount("1")}><b>1</b><small>Most common</small></button>
+                  <button type="button" className="wizard-equipment-card wizard-bus-card" onClick={() => chooseBusCount("2")}><b>2</b><small>Bus A / Bus B</small></button>
+                  <button type="button" className="wizard-equipment-card wizard-bus-card" onClick={() => chooseBusCount("3")}><b>3</b><small>Rare</small></button>
+                </div>
+              </>
+            ) : step === "equipment" && activeForm ? (
+              <form onSubmit={submitEquipmentForm}>
+                <div className="wizard-kicker">{editingPiece ? `Editing ${editingPiece.name}` : activeForm.kicker}</div>
+                <h2>{editingPiece ? `Edit ${activeForm.kicker.toLowerCase()}` : activeForm.heading}</h2>
+                {activeForm.subtitle && <p>{activeForm.subtitle}</p>}
+                {activeForm.rows.map((row, rowIndex) => (
+                  <div className={row.length > 1 ? "wizard-form-grid-2" : undefined} key={rowIndex}>
+                    {row.map((field) => (
+                      <div className="wizard-form-row" key={field.key}>
+                        <label>{field.label}</label>
+                        {field.kind === "text" && (
+                          <input required={field.key === "name"} value={formValues[field.key] || ""} onChange={(event) => setField(field.key, event.target.value)} placeholder={field.placeholder} autoFocus={field.key === "name"} />
+                        )}
+                        {field.key === "name" && nameTaken(formValues.name?.trim() || "") && (
+                          <p className="wizard-form-error">A piece named "{formValues.name?.trim()}" already exists — pick a different name.</p>
+                        )}
+                        {field.kind === "select" && (
+                          <select value={formValues[field.key] || field.options[0]} onChange={(event) => setField(field.key, event.target.value)}>
+                            {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        )}
+                        {field.kind === "cards" && (
+                          <div className="wizard-style-cards">
+                            {field.options.map((option) => (
+                              <button type="button" key={option.value} className={`wizard-style-card${formValues[field.key] === option.value ? " selected" : ""}`} onClick={() => setField(field.key, option.value)}>
+                                <span className="wizard-style-card-icon">{option.icon}</span>
+                                <b>{option.label}</b>
+                                <small>{option.sub}</small>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {field.kind === "circuits" && (
+                          <div className="wizard-circuit-builder">
+                            <div className="wizard-circuit-list">
+                              {formCircuits.map((load, index) => (
+                                <div className="wizard-circuit-row" key={index}>
+                                  <span className="wizard-circuit-ckt">{index + 1}</span>
+                                  {/* Editable in place — updating a "Spare" circuit to its real load
+                                      shouldn't mean removing and re-adding it. */}
+                                  <input className="wizard-circuit-load-input" value={load} onChange={(event) => updateCircuit(index, event.target.value)} aria-label={`Circuit ${index + 1} load`} />
+                                  <button type="button" className="wizard-circuit-remove" onClick={() => removeCircuit(index)} aria-label={`Remove circuit ${index + 1}`}>×</button>
+                                </div>
+                              ))}
+                              {!formCircuits.length && <p className="wizard-circuit-empty">No circuits added yet.</p>}
+                            </div>
+                            <div className="wizard-circuit-add">
+                              <input value={circuitDraft} onChange={(event) => setCircuitDraft(event.target.value)} placeholder="e.g. Exit/Egress Lighting — Zone 1" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCircuit(); } }} />
+                              <button type="button" className="header-btn" onClick={addCircuit}>Add Circuit</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                <div className="wizard-form-actions">
+                  <button type="button" className="header-btn" onClick={() => { setActiveType(null); setEditingPiece(null); }}>Back</button>
+                  <button type="submit" className="header-btn primary" disabled={nameTaken(formValues.name?.trim() || "")}>{editingPiece ? "Save Changes" : "Continue"}</button>
+                </div>
+              </form>
+            ) : step === "equipment" ? (
+              <>
+                <div className="wizard-kicker">Create Equipment</div>
+                <h2>Add a piece of equipment</h2>
+                <p>Define everything on the paper one-line first — no connections yet, just what exists.</p>
+                <div className="wizard-equipment-grid">
+                  {WIZARD_EQUIPMENT_TYPES.map((item) => (
+                    <button type="button" key={item.key} className="wizard-equipment-card" onClick={() => openEquipmentForm(item.key)}>
+                      <span className="wizard-equipment-icon">{item.icon}</span>
+                      <span className="wizard-equipment-text"><b>{item.label}</b>{item.sub && <small>{item.sub}</small>}</span>
+                      {item.badge && <span className="wizard-equipment-badge">{item.badge}</span>}
+                    </button>
+                  ))}
+                </div>
+                {pieces.length > 0 && (
+                  <div className="wizard-review-table-wrap">
+                    <div className="wizard-connections-section-title">Created Equipment ({pieces.length})</div>
+                    {/* Grouped by type (Container, Breaker, Transformer, Panel, Equipment, Area Served),
+                        in the same order as the Create Equipment cards above, instead of one long table
+                        mixing every type together — each group gets its own heading and stays that
+                        piece's own table, so the Type column (now redundant with the heading) is gone. */}
+                    {WIZARD_EQUIPMENT_TYPES.map((typeInfo) => {
+                      const group = pieces.filter((piece) => piece.type === typeInfo.key);
+                      if (!group.length) return null;
+                      return (
+                        <div className="wizard-review-group" key={typeInfo.key}>
+                          <div className="wizard-review-group-title">{typeInfo.label} ({group.length})</div>
+                          <div className="wizard-review-table-scroll">
+                            <table className="wizard-review-table">
+                              <thead><tr><th>Name</th><th>Details</th><th>Actions</th></tr></thead>
+                              <tbody>
+                                {group.map((piece) => (
+                                  <tr key={piece.name}>
+                                    <td>{piece.name}</td>
+                                    <td className="wizard-review-details">{summarizeWizardPieceMeta(piece)}</td>
+                                    <td>
+                                      <div className="wizard-review-actions">
+                                        <button type="button" className="wizard-review-edit" onClick={() => openEditForm(piece)}>Edit</button>
+                                        <button type="button" className="wizard-review-remove" onClick={() => setRemoveConfirm({ kind: "piece", key: piece.name, label: piece.name })}>Remove</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="wizard-equipment-footer">
+                  <button type="button" className="header-btn" onClick={() => setStep("start")}>Back</button>
+                  <span>{pieces.length} piece{pieces.length === 1 ? "" : "s"} created so far</span>
+                  <button type="button" className="header-btn primary" onClick={() => setStep("connections")}>Switch to Connections</button>
+                </div>
+              </>
+            ) : step === "connections" && connectingFrom ? (
+              <>
+                <div className="wizard-kicker">Downstream Connection</div>
+                <h2>Where does {connectingFrom.name} feed to?</h2>
+                <p>Picking marks the connection — everything here already exists from Phase 1.</p>
+                <div className="wizard-connections-section-title">Available Equipment ({downstreamOptions.length})</div>
+                {/* Same by-category grouping as the Equipment grid on the main Connections screen — ATS
+                    first, then each piece type — instead of one flat grid mixing everything, which got
+                    hard to scan once a container/breaker had this many valid targets to pick from. */}
+                {[{ key: "ATS", label: "ATS" }, ...WIZARD_EQUIPMENT_TYPES].map((group) => {
+                  const groupOptions = downstreamOptions.filter((option) => option.sub === group.key);
+                  if (!groupOptions.length) return null;
+                  return (
+                    <div className="wizard-connections-piece-group" key={group.key}>
+                      <div className="wizard-connections-piece-group-title">{group.label} ({groupOptions.length})</div>
+                      <div className="wizard-equipment-grid wizard-connections-grid">
+                        {groupOptions.map((option) => (
+                          <button type="button" key={option.key} className={`wizard-connection-card${selectedDownstream === option.name ? " selected" : ""}`} onClick={() => setSelectedDownstream(option.name)}>
+                            <span className="wizard-connection-badge ats"><IconATS size={13} /></span>
+                            <span className="wizard-connection-text"><b>{option.name}</b><small>{option.sub}</small></span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!downstreamOptions.length && <p className="operations-empty">No ATS units or equipment pieces created yet — add one in Create Equipment first.</p>}
+                <button type="button" className={`wizard-end-here${selectedDownstream === "End" ? " selected" : ""}`} onClick={() => setSelectedDownstream("End")}>End — stop here</button>
+                <div className="wizard-form-actions">
+                  <button type="button" className="header-btn" onClick={() => { setConnectingFrom(null); setSelectedDownstream(null); }}>Back</button>
+                  <button type="button" className="header-btn primary" disabled={!selectedDownstream} onClick={confirmDownstream}>Confirm Connection</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="wizard-kicker">Connections</div>
+                <h2>Pick something to connect or review</h2>
+                <p>Items with a ✓ are already wired — click to review or change them.</p>
+                <div className="wizard-connections-section-title">Sources ({generators.length + 1})</div>
+                <div className="wizard-equipment-grid wizard-connections-grid">
+                  {generators.map((generator) => (
+                    <button type="button" key={generator.id} className="wizard-connection-card" onClick={() => startConnecting({ id: generator.id, name: generator.name, kind: "generator" })}>
+                      <span className="wizard-connection-badge generator"><IconGenerator size={13} /></span>
+                      <span className="wizard-connection-text"><b>{generator.name}</b><small>{sourceLinks[generator.id] ? `✓ Connected to ${sourceLinks[generator.id]}` : "Needs connection"}</small></span>
+                    </button>
+                  ))}
+                  <button type="button" className="wizard-connection-card" onClick={() => startConnecting({ id: "utility", name: "Utility", kind: "utility" })}>
+                    <span className="wizard-connection-badge utility"><IconBolt size={13} /></span>
+                    <span className="wizard-connection-text"><b>Utility</b><small>{sourceLinks.utility ? `✓ Connected to ${sourceLinks.utility}` : "Needs connection"}</small></span>
+                  </button>
+                </div>
+                <div className="wizard-connections-section-title">ATS ({ats.length})</div>
+                <div className="wizard-equipment-grid wizard-connections-grid">
+                  {ats.map((item) => (
+                    <button type="button" key={item.id} className="wizard-connection-card" onClick={() => startConnecting({ id: item.id, name: item.name, kind: "ats" })}>
+                      <span className="wizard-connection-badge ats"><IconATS size={13} /></span>
+                      <span className="wizard-connection-text"><b>{item.name}</b><small>{atsDownstream[item.id] ? `✓ Connected to ${atsDownstream[item.id]}` : "Needs connection"}</small></span>
+                    </button>
+                  ))}
+                  {!ats.length && <p className="operations-empty">No ATS units registered for this system.</p>}
+                </div>
+                <div className="wizard-connections-section-title">Equipment ({pieces.length})</div>
+                <p className="wizard-connections-hint">Click a piece to add a downstream feed — click it again to add another (e.g. wire 7 feeders off one switchgear box).</p>
+                {/* Grouped by type (Container, Breaker, Transformer, Panel, Equipment, Area Served), same
+                    order and headings as Create Equipment's own review table — a flat list mixing every
+                    piece together got hard to scan once there were more than a handful. */}
+                {WIZARD_EQUIPMENT_TYPES.map((typeInfo) => {
+                  const group = pieces.filter((piece) => piece.type === typeInfo.key);
+                  if (!group.length) return null;
+                  return (
+                    <div className="wizard-connections-piece-group" key={typeInfo.key}>
+                      <div className="wizard-connections-piece-group-title">{typeInfo.label} ({group.length})</div>
+                      <div className="wizard-equipment-grid wizard-connections-grid">
+                        {group.map((piece) => {
+                          const linked = pieceDownstream[piece.name] || [];
+                          return (
+                            <button type="button" key={piece.name} className="wizard-connection-card" onClick={() => startConnecting({ id: `piece:${piece.name}`, name: piece.name, kind: "piece" })}>
+                              <span className="wizard-connection-badge ats"><IconATS size={13} /></span>
+                              <span className="wizard-connection-text"><b>{piece.name}</b><small>{linked.length ? `✓ Feeds ${linked.length} target${linked.length === 1 ? "" : "s"}` : "Add a downstream feed"}</small></span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!pieces.length && <p className="operations-empty">No equipment created yet — add pieces in Create Equipment first.</p>}
+                {(Object.keys(sourceLinks).length > 0 || Object.keys(atsDownstream).length > 0 || Object.keys(pieceDownstream).length > 0) && (
+                  <div className="wizard-review-table-wrap">
+                    <div className="wizard-connections-section-title">Connections Made</div>
+                    <div className="wizard-bulk-toolbar">
+                      <label className="wizard-bulk-select-all">
+                        <input type="checkbox" checked={allConnectionsSelected} onChange={toggleSelectAllConnections} />
+                        Select All ({allConnectionItems.length})
+                      </label>
+                      <button
+                        type="button"
+                        className="wizard-bulk-btn"
+                        disabled={!selectedConnectionItems.length}
+                        onClick={() => setRemoveConfirm({ kind: "bulk", items: selectedConnectionItems, label: `${selectedConnectionItems.length} selected connection${selectedConnectionItems.length === 1 ? "" : "s"}` })}
+                      >
+                        Remove Selected ({selectedConnectionItems.length})
+                      </button>
+                      <button
+                        type="button"
+                        className="wizard-bulk-btn danger"
+                        disabled={!allConnectionItems.length}
+                        onClick={() => setRemoveConfirm({ kind: "bulk", items: allConnectionItems, label: `all ${allConnectionItems.length} connections` })}
+                      >
+                        Remove All
+                      </button>
+                    </div>
+                    {/* Grouped by the "from" side's own equipment type (Generator, Utility, ATS,
+                        Container, Breaker, Transformer, Panel, Equipment, Area Served) — the same
+                        categories as the Equipment grid and the Created Equipment review table above —
+                        instead of the three broad wiring stages, so e.g. every feeder/breaker connection
+                        lands under one "Breaker Connections" heading regardless of what stage made it. */}
+                    {generators.length > 0 && Object.keys(sourceLinks).some((id) => id !== "utility") && (
+                      <div className="wizard-review-group">
+                        <div className="wizard-review-group-title">Generator Connections ({Object.keys(sourceLinks).filter((id) => id !== "utility").length})</div>
+                        <div className="wizard-review-table-scroll">
+                          <table className="wizard-review-table wizard-review-table-checkable">
+                            <thead><tr><th /><th>From</th><th>To</th><th /></tr></thead>
+                            <tbody>
+                              {Object.entries(sourceLinks).filter(([id]) => id !== "utility").map(([id, destination]) => {
+                                const fromLabel = generators.find((generator) => generator.id === id)?.name || id;
+                                const key = connKey("source", id);
+                                return (
+                                  <tr key={`source-${id}`}>
+                                    <td><input type="checkbox" checked={selectedConnections.has(key)} onChange={() => toggleConnection(key)} /></td>
+                                    <td>{fromLabel}</td>
+                                    <td>{destination === "End" ? "End of line" : destination}</td>
+                                    <td><button type="button" className="wizard-review-remove" onClick={() => setRemoveConfirm({ kind: "source", key: id, label: `${fromLabel} → ${destination === "End" ? "End of line" : destination}` })}>Remove</button></td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    {sourceLinks.utility && (
+                      <div className="wizard-review-group">
+                        <div className="wizard-review-group-title">Utility Connections (1)</div>
+                        <div className="wizard-review-table-scroll">
+                          <table className="wizard-review-table wizard-review-table-checkable">
+                            <thead><tr><th /><th>From</th><th>To</th><th /></tr></thead>
+                            <tbody>
+                              <tr>
+                                <td><input type="checkbox" checked={selectedConnections.has(connKey("source", "utility"))} onChange={() => toggleConnection(connKey("source", "utility"))} /></td>
+                                <td>Utility</td>
+                                <td>{sourceLinks.utility === "End" ? "End of line" : sourceLinks.utility}</td>
+                                <td><button type="button" className="wizard-review-remove" onClick={() => setRemoveConfirm({ kind: "source", key: "utility", label: `Utility → ${sourceLinks.utility === "End" ? "End of line" : sourceLinks.utility}` })}>Remove</button></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    {Object.keys(atsDownstream).length > 0 && (
+                      <div className="wizard-review-group">
+                        <div className="wizard-review-group-title">ATS Connections ({Object.keys(atsDownstream).length})</div>
+                        <div className="wizard-review-table-scroll">
+                          <table className="wizard-review-table wizard-review-table-checkable">
+                            <thead><tr><th /><th>From</th><th>To</th><th /></tr></thead>
+                            <tbody>
+                              {Object.entries(atsDownstream).map(([id, destination]) => {
+                                const fromLabel = ats.find((item) => item.id === id)?.name || id;
+                                const key = connKey("ats", id);
+                                return (
+                                  <tr key={`ats-${id}`}>
+                                    <td><input type="checkbox" checked={selectedConnections.has(key)} onChange={() => toggleConnection(key)} /></td>
+                                    <td>{fromLabel}</td>
+                                    <td>{destination === "End" ? "End of line" : destination}</td>
+                                    <td><button type="button" className="wizard-review-remove" onClick={() => setRemoveConfirm({ kind: "ats", key: id, label: `${fromLabel} → ${destination === "End" ? "End of line" : destination}` })}>Remove</button></td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    {WIZARD_EQUIPMENT_TYPES.map((typeInfo) => {
+                      const rows = Object.entries(pieceDownstream).flatMap(([name, destinations]) =>
+                        pieces.find((piece) => piece.name === name)?.type === typeInfo.key
+                          ? destinations.map((destination) => ({ name, destination }))
+                          : []
+                      );
+                      if (!rows.length) return null;
+                      return (
+                        <div className="wizard-review-group" key={`piece-group-${typeInfo.key}`}>
+                          <div className="wizard-review-group-title">{typeInfo.label} Connections ({rows.length})</div>
+                          <div className="wizard-review-table-scroll">
+                            <table className="wizard-review-table wizard-review-table-checkable">
+                              <thead><tr><th /><th>From</th><th>To</th><th /></tr></thead>
+                              <tbody>
+                                {rows.map(({ name, destination }) => {
+                                  const key = connKey("piece-link", name, destination);
+                                  return (
+                                    <tr key={`piece-${name}-${destination}`}>
+                                      <td><input type="checkbox" checked={selectedConnections.has(key)} onChange={() => toggleConnection(key)} /></td>
+                                      <td>{name}</td>
+                                      <td>{destination === "End" ? "End of line" : destination}</td>
+                                      <td><button type="button" className="wizard-review-remove" onClick={() => setRemoveConfirm({ kind: "piece-link", key: name, destination, label: `${name} → ${destination === "End" ? "End of line" : destination}` })}>Remove</button></td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="wizard-equipment-footer">
+                  <button type="button" className="header-btn" onClick={() => setStep("equipment")}>Switch to Create Equipment</button>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="wizard-side-card">
+            <div className="wizard-kicker">Where you are</div>
+            {step === "connections" && connectingFrom ? (
+              <div className="wizard-chain">
+                <div className="wizard-chain-node wizard-chain-node-active">
+                  <button
+                    type="button"
+                    className="wizard-chain-node-close"
+                    aria-label="Cancel this connection"
+                    title="Cancel — picked the wrong thing to connect?"
+                    onClick={() => { setConnectingFrom(null); setSelectedDownstream(null); }}
+                  >
+                    ×
+                  </button>
+                  <span className={`wizard-connection-badge ${connectingFrom.kind === "utility" ? "utility" : connectingFrom.kind === "generator" ? "generator" : "ats"}`}>{connectingFrom.kind === "utility" ? <IconBolt size={13} /> : connectingFrom.kind === "generator" ? <IconGenerator size={13} /> : <IconATS size={13} />}</span>
+                  <b>{connectingFrom.name}</b>
+                  <small>{connectingFrom.kind === "ats" ? "ATS" : connectingFrom.kind === "utility" ? "Utility" : connectingFrom.kind === "piece" ? (pieces.find((piece) => piece.name === connectingFrom.name)?.type || "Equipment") : "Generator"}</small>
+                </div>
+                <div className="wizard-chain-arrow">↓</div>
+                {selectedDownstream ? (
+                  <div className="wizard-chain-node">
+                    <span className={`wizard-connection-badge ${selectedDownstream === "End" ? "utility" : "ats"}`}>{selectedDownstream === "End" ? <IconCheckCircle size={13} /> : <IconATS size={13} />}</span>
+                    <b>{selectedDownstream === "End" ? "End of line" : selectedDownstream}</b>
+                    <small>{selectedDownstream === "End" ? "Stops here" : pieces.find((piece) => piece.name === selectedDownstream)?.type || "ATS"}</small>
+                  </div>
+                ) : (
+                  <div className="wizard-chain-node placeholder">
+                    <span>?</span>
+                    <small>Not set yet</small>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p>{step === "equipment" ? "Phase 1 has no connections yet — this fills in once you start wiring things in Phase 2." : "Pick something to connect — its upstream and downstream will show here as you build the connection."}</p>
+            )}
+          </div>
+        </div>
+        {removeConfirm && (
+          <Modal title="Remove" onClose={() => setRemoveConfirm(null)}>
+            <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--text-dim)" }}>
+              Remove <b style={{ color: "var(--text)" }}>{removeConfirm.label}</b>? {removeConfirm.kind === "piece" ? "This also clears any connections wired to it." : "This can be re-wired again from Connections."}
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="header-btn" onClick={() => setRemoveConfirm(null)}>Cancel</button>
+              <button type="button" className="header-btn danger" onClick={confirmRemove}>Remove</button>
+            </div>
+          </Modal>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="operations-section wizard-section">
+      {headerBar}
+      <div className="wizard-body">
+        <div className="wizard-main-card">
+          <div className="wizard-kicker">One-Line Wizard</div>
+          <h2>Let&apos;s get started</h2>
+          <p>Building the emergency distribution one-line for {systemName}.</p>
+          <div className="wizard-options">
+            <button type="button" className="wizard-option" onClick={beginNew}>
+              <b>New One-Line</b>
+              <span>Start from a blank canvas</span>
+            </button>
+            <button type="button" className={`wizard-option${pieces.length ? "" : " disabled"}`} disabled={!pieces.length} onClick={beginNew} title={pieces.length ? undefined : "No one-line exists yet"}>
+              <b>Edit Existing</b>
+              <span>{pieces.length ? `${pieces.length} piece${pieces.length === 1 ? "" : "s"} already built` : "No one-line exists yet"}</span>
+            </button>
+          </div>
+          <button type="button" className="wizard-test-link">Start with test equipment already created →</button>
+        </div>
+        <div className="wizard-side-card">
+          <div className="wizard-kicker">Where you are</div>
+          <p>{pieces.length ? `${pieces.length} piece${pieces.length === 1 ? "" : "s"} built so far.` : "Nothing built yet."}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ResultAtsModal({ ats, data, downstream, feederLabel, onClose, onViewBranch }: { ats: ATS; data?: Partial<AtsTelemetry>; downstream?: string; feederLabel: string; onClose: () => void; onViewBranch: () => void }) {
+  const emergency = data?.connected_source === "GENERATOR";
+  const meta = [ats.manufacturer, ats.model, ats.rated_amps ? `${ats.rated_amps}A` : null, ats.rated_volts ? `${ats.rated_volts} VAC` : null].filter(Boolean).join(" | ");
+  return (
+    <Modal title="" onClose={onClose} className="wizard-result-modal">
+      <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
+      <div className="wizard-result-modal-body">
+        <h3>{ats.name}</h3>
+        {meta && <p className="wizard-result-modal-meta">{meta}</p>}
+        <div className={`wizard-result-banner ${emergency ? "emergency" : "ready"}`}>{emergency ? "On Emergency" : "Normal"}</div>
+        <div className="wizard-connections-section-title">Source Status</div>
+        <div className="wizard-form-grid-2">
+          <div className={`wizard-result-source${data?.utility_available ? " on" : ""}`}><b>Normal Source</b><span>{data?.utility_available ? "Available" : "Unavailable"}</span></div>
+          <div className="wizard-result-source"><b>Connected To</b><span className={emergency ? "wizard-result-emergency-text" : "wizard-result-normal-text"}>{emergency ? "Emergency" : "Normal"}</span></div>
+          <div className={`wizard-result-source${data?.generator_available ? " on emergency" : ""}`}><b>Emergency Source</b><span>{data?.generator_available ? "Available" : "Unavailable"}</span></div>
+          <div className="wizard-result-source"><b>Fed From</b><span>{feederLabel}</span></div>
+        </div>
+        <div className="wizard-connections-section-title">Downstream</div>
+        {downstream ? (
+          <button type="button" className="wizard-downstream-link" onClick={onViewBranch}>
+            {downstream === "End" ? "End of line" : downstream} — View on separate page →
+          </button>
+        ) : (
+          <p className="operations-empty">Not wired yet — set this in the Wizard&apos;s Connections step.</p>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+type WizardTreeNode = { name: string; type: string; children: WizardTreeNode[] };
+
+/** Walks the piece-to-piece downstream links starting from `startName` as a tree — a piece can now
+ * feed multiple downstream targets (e.g. one switchgear box feeding 7 feeders), so this recurses
+ * into every branch rather than following a single chain. A `seen` set guards against cycles. */
+function resolveWizardTree(startName: string | undefined, pieces: WizardPiece[], pieceDownstream: Record<string, string[]>, seen: Set<string> = new Set()): WizardTreeNode[] {
+  if (!startName) return [];
+  if (startName === "End") return [{ name: "End of line", type: "", children: [] }];
+  if (seen.has(startName)) return [];
+  const nextSeen = new Set(seen);
+  nextSeen.add(startName);
+  const piece = pieces.find((item) => item.name === startName);
+  const children = (pieceDownstream[startName] || []).flatMap((child) => resolveWizardTree(child, pieces, pieceDownstream, nextSeen));
+  return [{ name: startName, type: piece?.type || "", children }];
+}
+
+/** The wire between an ATS/piece and one thing it feeds — a breaker at each end of a length of feeder
+ * cable by default, matching the wire+breaker language the main Result diagram uses for generators.
+ * A shared bus (see WizardBranchChildren) only needs one breaker per leg instead of two. Tone follows
+ * the ATS's real normal/emergency state for the whole branch. */
+function WizardBranchConnector({ tone, breakers = 1, fromName, toName }: { tone: "emergency" | "normal"; breakers?: 0 | 1 | 2; fromName: string; toName: string }) {
+  const lineClass = tone === "emergency" ? "emergency-source" : "";
+  // The target is itself an explicit breaker piece — it draws its own glyph (see WizardTreeNodeView),
+  // so this is just a plain connecting wire, not another decorative breaker stacked on top of it.
+  if (breakers === 0) {
+    return <span className={`wizard-branch-connector-plain-wire ${lineClass}`} aria-hidden="true" />;
+  }
+  // No real breaker piece backs this glyph — it's the implicit output breaker every ATS/feed is drawn
+  // with even when the user never explicitly created one — so its popup is marked Auto-derived.
+  const makeDetail = (label: string): BreakerDetailData => ({
+    key: `conn-${fromName}-${toName}-${label}`, name: `${fromName} Output Breaker`, style: "Fixed-Mount", derived: true,
+    position: "Closed", emergency: tone === "emergency", poweredBy: fromName, feeds: toName,
+  });
+  return (
+    <div className="wizard-branch-connector">
+      <span className={`sld-gear-connector ${lineClass}`} aria-hidden="true" />
+      <BreakerHitButton detail={makeDetail("1")}>
+        <BreakerSymbol tone={tone} size={32} strokeWidthPx={3} centered />
+      </BreakerHitButton>
+      <span className={`sld-gear-connector ${lineClass}`} aria-hidden="true" />
+      {breakers === 2 && (
+        <>
+          <BreakerHitButton detail={makeDetail("2")}>
+            <BreakerSymbol tone={tone} size={32} strokeWidthPx={3} centered />
+          </BreakerHitButton>
+          <span className={`sld-gear-connector ${lineClass}`} aria-hidden="true" />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Renders what a node feeds. A decorative breaker (not tied to any real piece) only ever appears on
+ * the ATS's own root connection (isRoot — matching the original "ATS has its own output breaker even
+ * if you didn't model one" request) — every deeper hop is a plain wire by default, since a breaker
+ * belongs here only if the user actually created one as a piece (it then draws its own glyph instead,
+ * see WizardTreeNodeView, and this connector steps aside for it below). Multiple targets share a
+ * horizontal bus instead of separate wires — matching how a real switchgear box feeds many breakers
+ * off one bar. */
+function WizardBranchChildren({ nodes, pieces, onViewSchedule, tone, parentLabel, isRoot = false }: { nodes: WizardTreeNode[]; pieces: WizardPiece[]; onViewSchedule: (piece: WizardPiece, tone: "emergency" | "normal", fedFrom: string) => void; tone: "emergency" | "normal"; parentLabel: string; isRoot?: boolean }) {
+  if (!nodes.length) return null;
+  const defaultBreakers = isRoot ? 1 : 0;
+  if (nodes.length === 1) {
+    return (
+      <div className="wizard-branch-tree-branch">
+        <WizardBranchConnector tone={tone} breakers={nodes[0].type === "breaker" ? 0 : defaultBreakers} fromName={parentLabel} toName={nodes[0].name} />
+        <WizardTreeNodeView node={nodes[0]} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={parentLabel} />
+      </div>
+    );
+  }
+  const lineClass = tone === "emergency" ? "emergency-source" : "";
+  return (
+    <div className="wizard-branch-bus-group">
+      <WizardBranchConnector tone={tone} breakers={defaultBreakers} fromName={parentLabel} toName="Bus" />
+      <div className={`wizard-branch-bus ${lineClass}`} aria-hidden="true" />
+      <div className="wizard-branch-tree-children">
+        {nodes.map((node, index) => (
+          <div className="wizard-branch-tree-branch" key={index}>
+            <WizardBranchConnector tone={tone} breakers={node.type === "breaker" ? 0 : defaultBreakers} fromName="Bus" toName={node.name} />
+            <WizardTreeNodeView node={node} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={parentLabel} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A feeder's own downstream, rendered below the distribution-gear box — a plain wire straight to the
+ * load with no breaker, since the feeder breaker itself already sits inside the box above it. */
+function WizardDistGearLoad({ nodes, pieces, onViewSchedule, tone, parentLabel }: { nodes: WizardTreeNode[]; pieces: WizardPiece[]; onViewSchedule: (piece: WizardPiece, tone: "emergency" | "normal", fedFrom: string) => void; tone: "emergency" | "normal"; parentLabel: string }) {
+  if (!nodes.length) return <p className="wizard-dist-gear-empty">Not wired</p>;
+  const lineClass = tone === "emergency" ? "emergency-source" : "";
+  return (
+    <div className="wizard-dist-gear-load-row">
+      {nodes.map((node, index) => (
+        <div className="wizard-dist-gear-load-branch" key={index}>
+          <span className={`wizard-dist-gear-tail-out ${lineClass}`} aria-hidden="true" />
+          <WizardTreeNodeView node={node} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={parentLabel} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** An unused feeder position — a crossed-out red box instead of a breaker glyph, matching the standard
+ * "spare, not populated" convention on a real panel schedule/switchgear elevation. */
+function SpareBreakerGlyph({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="2" y="2" width="16" height="16" rx="2" stroke="#ef4444" strokeWidth="2" />
+      <line x1="5" y1="5" x2="15" y2="15" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+      <line x1="15" y1="5" x2="5" y2="15" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Finds a Distribution Gear container (see WizardDistGearNode) nested anywhere below this node — a
+ * feeder that fans back out into another full gear box (e.g. F3 -> 52 CHILL-2 -> CHILLER DIST 2) needs
+ * its column widened to fit that box (see colWidthForFeeder below) instead of the fixed 200px every
+ * ordinary feeder gets. */
+function findNestedDistGear(node: WizardTreeNode, pieces: WizardPiece[]): WizardTreeNode | null {
+  const piece = pieces.find((item) => item.name === node.name);
+  if (node.type === "container" && piece?.meta?.containerType === "Distribution Gear" && node.children.length > 0) return node;
+  for (const child of node.children) {
+    const found = findNestedDistGear(child, pieces);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Mirrors the actual box CSS (.wizard-branch-diagram scope): 200px per column, 38px gaps between them,
+// ~76px combined left/right box padding+border — so a widened column reserves just enough real estate
+// for its nested box to render in normal document flow (pushing later feeders further along the row,
+// same as any other wider piece of content would) instead of overlapping neighbors or spilling past the
+// row's own edge, which happened when this used to grow the box after the fact via absolute overlays.
+function distGearBoxWidth(feederCount: number): number {
+  return feederCount * 200 + Math.max(0, feederCount - 1) * 38 + 76;
+}
+
+/** A container feeding more than one thing renders as an actual distribution-gear box — dashed
+ * enclosure, a shared bus, and a breaker per feeder (labeled with the feeder piece's own name, e.g.
+ * "FDR-1") — matching the real switchgear box style, instead of the generic chain-node/bus tree used
+ * for everything else. Each feeder's own downstream (the load, or a deeper sub-panel/transformer) is
+ * rendered below the box via WizardDistGearLoad, aligned under its breaker. */
+function WizardDistGearNode({ node, pieces, onViewSchedule, tone, parentLabel }: { node: WizardTreeNode; pieces: WizardPiece[]; onViewSchedule: (piece: WizardPiece, tone: "emergency" | "normal", fedFrom: string) => void; tone: "emergency" | "normal"; parentLabel: string }) {
+  const { selectedContainerName, openContainer } = useOneLineInspector();
+  const lineClass = tone === "emergency" ? "emergency-source" : "";
+  const containerPiece = pieces.find((item) => item.name === node.name);
+  // A feeder whose own downstream is itself another Distribution Gear box gets its column widened to
+  // exactly fit that nested box's own natural width — applied identically to both the breaker row and
+  // the loads row below (both map over the same node.children, so the same index is the same feeder in
+  // each), so the breaker stays centered above its own wire and box instead of the two drifting apart.
+  // Every other, ordinary feeder keeps the plain fixed 200px column from global.css untouched.
+  const colWidth = node.children.map((feeder) => {
+    const nested = findNestedDistGear(feeder, pieces);
+    return nested ? distGearBoxWidth(nested.children.length) : undefined;
+  });
+  return (
+    <div className="wizard-dist-gear">
+      <div className="wizard-dist-gear-box">
+        <button
+          type="button"
+          className={`wizard-dist-gear-label${selectedContainerName === node.name ? " selected" : ""}`}
+          aria-label={`Open ${node.name} details`}
+          onClick={() => containerPiece && openContainer({ piece: containerPiece, feeds: node.children.map((feeder) => feeder.name), feedsLabel: "Feeders", poweredBy: parentLabel })}
+        >
+          {node.name}
+        </button>
+        <div className={`wizard-dist-gear-bus ${lineClass}`} aria-hidden="true" />
+        <div className="wizard-dist-gear-row">
+          {node.children.map((feeder, index) => {
+            const isBreaker = feeder.type === "breaker";
+            const isSpare = feeder.name.trim().toLowerCase() === "spare";
+            const feederKey = `distfeeder-${node.name}-${feeder.name}`;
+            const feederPiece = isBreaker ? pieces.find((item) => item.name === feeder.name) : undefined;
+            const feederDetail: BreakerDetailData = {
+              key: feederKey, name: feeder.name, role: "Feeder",
+              style: feederPiece?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount", derived: !feederPiece,
+              position: "Closed", emergency: tone === "emergency", poweredBy: node.name,
+              feeds: feeder.children.length ? feeder.children.map((child) => child.name).join(", ") : "Not wired",
+            };
+            return (
+              <div className="wizard-dist-gear-col" style={colWidth[index] ? { width: colWidth[index] } : undefined} key={index}>
+                {isBreaker ? (
+                  <>
+                    <span className={`sld-gear-connector ${lineClass}`} aria-hidden="true" />
+                    <span className="sld-breaker-with-tag">
+                      {isSpare ? (
+                        <SpareBreakerGlyph size={32} />
+                      ) : (
+                        <BreakerHitButton detail={feederDetail}>
+                          <BreakerSymbol tone={tone} size={38} strokeWidthPx={3} centered />
+                        </BreakerHitButton>
+                      )}
+                      <div className={`sld-breaker-tag ${lineClass}`}>{feeder.name}</div>
+                    </span>
+                    {/* Real wire on both sides of the box's bottom border (see .wizard-dist-gear-tail-out
+                        below, just outside the box) — the border needs to cross the middle of a
+                        continuous wire, not sit right at the breaker's own bottom edge. */}
+                    <span className={`wizard-dist-gear-tail-in ${lineClass}`} aria-hidden="true" />
+                  </>
+                ) : (
+                  // No breaker piece was ever created for this feed — the user wired the load straight
+                  // to the bus — so this draws as a plain straight drop, matching the reference
+                  // (MCC-CHILLER's loads hang straight off its bus with no breaker at all), the same
+                  // "only draw a breaker if one was actually added" rule WizardBranchChildren already
+                  // applies everywhere else in this tree.
+                  <span className={`wizard-dist-gear-plain-drop ${lineClass}`} aria-hidden="true" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="wizard-dist-gear-row wizard-dist-gear-loads">
+        {node.children.map((feeder, index) => (
+          <div className="wizard-dist-gear-col" style={colWidth[index] ? { width: colWidth[index] } : undefined} key={index}>
+            {feeder.type === "breaker" ? (
+              <WizardDistGearLoad nodes={feeder.children} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={feeder.name} />
+            ) : (
+              <WizardDistGearLoad nodes={[feeder]} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={node.name} />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Small icon glyph for a terminal load box — a compact bordered square with the icon inside and the
+ * name as its own label below, matching the reference's Air Compressor / panel boxes, rather than a
+ * bigger text-only card. Equipment/area get the red 3-dot bus glyph; a panel (has its own circuit
+ * schedule behind it) gets a distinct 3-line schedule glyph instead, so the icon itself hints at
+ * "click for circuits" the way the reference's ICU LTG box does. */
+const WIZARD_LOAD_BOX_ICON_EQUIPMENT = (
+  <svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="1.5" y="5" width="17" height="10" rx="3.5" stroke="currentColor" strokeWidth="1.6" /><circle cx="6.7" cy="10" r="1.7" fill="#ef4444" /><circle cx="10" cy="10" r="1.7" fill="#ef4444" /><circle cx="13.3" cy="10" r="1.7" fill="#ef4444" /></svg>
+);
+const WIZARD_LOAD_BOX_ICON_PANEL = (
+  <svg width="22" height="22" viewBox="0 0 20 20" fill="none"><line x1="3" y1="5.5" x2="17" y2="5.5" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" /><line x1="3" y1="10" x2="17" y2="10" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" /><line x1="3" y1="14.5" x2="17" y2="14.5" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" /></svg>
+);
+const WIZARD_LOAD_BOX_ICONS: Record<string, JSX.Element> = {
+  equipment: WIZARD_LOAD_BOX_ICON_EQUIPMENT,
+  panel: WIZARD_LOAD_BOX_ICON_PANEL,
+  area: WIZARD_LOAD_BOX_ICON_EQUIPMENT,
+};
+
+/** The wide, dashed-bus "distribution gear" treatment (see WizardDistGearNode) is reserved for the
+ * root the ATS feeds directly into (ResultBranchModal renders that explicitly) — a nested multi-output
+ * device further down the tree (an MCC, a transformer) instead gets the same compact chain-node-plus-bus
+ * treatment as everything else, matching how the reference draws those as small boxes/symbols with a
+ * couple of short branches, not another full-width gear box competing for room inside its own column. */
+function WizardTreeNodeView({ node, pieces, onViewSchedule, tone, parentLabel }: { node: WizardTreeNode; pieces: WizardPiece[]; onViewSchedule: (piece: WizardPiece, tone: "emergency" | "normal", fedFrom: string) => void; tone: "emergency" | "normal"; parentLabel: string }) {
+  const { selectedContainerName, openContainer } = useOneLineInspector();
+  const piece = pieces.find((item) => item.name === node.name);
+  const circuits = piece?.type === "panel" ? (piece.meta?.circuits as WizardCircuit[] | undefined) : undefined;
+  const clickable = Boolean(piece && circuits?.length);
+  const loadIcon = WIZARD_LOAD_BOX_ICONS[node.type];
+
+  // A container explicitly built as a "Distribution Gear" (as opposed to a Motor Control Center,
+  // Switchgear, etc.) always gets the full dashed-box-plus-bus treatment (see WizardDistGearNode),
+  // regardless of how many feeders it currently has wired — a distribution gear is a bus with feeders
+  // by definition, not something that only looks like one once it happens to have more than one. This
+  // is a different, narrower rule than the one this component used to use (any container with more
+  // than one child), which mis-fired on wide multi-output devices like an MCC that aren't actually
+  // switchgear and don't need the full box.
+  if (node.type === "container" && piece?.meta?.containerType === "Distribution Gear" && node.children.length > 0) {
+    return <WizardDistGearNode node={node} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={parentLabel} />;
+  }
+
+  // Any other container (Switchgear, Main Switchboard, Paralleling Gear, or a Distribution Gear with
+  // nothing wired yet) — clickable like every other container in the one-line, opening the same details
+  // popup as "GEN SWBD" or a nested distribution-gear box, just without the wide dashed-bus treatment.
+  if (node.type === "container") {
+    return (
+      <div className="wizard-branch-tree-node">
+        <button
+          type="button"
+          className={`wizard-chain-node wizard-chain-node-clickable${selectedContainerName === node.name ? " selected" : ""}`}
+          onClick={() => piece && openContainer({ piece, feeds: node.children.map((child) => child.name), feedsLabel: "Feeders", poweredBy: parentLabel })}
+        >
+          <b>{node.name}</b>
+          <small>{node.type}</small>
+        </button>
+        {node.children.length > 0 && <WizardBranchChildren nodes={node.children} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={node.name} />}
+      </div>
+    );
+  }
+
+  // A transformer draws as the bare two-circle symbol itself — no bordered box around it, matching
+  // the reference — with the name below it, same as every other node here.
+  if (node.type === "transformer") {
+    return (
+      <div className="wizard-branch-tree-node">
+        <div className="wizard-symbol-node">
+          <svg width="75" height="75" viewBox="0 0 20 20" fill="none" className="wizard-symbol-icon" aria-hidden="true">
+            <circle cx="7.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.6" />
+            <circle cx="12.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.6" />
+          </svg>
+          <b className="wizard-symbol-label">{node.name}</b>
+        </div>
+        {/* This node is now the immediate feed for whatever's below it — not whatever fed *this* node. */}
+        {node.children.length > 0 && <WizardBranchChildren nodes={node.children} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={node.name} />}
+      </div>
+    );
+  }
+
+  // An explicit breaker piece mid-chain (not a feeder inside a distribution-gear box — those already
+  // get their own glyph, see WizardDistGearNode) draws as its own breaker symbol — the draw-out glyph
+  // for a Draw-Out piece (same one the Result spine's generator columns use), the standard arc for a
+  // Fixed-Mount one — instead of the generic chain-node text box every other pass-through piece falls
+  // back to below. Its own WizardBranchConnector (see WizardBranchChildren) skips its usual decorative
+  // breaker for this same reason, so it doesn't show up twice — once here, once as an unlabeled extra.
+  if (node.type === "breaker") {
+    const breakerLineClass = tone === "emergency" ? "emergency-source" : "";
+    const breakerKey = `piece-breaker-${node.name}`;
+    const breakerDetail: BreakerDetailData = {
+      key: breakerKey, name: node.name, style: piece?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount", derived: !piece,
+      position: "Closed", emergency: tone === "emergency", poweredBy: parentLabel,
+      feeds: node.children.length ? node.children.map((child) => child.name).join(", ") : undefined,
+    };
+    return (
+      <div className="wizard-branch-tree-node">
+        {/* Name to the side, not below — matching FDR-1 and every other breaker tag in this view,
+            via the same .sld-breaker-with-tag/.sld-breaker-tag pairing they use. */}
+        <span className="sld-breaker-with-tag">
+          <BreakerHitButton detail={breakerDetail}>
+            {piece?.meta?.style === "draw-out" ? (
+              <DrawoutBreakerGlyph tone={tone} />
+            ) : (
+              <BreakerSymbol tone={tone} size={40} strokeWidthPx={3} centered />
+            )}
+          </BreakerHitButton>
+          <div className={`sld-breaker-tag ${breakerLineClass}`}>{node.name}</div>
+        </span>
+        {node.children.length > 0 && <WizardBranchChildren nodes={node.children} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={node.name} />}
+      </div>
+    );
+  }
+
+  // A terminal load (equipment/panel/area) is a small icon box with the name below it, not a bigger
+  // text card — everything else (a pass-through breaker/container/transformer with more to show) keeps
+  // the fuller chain-node box.
+  if (loadIcon) {
+    const boxContent = (
+      <>
+        <span className="wizard-load-box">{loadIcon}</span>
+        <b className="wizard-load-box-label">{node.name}</b>
+      </>
+    );
+    return (
+      <div className="wizard-branch-tree-node">
+        {clickable ? (
+          <button type="button" className="wizard-load-box-wrap wizard-load-box-clickable" onClick={() => onViewSchedule(piece!, tone, parentLabel)}>
+            {boxContent}
+          </button>
+        ) : (
+          <div className="wizard-load-box-wrap">{boxContent}</div>
+        )}
+        {node.children.length > 0 && <WizardBranchChildren nodes={node.children} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={node.name} />}
+      </div>
+    );
+  }
+
+  const nodeContent = (
+    <>
+      <b>{node.name}</b>
+      {node.type && <small>{node.type}</small>}
+    </>
+  );
+  return (
+    <div className="wizard-branch-tree-node">
+      {/* A panel with a schedule opens it by clicking the box itself — no separate button label
+          cluttering it up. Anything else (no schedule to show) is just a plain, inert box. */}
+      {clickable ? (
+        <button type="button" className="wizard-chain-node wizard-chain-node-clickable" onClick={() => onViewSchedule(piece!, tone, parentLabel)}>
+          {nodeContent}
+        </button>
+      ) : (
+        <div className="wizard-chain-node">{nodeContent}</div>
+      )}
+      {node.children.length > 0 && <WizardBranchChildren nodes={node.children} pieces={pieces} onViewSchedule={onViewSchedule} tone={tone} parentLabel={node.name} />}
+    </div>
+  );
+}
+
+function countWizardTreeLeaves(nodes: WizardTreeNode[]): number {
+  return nodes.reduce((total, node) => total + (node.children.length ? countWizardTreeLeaves(node.children) : 1), 0);
+}
+
+const WIZARD_PIECE_TYPE_DESCRIPTION: Record<string, string> = {
+  panel: "panel",
+  equipment: "equipment load",
+  area: "area load",
+};
+
+/** Scales the content div — up or down — to exactly fill the container div in both dimensions, with
+ * no scrollbars: a 3-feeder tree grows to fill the page, an 8-feeder tree with nested distribution-gear
+ * boxes shrinks to still land on one page, and it re-measures live via ResizeObserver on both elements
+ * as more gets wired, since a fixed size can't guarantee either of those on its own. */
+function useFitScale<C extends HTMLElement, T extends HTMLElement>() {
+  const containerRef = useRef<C>(null);
+  const contentRef = useRef<T>(null);
+  const [scale, setScale] = useState(1);
+  // How far to shift the scaled content from the container's top-left corner. Centering this by giving
+  // the container align-items/justify-content:center (an earlier attempt) fought with the transform:
+  // flexbox positions a transformed item using its own pre-transform layout box, not its visual
+  // post-scale size, so it could still center content that was actually too big — splitting the real
+  // overflow evenly left/right, which made the left half unreachable (scrollLeft can't go negative).
+  // Computing the exact pixel offset here instead — directly from the same natural/available sizes
+  // already measured for scale — sidesteps that mismatch entirely: Math.max(0, ...) guarantees it can
+  // never go negative, so oversized content always collapses back to flush top-left (all overflow
+  // positive, reachable by .wizard-result-modal-body's scroll) while content with room to spare gets
+  // pushed toward the middle by exactly the leftover space, in one formula with no separate branch.
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+    let frame = 0;
+    // Deferred a frame so it always measures after the browser has finished reflowing from whatever
+    // triggered it (a window resize, or a browser/OS zoom level change) rather than mid-reflow.
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const naturalWidth = content.scrollWidth;
+        const naturalHeight = content.scrollHeight;
+        const availableWidth = container.clientWidth;
+        const availableHeight = container.clientHeight;
+        if (!naturalWidth || !naturalHeight || !availableWidth || !availableHeight) return;
+        const fit = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
+        // Browser/OS page zoom shrinks 100vw (in CSS px) as zoom increases, while this content's own
+        // fixed-px dimensions don't — left uncapped, that ratio keeps falling as zoom goes up, so the
+        // diagram would visibly shrink the more you zoom in instead of growing with the rest of the
+        // page. A floor stops that: past this point the container (not .wizard-branch-diagram, which
+        // still needs overflow:hidden so the un-clamped scale never scrolls it) takes over scrolling,
+        // the same way any other zoomed page does, rather than the content shrinking indefinitely. A
+        // ceiling likewise avoids a very simple tree (few feeders, wide page) blowing up oversized.
+        const appliedScale = Math.min(1.6, Math.max(0.55, fit));
+        setScale(appliedScale);
+        setOffset({
+          x: Math.max(0, (availableWidth - naturalWidth * appliedScale) / 2),
+          y: Math.max(0, (availableHeight - naturalHeight * appliedScale) / 2),
+        });
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    observer.observe(content);
+    // Belt-and-suspenders alongside the ResizeObserver above — some browsers are inconsistent about
+    // firing it for a page/browser zoom change (as opposed to an actual element resize), so a window
+    // resize listener and the pinch-zoom-aware visualViewport API both re-trigger the same measurement.
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  return { containerRef, contentRef, scale, offset };
+}
+
+function ResultBranchModal({
+  systemName, ats, atsTelemetry, feederLabel, pieces, atsDownstream, pieceDownstream, onClose, onViewSchedule,
+}: { systemName: string; ats: ATS; atsTelemetry?: Partial<AtsTelemetry>; feederLabel: string; pieces: WizardPiece[]; atsDownstream: Record<string, string>; pieceDownstream: Record<string, string[]>; onClose: () => void; onViewSchedule: (piece: WizardPiece, tone: "emergency" | "normal", fedFrom: string) => void }) {
+  const tree = resolveWizardTree(atsDownstream[ats.id], pieces, pieceDownstream);
+  const emergency = atsTelemetry?.connected_source === "GENERATOR";
+  const { containerRef, contentRef, scale, offset } = useFitScale<HTMLDivElement, HTMLDivElement>();
+  // Same faceplate the ATS grid's own switch opens (see SingleLineDiagram/onAtsClick) — this drill-down
+  // view is otherwise a dead end for checking the ATS's own status/source availability once you're
+  // already looking at its downstream tree.
+  const [showFaceplate, setShowFaceplate] = useState(false);
+
+  // A single, unbranched downstream leaf gets a specific title/subtitle ("ATS-01 — Exit Lighting" /
+  // "Single panel with schedule"); a branching feed (multiple targets anywhere in the tree) falls
+  // back to a leaf count instead, since there's no single downstream name to summarize it by.
+  const singleLeaf = tree.length === 1 && tree[0].children.length === 0 && tree[0].name !== "End of line" ? tree[0] : undefined;
+  const singleLeafPiece = singleLeaf ? pieces.find((piece) => piece.name === singleLeaf.name) : undefined;
+  const singleLeafCircuits = singleLeafPiece?.type === "panel" ? (singleLeafPiece.meta?.circuits as WizardCircuit[] | undefined) : undefined;
+
+  const title = singleLeaf ? `${ats.name} — ${singleLeaf.name}` : ats.name;
+  const branchSummary = !tree.length
+    ? "Not wired yet"
+    : singleLeaf
+    ? `${singleLeafCircuits?.length ? "Single panel with schedule" : `Single ${WIZARD_PIECE_TYPE_DESCRIPTION[singleLeafPiece?.type || ""] || "load"}`}`
+    : tree[0].name === "End of line"
+    ? "End of line"
+    : `${countWizardTreeLeaves(tree)} downstream feed${countWizardTreeLeaves(tree) === 1 ? "" : "s"}`;
+
+  return (
+    <>
+    <Modal title="" onClose={onClose} className="wizard-result-modal wizard-branch-modal">
+      <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
+      <div className="wizard-result-modal-body">
+        <div className="wizard-branch-header">
+          <h3>{title}</h3>
+          <p className="wizard-result-modal-meta">Fed from {feederLabel} on GEN SWBD · {branchSummary}</p>
+        </div>
+        <div className="wizard-branch-diagram" ref={containerRef}>
+          {/* transformOrigin "top left": translate (see offset in useFitScale) shifts the already-scaled
+              box by a fixed, never-negative pixel amount to center it when there's room, so scale must
+              grow/shrink from that same top-left corner — a "center" origin would instead expand the box
+              in all directions including back into negative territory, undoing the offset's guarantee. */}
+          <div className="wizard-branch-diagram-fit" ref={contentRef} style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: "top left" }}>
+            <div className="wizard-branch-ats-glyph">
+              {/* Name above the switch, not below it — the downstream wire (WizardBranchConnector,
+                  rendered right after this glyph) needs to run straight down from the switch's own
+                  bottom edge into the breaker, not have the name label and its old stub line break
+                  that into two visually disconnected segments. */}
+              <div className={`sld-ats ${emergency ? "on-emergency" : "on-normal"}`}>
+                <b>{ats.name}</b>
+                <button
+                  type="button"
+                  className="sld-switch"
+                  aria-label={`Open ${ats.name}: ${emergency ? "connected to emergency" : "connected to normal"}`}
+                  onClick={() => setShowFaceplate(true)}
+                >
+                  <span className={`sld-terminal normal-terminal ${!emergency ? "active" : ""}`}>N</span>
+                  <span className={`sld-terminal emergency-terminal ${emergency ? "active" : ""}`}>E</span>
+                  <i className="sld-arm" />
+                  <span className="sld-terminal load-terminal" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+            {tree.length > 0 && (
+              <div className="wizard-branch-tree-root">
+                {tree.length === 1 && tree[0].type === "container" && tree[0].children.length > 1 ? (
+                  // Feeding straight into a distribution-gear box: just the plain feed cable, no breaker —
+                  // protection lives on the individual feeders inside the box, not on this lead-in.
+                  <div className="wizard-branch-tree-branch">
+                    <span className={`sld-gear-connector ${emergency ? "emergency-source" : ""}`} aria-hidden="true" />
+                    <WizardDistGearNode node={tree[0]} pieces={pieces} onViewSchedule={onViewSchedule} tone={emergency ? "emergency" : "normal"} parentLabel={ats.name} />
+                  </div>
+                ) : (
+                  <WizardBranchChildren nodes={tree} pieces={pieces} onViewSchedule={onViewSchedule} tone={emergency ? "emergency" : "normal"} parentLabel={ats.name} isRoot />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Modal>
+    {showFaceplate && (
+      <EquipmentFaceplate
+        systemName={systemName}
+        ats={ats}
+        atsTelemetry={atsTelemetry}
+        fedFromLabel={feederLabel}
+        alwaysShowSourceAvailability
+        onClose={() => setShowFaceplate(false)}
+      />
+    )}
+    </>
+  );
+}
+
+function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose }: { piece: WizardPiece; emergency: boolean; fedFrom: string; onClose: () => void }) {
+  const circuits = (piece.meta?.circuits as WizardCircuit[] | undefined) || [];
+  const odd = circuits.filter((circuit) => circuit.ckt % 2 === 1);
+  const even = circuits.filter((circuit) => circuit.ckt % 2 === 0);
+  const usedCount = circuits.filter((circuit) => circuit.load && circuit.load.toLowerCase() !== "spare").length;
+  const voltage = typeof piece.meta?.voltage === "string" ? piece.meta.voltage : "";
+  const mainAmpsRaw = typeof piece.meta?.mainAmps === "string" ? piece.meta.mainAmps : "";
+  // Some panels' mainAmps already carry an "A Main" suffix from how they were entered in the wizard —
+  // strip it before appending our own, instead of risking "100A MainA Main".
+  const mainAmps = mainAmpsRaw.replace(/\s*A?\s*Main$/i, "").trim();
+
+  return (
+    <Modal title="" onClose={onClose} className="wizard-result-modal">
+      <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
+      <div className="wizard-result-modal-body">
+        <div className="wizard-panel-schedule-header">
+          <h3>{piece.name}</h3>
+          <p className="wizard-result-modal-meta">Panel{voltage ? ` · ${voltage}` : ""}{mainAmps ? ` · ${mainAmps}A Main` : ""}</p>
+        </div>
+        <div className={`wizard-result-banner ${emergency ? "emergency" : "ready"}`}>Energized · {emergency ? "Emergency" : "Normal"}</div>
+        {/* Plain label/value rows, not a colored badge — this is reference info, not a status to call
+            attention to (the banner above already does that job). */}
+        <div className="wizard-panel-schedule-info">
+          <div className="wizard-panel-schedule-info-row"><span>Fed From</span><b>{fedFrom}</b></div>
+          <div className="wizard-panel-schedule-info-row"><span>Circuits Used</span><b>{usedCount} of {circuits.length}</b></div>
+        </div>
+        <div className="wizard-connections-section-title wizard-panel-schedule-title">Panel Schedule</div>
+        {circuits.length ? (
+          <div className="wizard-panel-schedule-wrap">
+            <table className="wizard-panel-schedule">
+              <thead><tr><th>Ckt</th><th>Load</th><th>Ckt</th><th>Load</th></tr></thead>
+              <tbody>
+                {Array.from({ length: Math.max(odd.length, even.length) }).map((_, row) => (
+                  <tr key={row}>
+                    <td className="mono">{odd[row]?.ckt ?? ""}</td><td>{odd[row]?.load ?? ""}</td>
+                    <td className="mono">{even[row]?.ckt ?? ""}</td><td>{even[row]?.load ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="operations-empty">No circuits were added for this panel in the Wizard.</p>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function buildOneLineJson({
+  systemName, ats, generators, pieces, sourceLinks, atsDownstream, pieceDownstream,
+}: { systemName: string; ats: ATS[]; generators: Generator[]; pieces: WizardPiece[]; sourceLinks: Record<string, string>; atsDownstream: Record<string, string>; pieceDownstream: Record<string, string[]> }) {
+  const resolveChain = (atsId: string) => resolveWizardTree(atsDownstream[atsId], pieces, pieceDownstream);
+  return {
+    system: systemName,
+    sources: [
+      ...generators.map((generator) => ({ id: generator.id, kind: "generator", name: generator.name, feeds: sourceLinks[generator.id] || null })),
+      { id: "utility", kind: "utility", name: "Utility", feeds: sourceLinks.utility || null },
+    ],
+    equipment: pieces.map((piece) => ({ type: piece.type, name: piece.name, ...(piece.meta || {}) })),
+    ats: ats.map((item) => ({ id: item.id, name: item.name, feeds: resolveChain(item.id) })),
+  };
+}
+
+function ResultLegendModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="" onClose={onClose} className="wizard-result-modal">
+      <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
+      <div className="wizard-result-modal-body">
+        <h3>Legend</h3>
+        <p className="wizard-result-modal-meta">Emergency Generation Spine</p>
+        <div className="wizard-connections-section-title">Equipment State</div>
+        <div className="wizard-legend-rows">
+          <div className="wizard-legend-row"><span className="wizard-legend-dot ready" />Ready / On Normal</div>
+          <div className="wizard-legend-row"><span className="wizard-legend-dot running" />Running / On Emergency</div>
+          <div className="wizard-legend-row"><span className="wizard-legend-dot standby" />De-energized / Standby</div>
+        </div>
+        <div className="wizard-connections-section-title">Power Flow</div>
+        <div className="wizard-legend-rows">
+          <div className="wizard-legend-row"><span className="wizard-legend-line running" />Emergency Power</div>
+          <div className="wizard-legend-row"><span className="wizard-legend-line standby" />De-energized</div>
+        </div>
+        <div className="wizard-connections-section-title">Off-Page Connectors</div>
+        <p className="wizard-legend-note">The label under each ATS, named for the actual load (e.g. &quot;ICU&quot;), is an off-page connector — the same convention used on paper one-lines to point to another sheet. Clicking an ATS jumps to that load&apos;s own popup.</p>
+      </div>
+    </Modal>
+  );
+}
+
+/** The square, arrow-flanked draw-out breaker glyph — used in place of the plain arc BreakerSymbol
+ * wherever the wizard has an actual Breaker piece (style: Draw-Out) matching this connection. */
+function DrawoutBreakerGlyph({ tone }: { tone: "emergency" | "normal" | "tie" }) {
+  const color = tone === "emergency" ? "#ef4444" : tone === "normal" ? "#22c55e" : "#64748b";
+  return (
+    <svg width="24" height="75" viewBox="0 0 16 50" fill="none" aria-hidden="true">
+      <line x1="8" y1="0" x2="8" y2="50" stroke={color} strokeWidth="3" />
+      <path d="M4 8 L8 4 L12 8" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 14 L8 10 L12 14" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="2" y="19" width="12" height="12" rx="1.5" fill={color} />
+      <path d="M4 36 L8 40 L12 36" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 42 L8 46 L12 42" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+type BreakerDetailData = {
+  key: string;
+  name: string;
+  role?: string;
+  style: "Fixed-Mount" | "Draw-Out";
+  derived: boolean;
+  position: "Closed" | "Open";
+  emergency: boolean;
+  poweredBy?: string;
+  feeds?: string;
+};
+
+/** Popup for a single breaker in the generated spine — opened by clicking its glyph, matching the
+ * highlighted-circle-then-popup interaction on the paper one-line reference. */
+function BreakerDetailModal({ detail, onClose }: { detail: BreakerDetailData; onClose: () => void }) {
+  const subtitle = [detail.derived ? "Auto-derived" : "Configured", detail.style, detail.role].filter(Boolean).join(" · ");
+  return (
+    <Modal title="" onClose={onClose} className="wizard-result-modal">
+      <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
+      <div className="wizard-result-modal-body">
+        <h3>{detail.name}</h3>
+        <p className="wizard-result-modal-meta">{subtitle}</p>
+        <div className={`wizard-result-banner ${detail.emergency ? "emergency" : "ready"}`}>{detail.position.toUpperCase()}{detail.emergency ? " · EMERGENCY" : ""}</div>
+        <div className="wizard-panel-schedule-info">
+          {detail.role && <div className="wizard-panel-schedule-info-row"><span>Role</span><b>{detail.role}</b></div>}
+          <div className="wizard-panel-schedule-info-row"><span>Style</span><b>{detail.style}</b></div>
+          <div className="wizard-panel-schedule-info-row"><span>Position</span><b>{detail.position}</b></div>
+          {detail.poweredBy && <div className="wizard-panel-schedule-info-row"><span>Powered By</span><b>{detail.poweredBy}</b></div>}
+          {detail.feeds && <div className="wizard-panel-schedule-info-row"><span>Feeds</span><b>{detail.feeds}</b></div>}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+type ContainerDetailData = { piece: WizardPiece; feeds: string[]; feedsLabel?: string; poweredBy?: string };
+
+/** Popup for a container box itself (switchgear, distribution gear, etc.) — opened by clicking its
+ * label, wherever it appears: the main spine's "GEN SWBD" or any nested box in a downstream branch. */
+function ContainerDetailModal({ piece, feeds, feedsLabel = "Feeders", poweredBy, onClose }: { piece: WizardPiece; feeds: string[]; feedsLabel?: string; poweredBy?: string; onClose: () => void }) {
+  const containerType = typeof piece.meta?.containerType === "string" ? piece.meta.containerType : "";
+  const voltage = typeof piece.meta?.voltage === "string" ? piece.meta.voltage : "";
+  const busCount = typeof piece.meta?.busCount === "string" ? piece.meta.busCount : "";
+  return (
+    <Modal title="" onClose={onClose} className="wizard-result-modal">
+      <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
+      <div className="wizard-result-modal-body">
+        <h3>{piece.name}</h3>
+        <p className="wizard-result-modal-meta">{containerType || "Container"}</p>
+        <div className="wizard-result-banner ready">{busCount ? `${busCount} BUS${busCount === "1" ? "" : "ES"}` : "CONTAINER"} · {feeds.length} {feedsLabel.toUpperCase()}</div>
+        <div className="wizard-panel-schedule-info">
+          {poweredBy && <div className="wizard-panel-schedule-info-row"><span>Fed From</span><b>{poweredBy}</b></div>}
+          <div className="wizard-panel-schedule-info-row"><span>Container Type</span><b>{containerType || "—"}</b></div>
+          <div className="wizard-panel-schedule-info-row"><span>Voltage</span><b>{voltage || "—"}</b></div>
+          <div className="wizard-panel-schedule-info-row"><span>Buses</span><b>{busCount ? `${busCount} (${busCount === "1" ? "single bus" : "multi-bus"})` : "—"}</b></div>
+          <div className="wizard-panel-schedule-info-row"><span>{feedsLabel}</span><b>{feeds.length ? feeds.join(", ") : "—"}</b></div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+type OneLineInspectorApi = {
+  selectedBreakerKey: string | null;
+  openBreaker: (detail: BreakerDetailData) => void;
+  selectedContainerName: string | null;
+  openContainer: (detail: ContainerDetailData) => void;
+};
+const OneLineInspectorContext = createContext<OneLineInspectorApi | null>(null);
+/** Lets any breaker or container node in the generated one-line — the main spine, or any depth of a
+ * downstream branch's container/breaker/distribution-gear tree — open the same detail popup and share
+ * the same click-highlight state, without threading the handlers through every level of recursion. */
+function useOneLineInspector(): OneLineInspectorApi {
+  const ctx = useContext(OneLineInspectorContext);
+  if (!ctx) throw new Error("useOneLineInspector must be used inside a generated one-line view");
+  return ctx;
+}
+
+/** The clickable hit-circle around any breaker glyph, anywhere in the one-line — main spine or a
+ * downstream branch tree, any depth. One shared component so every breaker opens its popup and
+ * highlights through the exact same useOneLineInspector() path, instead of some call sites reading
+ * ResultTab's local state directly and others going through context. */
+function BreakerHitButton({ detail, children }: { detail: BreakerDetailData; children: React.ReactNode }) {
+  const { selectedBreakerKey, openBreaker } = useOneLineInspector();
+  return (
+    <button type="button" className={`sld-breaker-hit${selectedBreakerKey === detail.key ? " selected" : ""}`} aria-label={`Open ${detail.name} details`} onClick={() => openBreaker(detail)}>
+      {children}
+    </button>
+  );
+}
+
+/** The clickable "GEN SWBD"-style label on the main spine's switchgear box — a dedicated component
+ * (rather than an inline button reading state straight off ResultTab) so it opens its popup through
+ * the exact same useOneLineInspector() path every other container in the one-line uses, main spine or
+ * a downstream branch tree alike. */
+function SwitchgearLabelButton({ switchgear, feeds }: { switchgear: WizardPiece; feeds: string[] }) {
+  const { selectedContainerName, openContainer } = useOneLineInspector();
+  return (
+    <button
+      type="button"
+      className={`result-switchgear-label${selectedContainerName === switchgear.name ? " selected" : ""}`}
+      aria-label={`Open ${switchgear.name} details`}
+      onClick={() => openContainer({ piece: switchgear, feeds, feedsLabel: "Incomers" })}
+    >
+      {switchgear.name}
+    </button>
+  );
+}
+
+function ResultTab({
+  systemName, ats, generators, atsTelemetry, generatorTelemetry, pieces, sourceLinks, atsDownstream, pieceDownstream, generated,
+}: { systemName: string; ats: ATS[]; generators: Generator[]; atsTelemetry?: AtsTelemetry[]; generatorTelemetry?: GeneratorTelemetry[]; pieces: WizardPiece[]; sourceLinks: Record<string, string>; atsDownstream: Record<string, string>; pieceDownstream: Record<string, string[]>; generated: boolean }) {
+  const [openAts, setOpenAts] = useState<ATS | null>(null);
+  const [openGenerator, setOpenGenerator] = useState<Generator | null>(null);
+  const [branchAts, setBranchAts] = useState<ATS | null>(null);
+  const [scheduleView, setScheduleView] = useState<{ piece: WizardPiece; tone: "emergency" | "normal"; fedFrom: string } | null>(null);
+  const [showJson, setShowJson] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  const [breakerDetail, setBreakerDetail] = useState<BreakerDetailData | null>(null);
+  const [containerDetail, setContainerDetail] = useState<ContainerDetailData | null>(null);
+  // Shared across the main spine (below) and, via the Provider wrapping this whole return, every depth
+  // of a downstream branch's container/breaker/distribution-gear tree — one popup implementation, one
+  // click-highlight state, instead of threading these handlers through every level of recursion.
+  const inspectorApi = useMemo<OneLineInspectorApi>(() => ({
+    selectedBreakerKey: breakerDetail?.key ?? null,
+    openBreaker: setBreakerDetail,
+    selectedContainerName: containerDetail?.piece.name ?? null,
+    openContainer: setContainerDetail,
+  }), [breakerDetail, containerDetail]);
+
+  // Wiring up equipment/connections isn't enough on its own — this stays empty until "Finish & Generate"
+  // is actually clicked in the wizard (see onGenerate/oneLineGenerated in SystemOperationsOverview), so
+  // this tab never shows a diagram the user hasn't explicitly asked to generate yet.
+  if (!pieces.length || !generated) {
+    return (
+      <section className="operations-section">
+        <div className="wizard-result-empty">
+          <p className="wizard-result-empty-text">Nothing generated yet — build your one-line and connections in the One-Line Wizard tab, then click Finish &amp; Generate.</p>
+        </div>
+      </section>
+    );
+  }
+
+  const switchgear = pieces.find((piece) => piece.type === "container");
+  const json = buildOneLineJson({ systemName, ats, generators, pieces, sourceLinks, atsDownstream, pieceDownstream });
+  // Precomputed once and rendered in two places — the generator lead-in (G icon, wire, output breaker)
+  // sits above the switchgear box's dashed boundary, and the entry wire/bus feed sits inside it, so the
+  // boundary reads as the actual switchgear enclosure rather than swallowing the generators themselves.
+  const generatorViews = generators.map((generator, index) => {
+    const data = resolveGeneratorTelemetry(generatorTelemetry, generator.id, generator.name);
+    const running = Boolean(data?.running);
+    // Structural tone keeps the exact tuned lead/tail connector heights from the real one-line
+    // diagram (emergency-source/normal-source). "standby" only overrides the *color* on top of
+    // that — the G icon stays green when ready, but the wire/breaker read grey (de-energized)
+    // until this generator is actually running and pushing power.
+    const structuralTone: "emergency-source" | "normal-source" = running ? "emergency-source" : "normal-source";
+    const lineClass = running ? structuralTone : `${structuralTone} standby`;
+    const breakerTone: "emergency" | "tie" = running ? "emergency" : "tie";
+    // The real breaker(s) this generator is actually wired to (Connections step: Generator → Breaker →
+    // Breaker → ...), not a phantom that merely happens to share the generator's own name. A chain like
+    // Generator → GEN #1-SKID (Fixed-Mount) → 52-G1 (Draw-Out) → GEN SWBD models a local disconnect at
+    // the genset feeding a separate breaker at the switchgear — leadBreaker is the first (rendered above
+    // the switchgear's dashed border), entryBreaker the second, if any (rendered inside it, in the slot
+    // that otherwise falls back to a plain wire). Walking stops at the first piece that isn't itself a
+    // breaker (a container like GEN SWBD, an ATS, "End") — a generator wired straight through with no
+    // breaker at all, or only one, leaves the other slot as that existing plain-wire fallback.
+    let leadBreaker: WizardPiece | undefined;
+    let entryBreaker: WizardPiece | undefined;
+    const seen = new Set<string>();
+    let current: string | undefined = sourceLinks[generator.id];
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      const piece = pieces.find((item) => item.name === current);
+      if (piece?.type !== "breaker") break;
+      if (!leadBreaker) leadBreaker = piece;
+      else if (!entryBreaker) { entryBreaker = piece; break; }
+      current = (pieceDownstream[current] || [])[0];
+    }
+    return { generator, data, running, structuralTone, lineClass, breakerTone, leadBreaker, entryBreaker, index };
+  });
+  // Nothing renders here by default just because the equipment exists — a generator only shows once
+  // it's actually wired to something (sourceLinks), and an ATS only shows once a wired source's chain
+  // actually reaches it (walking sourceLinks → pieceDownstream), so the spine visibly builds up one
+  // connection at a time instead of presenting every registered generator/ATS from the start. This is
+  // deliberately about the ATS's UPSTREAM feed, not whether the ATS has confirmed its own downstream
+  // load yet (atsDownstream) — that's separate, still shown as "Not Wired" inside an otherwise-visible
+  // ATS box below.
+  const wiredGeneratorViews = generatorViews.filter(({ generator }) => Boolean(sourceLinks[generator.id]));
+  const reachableFromSources = new Set<string>();
+  const reachStack = Object.values(sourceLinks);
+  while (reachStack.length) {
+    const name = reachStack.pop();
+    if (!name || name === "End" || reachableFromSources.has(name)) continue;
+    reachableFromSources.add(name);
+    reachStack.push(...(pieceDownstream[name] || []));
+  }
+  const wiredAts = ats.filter((item) => reachableFromSources.has(item.name));
+
+  return (
+    <OneLineInspectorContext.Provider value={inspectorApi}>
+    <section className="operations-section wizard-section">
+      <div className="wizard-header-bar">
+        <span className="wizard-brand">CPC</span>
+        <span className="wizard-header-label">Generated One-Line</span>
+        <button type="button" className="header-btn" onClick={() => setShowLegend(true)}>Legend</button>
+        <button type="button" className="header-btn" onClick={() => setShowJson((current) => !current)}>{showJson ? "Hide JSON" : "View JSON"}</button>
+      </div>
+      {showJson && <pre className="wizard-json-view">{JSON.stringify(json, null, 2)}</pre>}
+      <div className="result-spine-wrap">
+        <div className="result-spine-header">
+          <div>
+            <div className="wizard-kicker">Generators → {switchgear ? switchgear.name : "Switchgear"} → ATS</div>
+            <p className="result-spine-sub">The spine — click any ATS to view its downstream load.</p>
+          </div>
+        </div>
+        <div className="result-spine">
+          {/* Only the generator itself and its own output breaker sit above the boundary — the
+              draw-out switchgear breaker (52-G#) is physically inside "GEN SWBD", so it stays inside
+              the dashed box. A real wire segment runs on both sides of the border (here, and again just
+              inside the box below) so the border crosses the middle of a plain wire, the same way the
+              bottom border crosses the wire between the feeder breaker and the ATS below it. */}
+          <div className="sld-generators result-gen-row result-gen-lead-row">
+            {wiredGeneratorViews.map(({ generator, data, running, structuralTone, lineClass, breakerTone, leadBreaker, entryBreaker }) => {
+              const leadKey = `lead-${generator.id}`;
+              const leadName = leadBreaker?.name || `${generator.name} Breaker`;
+              const leadDetail: BreakerDetailData = {
+                key: leadKey, name: leadName, style: leadBreaker?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount",
+                derived: !leadBreaker, position: running ? "Closed" : "Open", emergency: running,
+                poweredBy: generator.name, feeds: entryBreaker?.name || switchgear?.name || "Bus",
+              };
+              return (
+              <div className="sld-generator-column" key={generator.id}>
+                <button type="button" className={`sld-generator ${structuralTone}`} aria-label={`Open ${generator.name}`} title={`Open ${generator.name}`} onClick={() => setOpenGenerator(generator)}>
+                  <i>G</i><span>{generator.name}</span><small>{data?.status || "Waiting"}</small>
+                </button>
+                <span className={`sld-gear-connector ${lineClass}`} aria-hidden="true" />
+                {/* Whatever real breaker piece the generator is actually wired to first — styled to match
+                    (Draw-Out gets the same square glyph it would anywhere else in this app, Fixed-Mount
+                    or nothing wired keeps the plain arc) with its own real name, instead of an unlabeled
+                    generic breaker regardless of what was actually created. */}
+                <span className="sld-breaker-with-tag">
+                  <BreakerHitButton detail={leadDetail}>
+                    {leadBreaker?.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone={breakerTone} /> : <BreakerSymbol tone={breakerTone} size={38} centered />}
+                  </BreakerHitButton>
+                  {leadBreaker && <div className={`sld-breaker-tag ${lineClass}`}>{leadBreaker.name}</div>}
+                </span>
+                <span className={`result-crossing-wire ${lineClass}`} aria-hidden="true" />
+              </div>
+              );
+            })}
+            {!wiredGeneratorViews.length && <p className="operations-empty">No generators wired yet — connect one in the Connections step.</p>}
+          </div>
+          {switchgear && (
+            <div className="result-switchgear-box">
+              <SwitchgearLabelButton
+                switchgear={switchgear}
+                feeds={wiredGeneratorViews.map(({ entryBreaker, leadBreaker, index }) => entryBreaker?.name || leadBreaker?.name || `52-G${index + 1}`)}
+              />
+              {Boolean(wiredGeneratorViews.length) && (
+                <div className="sld-generators result-gen-row result-gen-entry-row">
+                  {wiredGeneratorViews.map(({ generator, lineClass, breakerTone, entryBreaker, leadBreaker, running, index }) => {
+                    const entryKey = `entry-${generator.id}`;
+                    const entryName = entryBreaker?.name || `52-G${index + 1}`;
+                    const entryDetail: BreakerDetailData = {
+                      key: entryKey, name: entryName, role: "Incomer", style: entryBreaker?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount",
+                      derived: !entryBreaker, position: running ? "Closed" : "Open", emergency: running,
+                      poweredBy: leadBreaker?.name || generator.name, feeds: "Bus",
+                    };
+                    return (
+                    <div className="sld-generator-column" key={generator.id}>
+                      {/* This slot always reserves the same height whether or not a second breaker piece
+                          exists in this generator's chain — otherwise a column without one renders shorter
+                          than its neighbors and falls short of the bus below. */}
+                      <span className={`result-crossing-wire ${lineClass}`} aria-hidden="true" />
+                      <span className="result-drawout-slot">
+                        {entryBreaker ? (
+                          <span className="sld-breaker-with-tag">
+                            <BreakerHitButton detail={entryDetail}>
+                              {entryBreaker.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone={breakerTone} /> : <BreakerSymbol tone={breakerTone} size={38} centered />}
+                            </BreakerHitButton>
+                            <div className={`sld-breaker-tag ${lineClass}`}>{entryBreaker.name}</div>
+                          </span>
+                        ) : (
+                          <span className={`sld-gear-connector ${lineClass}`} aria-hidden="true" />
+                        )}
+                      </span>
+                      <span className={`sld-gear-connector tail ${lineClass}`} aria-hidden="true" />
+                    </div>
+                    );
+                  })}
+                </div>
+              )}
+              {Boolean(wiredGeneratorViews.length) && <div className="result-bus" />}
+              {Boolean(wiredAts.length) && (
+                <div className="result-ats-row result-feeder-row">
+                  {/* These feeders all drop off the same emergency bus, so — like the bus itself — they
+                      stay red regardless of any one ATS's current normal/emergency state. */}
+                  {wiredAts.map((item, index) => {
+                    const feederKey = `feeder-${item.id}`;
+                    const feederName = `52-F${index + 1}`;
+                    const feederDetail: BreakerDetailData = {
+                      key: feederKey, name: feederName, role: "Feeder", style: "Fixed-Mount", derived: true,
+                      position: "Closed", emergency: true, poweredBy: switchgear?.name || "Bus", feeds: item.name,
+                    };
+                    return (
+                    <div className="result-ats-col" key={item.id}>
+                      <span className="result-connector emergency" />
+                      <span className="sld-breaker-with-tag">
+                        <BreakerHitButton detail={feederDetail}>
+                          <BreakerSymbol tone="emergency" size={38} centered />
+                        </BreakerHitButton>
+                        <div className="sld-breaker-tag emergency-source">{feederName}</div>
+                      </span>
+                      <span className="result-connector emergency" />
+                    </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="result-ats-row">
+            {wiredAts.map((item) => {
+              const data = resolveAtsTelemetry(atsTelemetry, item.id, item.name);
+              const emergency = data?.connected_source === "GENERATOR";
+              const downstream = atsDownstream[item.id];
+              return (
+                <div className="result-ats-col" key={item.id}>
+                  <span className="result-connector emergency" aria-hidden="true" />
+                  <div className={`sld-ats result-ats-node ${emergency ? "on-emergency" : "on-normal"}`}>
+                    <button type="button" className="sld-switch" aria-label={`Open ${item.name}: ${emergency ? "connected to emergency" : "connected to normal"}`} onClick={() => setOpenAts(item)}>
+                      <span className={`sld-terminal normal-terminal ${!emergency ? "active" : ""}`}>N</span>
+                      <span className={`sld-terminal emergency-terminal ${emergency ? "active" : ""}`}>E</span>
+                      <i className="sld-arm" />
+                      <span className="sld-terminal load-terminal" aria-hidden="true" />
+                    </button>
+                    <b>{item.name}</b>
+                    {downstream ? (
+                      <button type="button" className="sld-load-label" aria-label={`View ${item.name}'s downstream branch`} onClick={() => setBranchAts(item)}>
+                        {downstream === "End" ? "End of line" : downstream}
+                      </button>
+                    ) : (
+                      <span className="sld-load-label">Not wired</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {!wiredAts.length && <p className="operations-empty">No ATS units wired yet — connect one in the Connections step.</p>}
+          </div>
+        </div>
+      </div>
+      {openAts && (
+        <EquipmentFaceplate
+          systemName={systemName}
+          ats={openAts}
+          atsTelemetry={resolveAtsTelemetry(atsTelemetry, openAts.id, openAts.name)}
+          onClose={() => setOpenAts(null)}
+          alwaysShowSourceAvailability
+          fedFromLabel={`F${ats.findIndex((item) => item.id === openAts.id) + 1}`}
+          extraSection={
+            <>
+              <div className="faceplate-v2-section-title">Downstream</div>
+              {atsDownstream[openAts.id] ? (
+                <button type="button" className="wizard-downstream-link" onClick={() => { setBranchAts(openAts); setOpenAts(null); }}>
+                  {atsDownstream[openAts.id] === "End" ? "End of line" : atsDownstream[openAts.id]} — View on separate page →
+                </button>
+              ) : (
+                <p className="faceplate-v2-load-box">Not wired yet — set this in the Wizard&apos;s Connections step.</p>
+              )}
+            </>
+          }
+        />
+      )}
+      {openGenerator && (
+        <EquipmentFaceplate
+          systemName={systemName}
+          generator={openGenerator}
+          generatorTelemetry={resolveGeneratorTelemetry(generatorTelemetry, openGenerator.id, openGenerator.name)}
+          onClose={() => setOpenGenerator(null)}
+        />
+      )}
+      {branchAts && (
+        <ResultBranchModal
+          systemName={systemName}
+          ats={branchAts}
+          atsTelemetry={resolveAtsTelemetry(atsTelemetry, branchAts.id, branchAts.name)}
+          feederLabel={`F${ats.findIndex((item) => item.id === branchAts.id) + 1}`}
+          pieces={pieces}
+          atsDownstream={atsDownstream}
+          pieceDownstream={pieceDownstream}
+          onClose={() => setBranchAts(null)}
+          onViewSchedule={(piece, tone, fedFrom) => setScheduleView({ piece, tone, fedFrom })}
+        />
+      )}
+      {scheduleView && (
+        <ResultPanelScheduleModal piece={scheduleView.piece} emergency={scheduleView.tone === "emergency"} fedFrom={scheduleView.fedFrom} onClose={() => setScheduleView(null)} />
+      )}
+      {showLegend && <ResultLegendModal onClose={() => setShowLegend(false)} />}
+      {breakerDetail && <BreakerDetailModal detail={breakerDetail} onClose={() => setBreakerDetail(null)} />}
+      {containerDetail && (
+        <ContainerDetailModal
+          piece={containerDetail.piece}
+          feeds={containerDetail.feeds}
+          feedsLabel={containerDetail.feedsLabel}
+          poweredBy={containerDetail.poweredBy}
+          onClose={() => setContainerDetail(null)}
+        />
+      )}
+    </section>
+    </OneLineInspectorContext.Provider>
+  );
+}
+
+export function SystemOperationsOverview({ systemId, systemName, ats, generators, view, onViewChange }: { systemId: string; systemName: string; ats: ATS[]; generators: Generator[]; view: "details" | "wizard" | "result"; onViewChange: (view: "details" | "wizard" | "result") => void }) {
   const navigate = useNavigate();
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentSelection | null>(null);
   const [testWizardTarget, setTestWizardTarget] = useState<TestTarget | null>(null);
+  // Lifted here (rather than inside OneLineWizardTab) so the built one-line survives switching
+  // to the Result tab and back — both tabs are children of this same, always-mounted component.
+  // Backed by the server (system_one_lines table) so it also survives a page refresh.
+  const { data: savedOneLine } = useOneLine(systemId);
+  const saveOneLine = useSaveOneLine();
+  const [wizardPieces, setWizardPieces] = useState<WizardPiece[]>([]);
+  const [wizardSourceLinks, setWizardSourceLinks] = useState<Record<string, string>>({});
+  const [wizardAtsDownstream, setWizardAtsDownstream] = useState<Record<string, string>>({});
+  const [wizardPieceDownstream, setWizardPieceDownstream] = useState<Record<string, string[]>>({});
+  // True only once "Finish & Generate" has actually been clicked — the Result tab stays empty until
+  // then, even though the wizard's own pieces/connections exist as soon as they're wired up.
+  const [oneLineGenerated, setOneLineGenerated] = useState(false);
+  const [oneLineHydrated, setOneLineHydrated] = useState(false);
+
+  useEffect(() => {
+    if (savedOneLine === undefined) return; // still loading
+    if (savedOneLine) {
+      const data = savedOneLine.data as { pieces?: WizardPiece[]; sourceLinks?: Record<string, string>; atsDownstream?: Record<string, string>; pieceDownstream?: Record<string, string | string[]>; generated?: boolean };
+      setWizardPieces(data.pieces || []);
+      setWizardSourceLinks(data.sourceLinks || {});
+      setWizardAtsDownstream(data.atsDownstream || {});
+      // Older saved diagrams stored one destination per piece as a plain string — normalize those
+      // into single-item arrays so a piece can now feed multiple downstream targets.
+      const rawPieceDownstream = data.pieceDownstream || {};
+      setWizardPieceDownstream(
+        Object.fromEntries(Object.entries(rawPieceDownstream).map(([name, value]) => [name, Array.isArray(value) ? value : [value]]))
+      );
+      setOneLineGenerated(Boolean(data.generated));
+    }
+    setOneLineHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedOneLine, systemId]);
+
+  useEffect(() => {
+    if (!oneLineHydrated) return;
+    const hasContent = wizardPieces.length > 0 || Object.keys(wizardSourceLinks).length > 0 || Object.keys(wizardAtsDownstream).length > 0 || Object.keys(wizardPieceDownstream).length > 0;
+    // Don't create a row for a system nobody has touched the wizard for yet — but once one exists,
+    // still save an emptied-out state (e.g. the user cleared everything back out on purpose).
+    if (!hasContent && !savedOneLine) return;
+    const timeout = setTimeout(() => {
+      saveOneLine.mutate({ systemId, data: { pieces: wizardPieces, sourceLinks: wizardSourceLinks, atsDownstream: wizardAtsDownstream, pieceDownstream: wizardPieceDownstream, generated: oneLineGenerated } });
+    }, 800);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oneLineHydrated, wizardPieces, wizardSourceLinks, wizardAtsDownstream, wizardPieceDownstream, oneLineGenerated]);
+
   const telemetry = useTelemetrySnapshot();
   const { data: alarms } = useAlarms({ systemId });
   const activeAlarms = (alarms || []).filter((alarm) => alarm.status === "active");
@@ -308,19 +2270,72 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
         </span>
         <div className="operations-view-tabs">
           <button type="button" className={`view-tab ${view === "details" ? "active" : ""}`} onClick={() => onViewChange("details")}>System Details</button>
-          <button type="button" className={`view-tab ${view === "one-line" ? "active" : ""}`} onClick={() => onViewChange("one-line")}>One-Line</button>
+          <button type="button" className={`view-tab ${view === "wizard" ? "active" : ""}`} onClick={() => onViewChange("wizard")}>One-Line Wizard</button>
+          <button type="button" className={`view-tab ${view === "result" ? "active" : ""}`} onClick={() => onViewChange("result")}>One-Line</button>
         </div>
       </div>
       <EventsPanel alarms={activeAlarms} />
     </div>
-    {view === "one-line" ? (
-      <SingleLineDiagram
-        ats={ats}
-        generators={generators}
-        atsTelemetry={telemetry?.ats}
-        generatorTelemetry={telemetry?.generators}
-        onAtsClick={(id) => setSelectedEquipment({ type: "ats", id })}
-        onGeneratorClick={(id) => setSelectedEquipment({ type: "generator", id })}
+    {view === "wizard" ? (
+      <OneLineWizardTab
+        systemName={systemName} ats={ats} generators={generators}
+        pieces={wizardPieces} addPiece={(piece) => setWizardPieces((current) => [...current, piece])}
+        removePiece={(name) => {
+          setWizardPieces((current) => current.filter((piece) => piece.name !== name));
+          setWizardAtsDownstream((current) => Object.fromEntries(Object.entries(current).filter(([, value]) => value !== name)));
+          setWizardPieceDownstream((current) => {
+            const next: Record<string, string[]> = {};
+            for (const [key, values] of Object.entries(current)) {
+              if (key === name) continue;
+              const filtered = values.filter((value) => value !== name);
+              if (filtered.length) next[key] = filtered;
+            }
+            return next;
+          });
+        }}
+        updatePiece={(oldName, piece) => {
+          setWizardPieces((current) => current.map((existing) => (existing.name === oldName ? piece : existing)));
+          // Renamed — every place that referenced the piece by its old name needs to follow, or the
+          // wiring quietly breaks (a source/ATS/piece link pointing at a name nothing matches anymore).
+          if (piece.name === oldName) return;
+          setWizardSourceLinks((current) =>
+            Object.fromEntries(Object.entries(current).map(([id, destination]) => [id, destination === oldName ? piece.name : destination]))
+          );
+          setWizardAtsDownstream((current) =>
+            Object.fromEntries(Object.entries(current).map(([id, destination]) => [id, destination === oldName ? piece.name : destination]))
+          );
+          setWizardPieceDownstream((current) => {
+            const next: Record<string, string[]> = {};
+            for (const [key, values] of Object.entries(current)) {
+              const nextKey = key === oldName ? piece.name : key;
+              next[nextKey] = values.map((value) => (value === oldName ? piece.name : value));
+            }
+            return next;
+          });
+        }}
+        sourceLinks={wizardSourceLinks} setSourceLink={(id, destination) => setWizardSourceLinks((current) => ({ ...current, [id]: destination }))}
+        removeSourceLink={(id) => setWizardSourceLinks((current) => { const next = { ...current }; delete next[id]; return next; })}
+        atsDownstream={wizardAtsDownstream} setAtsDownstreamLink={(id, destination) => setWizardAtsDownstream((current) => ({ ...current, [id]: destination }))}
+        removeAtsLink={(id) => setWizardAtsDownstream((current) => { const next = { ...current }; delete next[id]; return next; })}
+        pieceDownstream={wizardPieceDownstream}
+        setPieceDownstreamLink={(name, destination) => setWizardPieceDownstream((current) => {
+          const existing = current[name] || [];
+          if (existing.includes(destination)) return current;
+          return { ...current, [name]: [...existing, destination] };
+        })}
+        removePieceLink={(name, destination) => setWizardPieceDownstream((current) => {
+          const filtered = (current[name] || []).filter((value) => value !== destination);
+          const next = { ...current };
+          if (filtered.length) next[name] = filtered; else delete next[name];
+          return next;
+        })}
+        onGenerate={() => setOneLineGenerated(true)}
+      />
+    ) : view === "result" ? (
+      <ResultTab
+        systemName={systemName} ats={ats} generators={generators} atsTelemetry={telemetry?.ats} generatorTelemetry={telemetry?.generators}
+        pieces={wizardPieces} sourceLinks={wizardSourceLinks} atsDownstream={wizardAtsDownstream} pieceDownstream={wizardPieceDownstream}
+        generated={oneLineGenerated}
       />
     ) : (
       <>

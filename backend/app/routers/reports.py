@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -9,6 +9,7 @@ from app.crud import system as system_crud
 from app.database import get_db
 from app.models.user import User
 from app.schemas.report import ReportDetail, ReportListItem
+from app.services.report_pdf import build_report_pdf
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -44,3 +45,20 @@ def get_report(
     if not can_view_system(user, db, report.system):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
     return report
+
+
+@router.get("/{report_id}/pdf")
+def download_report_pdf(
+    report_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    report = crud.get_report(db, report_id)
+    if not report:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
+    if not can_view_system(user, db, report.system):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
+    pdf_bytes = build_report_pdf(report, report.system.name, report.company.name, report.company.logo_data)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{report.report_code}.pdf"'},
+    )

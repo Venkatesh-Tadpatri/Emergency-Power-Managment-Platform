@@ -39,9 +39,13 @@ export function LeafletMap({
       attributionControl: false,
     });
     L.control.zoom({ position: "topright" }).addTo(map);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd",
-      maxZoom: 19,
+    // Esri's free, key-less light-grey canvas basemap + its matching label/road reference overlay —
+    // keeps the minimal light background the markers were designed for, with legible place names.
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 16,
+    }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 16,
     }).addTo(map);
     mapRef.current = map;
     return () => {
@@ -88,7 +92,7 @@ export function LeafletMap({
       L.marker([m.lat, m.lng], {
         icon: L.divIcon({
           className: "cpc-map-label",
-          html: `<span style="font-family:Inter;font-size:10px;font-weight:600;color:#e2e8f0;text-shadow:0 0 4px #000,0 0 8px #000;white-space:nowrap">${m.label}</span>`,
+          html: `<span style="font-family:Inter;font-size:10px;font-weight:700;color:#0f172a;text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 7px #fff;white-space:nowrap">${m.label}</span>`,
           iconSize: [0, 0],
           iconAnchor: [-12, 4],
         }),

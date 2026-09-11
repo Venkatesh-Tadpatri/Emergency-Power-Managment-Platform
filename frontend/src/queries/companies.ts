@@ -48,3 +48,15 @@ export function useArchiveCompany() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
   });
 }
+
+export function useUploadCompanyLogo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const form = new FormData();
+      form.append("logo", file);
+      return (await api.post<Company>(`/api/companies/${id}/logo`, form)).data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
+  });
+}

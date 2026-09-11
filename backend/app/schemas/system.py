@@ -9,6 +9,7 @@ class SystemBase(BaseModel):
     company_id: str
     site_id: str | None = None
     status: str = "normal"
+    archived: bool = False
 
 
 class SystemCreate(SystemBase):

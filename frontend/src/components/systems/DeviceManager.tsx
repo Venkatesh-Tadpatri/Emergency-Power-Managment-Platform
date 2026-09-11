@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 
@@ -25,7 +25,104 @@ const BRANCHES = [
   { value: "equipment", label: "Equipment" },
 ];
 
-const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "", branch: "equipment", rated_amps: "", rated_volts: "" };
+const SOURCE_TYPES = [
+  { value: "utility", label: "Utility" },
+  { value: "generator", label: "Generator" },
+];
+
+const ATS_RATED_AMPS = ["40", "63", "80", "100", "125", "160", "200", "250", "315", "400", "500", "630", "800", "1000", "1250", "1600", "2000", "2500", "3200", "4000", "5000"];
+const ATS_RATED_VOLTS = ["120", "208", "220", "230", "240", "380", "400", "415", "440", "480", "600"];
+const ATS_MANUFACTURERS = ["ABB", "ASCO", "Caterpillar", "Cummins", "Eaton", "Generac", "Kohler", "Schneider Electric", "Siemens", "Socomec", "Vertiv"];
+
+const GEN_MAKES = ["Caterpillar", "Cummins", "Kirloskar", "Mahindra Powerol", "Perkins", "Volvo Penta", "MTU", "Kohler", "Mitsubishi", "Doosan", "Yanmar", "JCB", "Generac"];
+const GEN_RATED_KW = ["5", "10", "15", "20", "25", "30", "40", "50", "60", "75", "80", "100", "125", "150", "175", "200", "250", "300", "350", "400", "450", "500", "625", "750", "800", "1000", "1250", "1500", "1750", "2000", "2500", "3000", "4500", "5000"];
+const GEN_RATED_VOLTS = ["120", "208", "220", "230", "240", "380", "400", "415", "440", "480", "600", "690", "3300", "11000", "13200", "15000", "22000", "33000"];
+const GEN_RATED_AMPS = ["10", "16", "20", "25", "32", "40", "50", "63", "80", "100", "125", "160", "200", "400", "500", "630", "800", "1000", "1250", "1600", "2000", "2500", "3200", "4000", "5000", "6300"];
+
+/** Editable combobox: type a value directly, or click a preset from the height-limited, scrollable
+ * suggestion list. Used by the Add/Edit ATS form's Rated Amps, Rated Volts and Manufacturer fields.
+ * Built as a plain input + custom popup (not a native <select>) so the field stays directly typeable
+ * — no separate "Other" step — and the open list can be scroll-limited, unlike an OS-rendered listbox. */
+function SelectOrCustom({ label, unit, options, value, onChange, placeholder, required }: { label: string; unit?: string; options: string[]; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const positionPanel = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rect = root.getBoundingClientRect();
+    const gap = 4;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
+    const spaceAbove = rect.top - gap - 8;
+    const openAbove = spaceBelow < 140 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(100, Math.min(220, openAbove ? spaceAbove : spaceBelow));
+    const style: React.CSSProperties = {
+      position: "fixed",
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+    };
+    if (openAbove) style.bottom = window.innerHeight - rect.top + gap;
+    else style.top = rect.bottom + gap;
+    setPanelStyle(style);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    positionPanel();
+    const onDocPointerDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onReposition = () => positionPanel();
+    document.addEventListener("mousedown", onDocPointerDown);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      document.removeEventListener("mousedown", onDocPointerDown);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  return (
+    <div className="form-row" ref={rootRef} style={{ position: "relative" }}>
+      <label>{label}{required ? " *" : ""}</label>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input
+          type={unit ? "number" : "text"}
+          min={unit ? 0 : undefined}
+          step={unit ? 1 : undefined}
+          required={required}
+          placeholder={placeholder || `Select or type ${label.toLowerCase()}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setOpen(true)}
+          style={{ flex: 1 }}
+        />
+        {unit && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-dim)" }}>{unit}</span>}
+      </div>
+      {open && (
+        <div className="dropdown-panel" role="listbox" style={panelStyle}>
+          {options.map((o) => (
+            <div
+              key={o}
+              role="option"
+              aria-selected={o === value}
+              className={`dropdown-item${o === value ? " selected" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); onChange(o); setOpen(false); }}
+            >
+              {o}{unit ? ` ${unit}` : ""}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "", branch: "equipment", source_type: "utility", rated_amps: "", rated_volts: "" };
 const emptyGenForm = { name: "", make: "", model: "", serial_number: "", rated_volts: "", rated_amps: "", rated_kw: "" };
 
 export function DeviceManager({ systemId }: { systemId: string }) {
@@ -52,6 +149,14 @@ export function DeviceManager({ systemId }: { systemId: string }) {
   const [genEditing, setGenEditing] = useState<Generator | "new" | null>(null);
   const [genForm, setGenForm] = useState(emptyGenForm);
   const [meterFor, setMeterFor] = useState<ATS | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ kind: "ats" | "generator"; id: string; name: string } | null>(null);
+
+  function confirmDelete() {
+    if (!deleteConfirm) return;
+    if (deleteConfirm.kind === "ats") deleteAts.mutate(deleteConfirm.id);
+    else deleteGenerator.mutate(deleteConfirm.id);
+    setDeleteConfirm(null);
+  }
 
   async function ensurePanelId(): Promise<string> {
     if (panelId) return panelId;
@@ -70,6 +175,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       model: a.model || "",
       serial_number: a.serial_number || "",
       branch: a.branch,
+      source_type: a.source_type || "utility",
       rated_amps: a.rated_amps?.toString() || "",
       rated_volts: a.rated_volts?.toString() || "",
     });
@@ -84,6 +190,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       model: atsForm.model || undefined,
       serial_number: atsForm.serial_number || undefined,
       branch: atsForm.branch,
+      source_type: atsForm.source_type,
       rated_amps: atsForm.rated_amps ? Number(atsForm.rated_amps) : undefined,
       rated_volts: atsForm.rated_volts ? Number(atsForm.rated_volts) : undefined,
     };
@@ -157,7 +264,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
             </thead>
             <tbody>
               {(ats || []).map((a, index) => (
-                <AtsRow key={a.id} serial={index + 1} ats={a} canManage={canManage} onDetail={() => navigate(`/systems/${systemId}/ats`)} onEdit={() => openEditAts(a)} onDelete={() => deleteAts.mutate(a.id)} onMeter={() => setMeterFor(a)} />
+                <AtsRow key={a.id} serial={index + 1} ats={a} canManage={canManage} onDetail={() => navigate(`/systems/${systemId}/ats`)} onEdit={() => openEditAts(a)} onDelete={() => setDeleteConfirm({ kind: "ats", id: a.id, name: a.name })} onMeter={() => setMeterFor(a)} />
               ))}
             </tbody>
           </table>
@@ -185,7 +292,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
                     <button className="header-btn detail-action" onClick={() => navigate(`/systems/${systemId}/generators`)}>Detailed view</button>
                     {canManage && <>
                       <button className="header-btn edit-action" onClick={() => openEditGen(g)}>Edit</button>
-                      <button className="header-btn delete-action" onClick={() => deleteGenerator.mutate(g.id)}>Delete</button>
+                      <button className="header-btn delete-action" onClick={() => setDeleteConfirm({ kind: "generator", id: g.id, name: g.name })}>Delete</button>
                     </>}
                   </td>
                 </tr>
@@ -208,20 +315,17 @@ export function DeviceManager({ systemId }: { systemId: string }) {
                 {BRANCHES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
               </select>
             </div>
-            <div className="form-grid-2">
-              <div className="form-row">
-                <label>Rated Amps</label>
-                <input type="number" min={0} step={1} value={atsForm.rated_amps} onChange={(e) => setAtsForm({ ...atsForm, rated_amps: e.target.value })} />
-              </div>
-              <div className="form-row">
-                <label>Rated Volts</label>
-                <input type="number" min={0} step={1} value={atsForm.rated_volts} onChange={(e) => setAtsForm({ ...atsForm, rated_volts: e.target.value })} />
-              </div>
-            </div>
             <div className="form-row">
-              <label>Manufacturer</label>
-              <input value={atsForm.manufacturer} onChange={(e) => setAtsForm({ ...atsForm, manufacturer: e.target.value })} />
+              <label>Source Type</label>
+              <select value={atsForm.source_type} onChange={(e) => setAtsForm({ ...atsForm, source_type: e.target.value })}>
+                {SOURCE_TYPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
             </div>
+            <div className="form-grid-2">
+              <SelectOrCustom label="Rated Amps" unit="A" options={ATS_RATED_AMPS} value={atsForm.rated_amps} onChange={(v) => setAtsForm({ ...atsForm, rated_amps: v })} />
+              <SelectOrCustom label="Rated Volts" unit="V" options={ATS_RATED_VOLTS} value={atsForm.rated_volts} onChange={(v) => setAtsForm({ ...atsForm, rated_volts: v })} />
+            </div>
+            <SelectOrCustom label="Manufacturer" options={ATS_MANUFACTURERS} value={atsForm.manufacturer} onChange={(v) => setAtsForm({ ...atsForm, manufacturer: v })} placeholder="Enter manufacturer name" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="form-row">
                 <label>Model</label>
@@ -248,10 +352,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
               <input required minLength={2} maxLength={80} value={genForm.name} onChange={(e) => setGenForm({ ...genForm, name: e.target.value })} placeholder="e.g. GEN-1" autoFocus />
             </div>
             <div className="form-grid-2">
-              <div className="form-row">
-                <label>Make</label>
-                <input value={genForm.make} onChange={(e) => setGenForm({ ...genForm, make: e.target.value })} />
-              </div>
+              <SelectOrCustom label="Make" options={GEN_MAKES} value={genForm.make} onChange={(v) => setGenForm({ ...genForm, make: v })} placeholder="Select or type make" />
               <div className="form-row">
                 <label>Model</label>
                 <input value={genForm.model} onChange={(e) => setGenForm({ ...genForm, model: e.target.value })} />
@@ -262,18 +363,9 @@ export function DeviceManager({ systemId }: { systemId: string }) {
               <input value={genForm.serial_number} onChange={(e) => setGenForm({ ...genForm, serial_number: e.target.value })} />
             </div>
             <div className="form-grid-3">
-              <div className="form-row">
-                <label>Rated kW</label>
-                <input type="number" min={0} step={1} value={genForm.rated_kw} onChange={(e) => setGenForm({ ...genForm, rated_kw: e.target.value })} />
-              </div>
-              <div className="form-row">
-                <label>Rated Volts</label>
-                <input type="number" min={0} step={1} value={genForm.rated_volts} onChange={(e) => setGenForm({ ...genForm, rated_volts: e.target.value })} />
-              </div>
-              <div className="form-row">
-                <label>Rated Amps</label>
-                <input type="number" min={0} step={1} value={genForm.rated_amps} onChange={(e) => setGenForm({ ...genForm, rated_amps: e.target.value })} />
-              </div>
+              <SelectOrCustom label="Rated kW" unit="kW" options={GEN_RATED_KW} value={genForm.rated_kw} onChange={(v) => setGenForm({ ...genForm, rated_kw: v })} />
+              <SelectOrCustom label="Rated Volts" unit="V" options={GEN_RATED_VOLTS} value={genForm.rated_volts} onChange={(v) => setGenForm({ ...genForm, rated_volts: v })} />
+              <SelectOrCustom label="Rated Amps" unit="A" options={GEN_RATED_AMPS} value={genForm.rated_amps} onChange={(v) => setGenForm({ ...genForm, rated_amps: v })} />
             </div>
             <div className="modal-actions">
               <button type="button" className="header-btn" onClick={() => setGenEditing(null)}>Cancel</button>
@@ -284,6 +376,18 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       )}
 
       {meterFor && <MeterModal ats={meterFor} onClose={() => setMeterFor(null)} />}
+
+      {deleteConfirm && (
+        <Modal title={`Delete ${deleteConfirm.kind === "ats" ? "ATS" : "Generator"}`} onClose={() => setDeleteConfirm(null)}>
+          <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--text-dim)" }}>
+            Delete <b style={{ color: "var(--text)" }}>{deleteConfirm.name}</b>? This permanently removes this {deleteConfirm.kind === "ats" ? "ATS" : "generator"} from the system.
+          </p>
+          <div className="modal-actions">
+            <button type="button" className="header-btn" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+            <button type="button" className="header-btn danger" onClick={confirmDelete}>Delete</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
