@@ -16,7 +16,7 @@ import {
 import { useMe } from "../../queries/me";
 import { useCompany } from "../../queries/companies";
 import { useAlarms } from "../../queries/alarms";
-import { useReseller } from "../../queries/resellers";
+import { useReseller, useResellers } from "../../queries/resellers";
 import { useSites, useSystem, useSystems } from "../../queries/systems";
 
 const DOT: Record<string, string> = {
@@ -43,13 +43,13 @@ function NavItem({
   color?: string;
 }) {
   return (
-    <div className={`nav-item${active ? " active" : ""}`} onClick={onClick}>
+    <div className={`nav-item${active ? " active" : ""}`} onClick={onClick} title={label}>
       {Icon && (
         <span className="nav-icon-badge" style={{ background: `${color}18`, color }}>
           <Icon size={13} />
         </span>
       )}
-      {label}
+      <span className="nav-item-label">{label}</span>
       {!!badge && <span className="nav-badge">{badge}</span>}
     </div>
   );
@@ -68,7 +68,8 @@ export function Sidebar() {
   const siteMatch = useMatch("/companies/:companyId/sites/:siteId");
   const systemMatch = useMatch("/systems/:systemId");
 
-  const resellerId = resellerMatch?.params.resellerId;
+  const resellerId =
+    resellerMatch?.params.resellerId === "archived" ? undefined : resellerMatch?.params.resellerId;
   const companyIdFromRoute = companyMatch?.params.companyId;
   const systemId = systemMatch?.params.systemId;
   const siteId = siteMatch?.params.siteId;
@@ -78,6 +79,7 @@ export function Sidebar() {
   const activeSiteId = siteId || systemForNav?.site_id;
 
   const { data: reseller } = useReseller(resellerId);
+  const { data: resellers } = useResellers();
   const { data: company } = useCompany(companyId);
   const { data: sites } = useSites(companyId);
   const { data: systems } = useSystems(companyId, activeSiteId);
@@ -93,13 +95,9 @@ export function Sidebar() {
     const canViewReseller = me?.role === "superadmin" || me?.role === "reseller_admin";
     return (
       <div className="sidebar-nav">
-        {canViewReseller ? (
+        {canViewReseller && (
           <div className="scope-header" onClick={() => navigate(company.reseller_id ? `/resellers/${company.reseller_id}` : "/resellers")}>
             <span className="scope-back-label">&larr; {reseller?.name || "Back"}</span>
-          </div>
-        ) : (
-          <div className="scope-header" style={{ cursor: "default" }} onClick={() => navigate("/")}>
-            <span className="scope-back-label">&larr; Dashboard</span>
           </div>
         )}
         <div className="scope-title">{company.name}</div>
@@ -112,7 +110,7 @@ export function Sidebar() {
         <div className="nav-section">
           <div className="nav-section-label">{activeSiteId ? "Systems" : "Sites"}</div>
           {!activeSiteId && (sites || []).filter((site) => site.status !== "archived").map((site) => (
-            <div key={site.id} className={`nav-item sys-nav-item${activeSiteId === site.id ? " active" : ""}`} onClick={() => navigate(`/companies/${companyId}/sites/${site.id}`)}>
+            <div key={site.id} className={`nav-item sys-nav-item${activeSiteId === site.id ? " active" : ""}`} onClick={() => navigate(`/companies/${companyId}/sites/${site.id}`)} title={site.name}>
               <span className="sys-dot dot-green" />
               <span className="sys-nav-name">{site.name}</span>
             </div>
@@ -122,6 +120,7 @@ export function Sidebar() {
               key={s.id}
               className={`nav-item sys-nav-item${systemId === s.id ? " active" : ""}`}
               onClick={() => navigate(`/systems/${s.id}`)}
+              title={s.name}
             >
               <span className={`sys-dot ${DOT[s.status] || "dot-green"}`} />
               <span className="sys-nav-name">{s.name}</span>
@@ -132,12 +131,16 @@ export function Sidebar() {
           <div className="nav-section-label">Monitoring</div>
           <NavItem icon={IconAlert} color="#dc2626" label="Alarms" active={path.endsWith("/alarms")} badge={activeAlarms.length} onClick={() => navigate(`/companies/${companyId}/alarms`)} />
           <NavItem icon={IconPhone} color="#0e7490" label="On-Call" active={path.endsWith("/oncall")} onClick={() => navigate(`/companies/${companyId}/oncall`)} />
-          <NavItem icon={IconReport} color="#2563eb" label="Analytics" active={path === "/analytics"} onClick={() => navigate("/analytics")} />
+          <NavItem icon={IconReport} color="#2563eb" label="Analytics" active={path === "/analytics"} onClick={() => navigate(`/analytics?companyId=${companyId}${activeSiteId ? `&siteId=${activeSiteId}` : ""}`)} />
         </div>
         <div className="nav-section">
           <div className="nav-section-label">Administration</div>
-          <NavItem icon={IconUsers} color="#7c3aed" label="Users" active={path.endsWith("/users")} onClick={() => navigate(`/companies/${companyId}/users`)} />
-          <NavItem icon={IconBuilding} color="#16a34a" label="Company Details" active={path.endsWith("/details")} onClick={() => navigate(`/companies/${companyId}/details`)} />
+          {me?.permissions.manage_company_users && (
+            <>
+              <NavItem icon={IconUsers} color="#7c3aed" label="Users" active={path.endsWith("/users")} onClick={() => navigate(`/companies/${companyId}/users`)} />
+              <NavItem icon={IconBuilding} color="#16a34a" label="Company Details" active={path.endsWith("/details")} onClick={() => navigate(`/companies/${companyId}/details`)} />
+            </>
+          )}
           <NavItem icon={IconReport} color="#2563eb" label="Reports" active={path.includes("/reports")} onClick={() => navigate(`/companies/${companyId}/reports`)} />
         </div>
       </div>
@@ -148,9 +151,11 @@ export function Sidebar() {
     const activeAlarms = (resellerAlarms || []).filter((a) => a.status === "active");
     return (
       <div className="sidebar-nav">
-        <div className="scope-header" onClick={() => navigate("/resellers")}>
-          <span className="scope-back-label">&larr; All Resellers</span>
-        </div>
+        {me?.role === "superadmin" && (
+          <div className="scope-header" onClick={() => navigate("/resellers")}>
+            <span className="scope-back-label">&larr; All Resellers</span>
+          </div>
+        )}
         <div className="scope-title">{reseller.name}</div>
         <div className="scope-subtitle">Reseller Context</div>
         <div className="nav-section">
@@ -181,8 +186,16 @@ export function Sidebar() {
       {canManageHierarchy && (
         <div className="nav-section">
           <div className="nav-section-label">Hierarchy</div>
-          <NavItem icon={IconResellers} color="#7c3aed" label="Resellers" active={path.startsWith("/resellers")} onClick={() => navigate("/resellers")} />
+          <NavItem icon={IconResellers} color="#7c3aed" label="Resellers" active={path === "/resellers"} onClick={() => navigate("/resellers")} />
           <NavItem icon={IconBuilding} color="#2563eb" label="Customers" active={path === "/companies"} onClick={() => navigate("/companies")} />
+          <NavItem
+            icon={IconResellers}
+            color="#64748b"
+            label="Archived Resellers"
+            active={path === "/resellers/archived"}
+            badge={(resellers || []).filter((r) => r.status === "archived").length}
+            onClick={() => navigate("/resellers/archived")}
+          />
         </div>
       )}
       <div className="nav-section">

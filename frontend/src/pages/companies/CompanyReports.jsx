@@ -14,7 +14,7 @@ const TABS = [
   { key: "calendar", label: "Calendar" },
   { key: "list", label: "All Reports" },
   { key: "initiating", label: "Initiating ATS Report" },
-  { key: "time-to-buss", label: "Time to Buss Report" },
+  { key: "time-to-buss", label: "Time to Re-Xfer Report" },
   { key: "compliance", label: "ATS Compliance" },
 ];
 // No dedicated "load served" field exists on an ATS today — approximated from its branch, same
@@ -254,7 +254,7 @@ function InitiatingAtsReportTab({ reports, systemName }) {
   );
 }
 
-/** ─── Time to Buss Report: every ATS transfer reading (one row per ATS per event) in range, flagged
+/** ─── Time to Re-Xfer Report: every ATS transfer reading (one row per ATS per event) in range, flagged
  * against the NFPA 110 Type 10 10-second transfer requirement. ─── */
 function TimeToBussReportTab({ reports }) {
   const [range, setRange] = useState({ start: "2000-01-01", end: fmtDate(new Date()) });
@@ -282,18 +282,18 @@ function TimeToBussReportTab({ reports }) {
       <DateRangeFilter range={range} onGenerate={(start, end) => setRange({ start, end })} />
       <div className="report-doc-tiles">
         <div className="report-doc-tile dark"><div className="report-doc-tile-value">{stats.total}</div><div className="report-doc-tile-label">TOTAL READINGS</div></div>
-        <div className="report-doc-tile light"><div className="report-doc-tile-value dark-text">{stats.avg} sec</div><div className="report-doc-tile-label light-label">AVERAGE TIME TO BUSS</div></div>
+        <div className="report-doc-tile light"><div className="report-doc-tile-value dark-text">{stats.avg} sec</div><div className="report-doc-tile-label light-label">AVERAGE TIME TO RE-XFER</div></div>
         <div className="report-doc-tile light"><div className="report-doc-tile-value blue-text">{stats.fastest} sec</div><div className="report-doc-tile-label light-label">FASTEST READING</div></div>
         <div className="report-doc-tile red"><div className="report-doc-tile-value">{stats.exceeded}</div><div className="report-doc-tile-label">READINGS ABOVE 10.0 SEC</div></div>
       </div>
       <p className="report-doc-caption">Readings above 10.0 sec are flagged for review against NFPA 110 Type 10 transfer requirements.</p>
       <div className="report-doc-section-title report-doc-section-row">
-        <span>ATS TRANSFER READINGS — TIME TO BUSS</span>
+        <span>ATS TRANSFER READINGS — TIME TO RE-XFER</span>
         <span className="report-doc-section-range">{displayDate(range.start)} - {displayDate(range.end)}</span>
       </div>
       <div className="report-doc-table-wrap">
         <table className="report-doc-table left">
-          <thead><tr><th>Date</th><th>Time</th><th>ATS</th><th>Load Served</th><th>Branch</th><th>Event Type</th><th>Time to Buss</th><th>Time to Available</th></tr></thead>
+          <thead><tr><th>Date</th><th>Time</th><th>ATS</th><th>Load Served</th><th>Branch</th><th>Event Type</th><th>Time to Re-Xfer</th><th>Time to Available</th></tr></thead>
           <tbody>
             {rows.map(({ report: r, detail: d }, i) => {
               const exceeded = (d.time_to_bus_sec ?? 0) > 10;

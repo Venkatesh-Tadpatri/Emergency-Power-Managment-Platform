@@ -20,6 +20,8 @@ export function DeviceAnalyticsModal({ kind, snapshot, history, onClose }: {
   const unhealthy = snapshot.fault_active || !snapshot.communication_healthy;
   const grafanaHref = deviceGrafanaUrl(kind, snapshot.equipment_id, snapshot.equipment_name);
 
+  const times = history.map((point) => point.t);
+
   const voltageSeries = [
     series("vab", "V A-B", "var(--chart-1)", history, "voltage_ab"),
     series("vbc", "V B-C", "var(--chart-2)", history, "voltage_bc"),
@@ -57,17 +59,17 @@ export function DeviceAnalyticsModal({ kind, snapshot, history, onClose }: {
       </div>
 
       <div className="device-analytics-trends">
-        <TrendChart title="Load" unit="%" series={[series("load", "Load", "var(--chart-1)", history, "load_percentage")]} />
-        <TrendChart title="Active power" unit=" kW" series={[series("kw", "Power", "var(--chart-1)", history, "active_power_kw")]} />
-        <TrendChart title="Line voltage" unit=" V" decimals={1} series={voltageSeries} />
-        <TrendChart title="Line current" unit=" A" decimals={1} series={currentSeries} />
-        <TrendChart title="Frequency" unit=" Hz" decimals={2} series={[series("hz", "Frequency", "var(--chart-1)", history, "frequency")]} />
+        <TrendChart title="Load" unit="%" series={[series("load", "Load", "var(--chart-1)", history, "load_percentage")]} times={times} />
+        <TrendChart title="Active power" unit=" kW" series={[series("kw", "Power", "var(--chart-1)", history, "active_power_kw")]} times={times} />
+        <TrendChart title="Line voltage" unit=" V" decimals={1} series={voltageSeries} times={times} />
+        <TrendChart title="Line current" unit=" A" decimals={1} series={currentSeries} times={times} />
+        <TrendChart title="Frequency" unit=" Hz" decimals={2} series={[series("hz", "Frequency", "var(--chart-1)", history, "frequency")]} times={times} />
         {isGenerator ? <>
-          <TrendChart title="Coolant temperature" unit="°C" series={[series("temp", "Coolant", "var(--chart-1)", history, "coolant_temperature_c")]} />
-          <TrendChart title="Fuel level" unit="%" decimals={0} series={[series("fuel", "Fuel", "var(--chart-1)", history, "fuel_level_percent")]} />
-          <TrendChart title="Oil pressure" unit=" psi" series={[series("oil", "Oil pressure", "var(--chart-1)", history, "oil_pressure_psi")]} />
+          <TrendChart title="Coolant temperature" unit="°C" series={[series("temp", "Coolant", "var(--chart-1)", history, "coolant_temperature_c")]} times={times} />
+          <TrendChart title="Fuel level" unit="%" decimals={0} series={[series("fuel", "Fuel", "var(--chart-1)", history, "fuel_level_percent")]} times={times} />
+          <TrendChart title="Oil pressure" unit=" psi" series={[series("oil", "Oil pressure", "var(--chart-1)", history, "oil_pressure_psi")]} times={times} />
         </> : (
-          <TrendChart title="Power factor" unit="" decimals={2} series={[series("pf", "Power factor", "var(--chart-1)", history, "power_factor")]} />
+          <TrendChart title="Power factor" unit="" decimals={2} series={[series("pf", "Power factor", "var(--chart-1)", history, "power_factor")]} times={times} />
         )}
       </div>
 

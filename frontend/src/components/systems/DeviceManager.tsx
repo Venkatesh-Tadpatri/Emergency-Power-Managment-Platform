@@ -403,7 +403,7 @@ function AtsRow({ serial, ats, canManage, onDetail, onEdit, onDelete, onMeter }:
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{[meter.make, meter.model].filter(Boolean).join(" ") || "Configured"}</span>
         ) : canManage ? (
           <button className="header-btn" style={{ padding: "3px 8px", fontSize: 10 }} onClick={onMeter}><IconMeter size={10} /> Add</button>
-        ) : "â€”"}
+        ) : "—"}
         {meter && canManage && <button className="header-btn" style={{ padding: "3px 8px", fontSize: 10, marginLeft: 6 }} onClick={onMeter}>Edit</button>}
       </td>
       <td className="device-row-actions" style={{ display: "flex", gap: 6 }}>

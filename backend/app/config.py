@@ -5,6 +5,12 @@ class Settings(BaseSettings):
     database_url: str = "mysql+pymysql://cpc:cpc_dev_pw@localhost:3306/cpc"
     # The `iss` claim inside tokens — must match what the browser used (external/host address).
     zitadel_issuer: str = "http://localhost:8080"
+    # Extra trusted issuers beyond zitadel_issuer, comma-separated — e.g. a Cloudflare
+    # tunnel hostname used for customer/UAT testing (see docs/cloudflare-customer-testing.md).
+    # Zitadel's JWKS is shared across every domain registered on the one instance, so a
+    # token issued via any trusted domain verifies against the same signing keys; this only
+    # widens which `iss` string is accepted, not which keys are trusted.
+    zitadel_additional_issuers: str = ""
     # Where the backend itself reaches Zitadel over the Docker network — "localhost" from
     # inside the backend container means the backend container, not the zitadel container.
     zitadel_internal_url: str = "http://zitadel:8080"
@@ -17,6 +23,11 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def zitadel_issuer_list(self) -> list[str]:
+        extra = [i.strip() for i in self.zitadel_additional_issuers.split(",") if i.strip()]
+        return [self.zitadel_issuer, *extra]
 
     class Config:
         env_file = ".env"

@@ -31,7 +31,7 @@ class ReportListItem(BaseModel):
     peak_kw: int | None = None
     avg_kw: int | None = None
     event_type: str | None = None
-    # Included at list level (not just ReportDetail) — the Initiating ATS / Time to Buss analytical
+    # Included at list level (not just ReportDetail) — the Initiating ATS / Time to Re-Xfer analytical
     # reports (CompanyReports.jsx) aggregate this across every report in a date range and would
     # otherwise need an extra per-report detail fetch just to build those tables.
     ats_details: list[AtsTransferDetail] | None = None

@@ -33,3 +33,15 @@ def archive_reseller(db: Session, reseller: Reseller) -> Reseller:
     db.commit()
     db.refresh(reseller)
     return reseller
+
+
+def unarchive_reseller(db: Session, reseller: Reseller) -> Reseller:
+    reseller.status = "active"
+    db.commit()
+    db.refresh(reseller)
+    return reseller
+
+
+def delete_reseller(db: Session, reseller: Reseller) -> None:
+    db.delete(reseller)
+    db.commit()

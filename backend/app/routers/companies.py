@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import can_create_company, can_view_company, can_write_company
+from app.auth.permissions import (
+    can_create_company,
+    can_manage_company_users,
+    can_view_company,
+    can_write_company,
+)
 from app.crud import company as crud
 from app.database import get_db
 from app.models.user import User
@@ -64,7 +69,7 @@ async def upload_company_logo(company_id: str, logo: UploadFile = File(...), db:
     company = crud.get_company(db, company_id)
     if not company:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "company not found")
-    if not can_write_company(user, db, company.id, company.reseller_id):
+    if not can_manage_company_users(user, company.id, company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this company")
     if logo.content_type not in {"image/png", "image/jpeg"}:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "logo must be a PNG or JPEG image")

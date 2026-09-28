@@ -7,13 +7,13 @@ import { PageHero } from "../../components/common/PageHero";
 import { StatsGrid } from "../../components/common/StatCard";
 import { StatusPill } from "../../components/common/StatusPill";
 import { usePageHeader } from "../../components/layout/HeaderContext";
-import { resolveAtsTelemetry, resolveGeneratorTelemetry, SingleLineDiagram } from "../../components/systems/SystemOperationsOverview";
+import { resolveAtsTelemetry, resolveGeneratorTelemetry, ResultTab } from "../../components/systems/SystemOperationsOverview";
 import { TestWizard } from "../../components/systems/TestWizard";
 import { useTelemetrySnapshot } from "../../hooks/useTelemetry";
 import { useAlarms } from "../../queries/alarms";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
-import { useAllAts, useAllGenerators, useAllPanels, useArchiveSystem, useCreateSystem, useSite, useSystems, useUpdateSystem } from "../../queries/systems";
+import { useAllAts, useAllGenerators, useAllPanels, useArchiveSystem, useCreateSystem, useOneLine, useSite, useSystems, useUpdateSystem } from "../../queries/systems";
 
 function SystemCardMenu({ system, canManage, onEdit, onDelete }) {
   const [open, setOpen] = useState(false);
@@ -67,6 +67,7 @@ export function SiteSystems() {
   const [editingSystem, setEditingSystem] = useState(null);
   const [editName, setEditName] = useState("");
   const [deleteConfirmSystem, setDeleteConfirmSystem] = useState(null);
+  const { data: savedOneLine } = useOneLine(sldSystemId || undefined);
 
   const siteSystems = systems || [];
   const siteSystemIds = useMemo(() => new Set(siteSystems.map((system) => system.id)), [siteSystems]);
@@ -90,7 +91,7 @@ export function SiteSystems() {
   }, [generators]);
   const canManage = me?.role === "superadmin";
 
-  usePageHeader(site?.name || "Site", [{ label: customer?.name || "Customer", onClick: () => navigate(`/companies/${companyId}`) }]);
+  usePageHeader(site?.name || "Site");
 
   function submit(event) {
     event.preventDefault();
@@ -160,6 +161,10 @@ export function SiteSystems() {
 
   const sldSystem = sldSystemId ? siteSystems.find((system) => system.id === sldSystemId) : null;
   const sldAssets = sldSystemId ? assetsFor(sldSystemId) : null;
+  const savedOneLineData = savedOneLine?.data || {};
+  const savedPieceDownstream = Object.fromEntries(
+    Object.entries(savedOneLineData.pieceDownstream || {}).map(([name, value]) => [name, Array.isArray(value) ? value : [value]])
+  );
   const testSystem = testSystemId ? siteSystems.find((system) => system.id === testSystemId) : null;
   const testAssets = testSystemId ? assetsFor(testSystemId) : null;
 
@@ -167,7 +172,7 @@ export function SiteSystems() {
     <PageHero title={site?.name || "Site"} subtitle={`${customer?.name || "Customer"}${site?.address ? ` · ${site.address}` : ""}`} icon={IconMap} color={activeAlarms.length ? "#dc2626" : "#0ea5e9"} bgImage="/images/hero-bg.jpg" />
     <StatsGrid stats={[
       { label: "Systems", value: siteSystems.length, color: "var(--cyan)", icon: IconPanel },
-      { label: "Normal", value: normal, color: "var(--green)", icon: IconCheckCircle },
+      { label: "Online", value: normal, color: "var(--green)", icon: IconCheckCircle },
       { label: "ATS", value: atsCount, color: "var(--purple)", icon: IconPanel },
       { label: "Generators", value: generatorCount, color: "var(--amber)", icon: IconPanel },
       { label: "Active alarms", value: activeAlarms.length, color: activeAlarms.length ? "var(--red)" : "var(--green)", icon: IconAlert },
@@ -176,7 +181,7 @@ export function SiteSystems() {
       <div className={`site-status-banner ${allNormal ? "normal" : "emergency"}`}>
         {allNormal ? (
           <>
-            <h2>All Systems Normal</h2>
+            <h2>All Systems Online</h2>
             <p>No active alarms. No emergency operations.</p>
           </>
         ) : (
@@ -242,16 +247,24 @@ export function SiteSystems() {
       </Modal>
     )}
     {sldSystem && sldAssets && (
-      <Modal title="" onClose={() => setSldSystemId(null)} className="modal-sld-only">
+      <Modal title="" onClose={() => setSldSystemId(null)} className="modal-sld-only modal-generated-one-line">
         <button type="button" className="equipment-popup-close" aria-label="Close single line diagram" onClick={() => setSldSystemId(null)}>x</button>
-        <SingleLineDiagram
-          ats={sldAssets.ats}
-          generators={sldAssets.generators}
-          atsTelemetry={telemetry?.ats}
-          generatorTelemetry={telemetry?.generators}
-          onAtsClick={() => {}}
-          onGeneratorClick={() => {}}
-        />
+        {savedOneLine === undefined ? (
+          <div className="operations-empty">Loading generated one-line...</div>
+        ) : (
+          <ResultTab
+            systemName={sldSystem.name}
+            ats={sldAssets.ats}
+            generators={sldAssets.generators}
+            atsTelemetry={telemetry?.ats}
+            generatorTelemetry={telemetry?.generators}
+            pieces={savedOneLineData.pieces || []}
+            sourceLinks={savedOneLineData.sourceLinks || {}}
+            atsDownstream={savedOneLineData.atsDownstream || {}}
+            pieceDownstream={savedPieceDownstream}
+            generated={Boolean(savedOneLineData.generated)}
+          />
+        )}
       </Modal>
     )}
     {testSystem && testAssets && (

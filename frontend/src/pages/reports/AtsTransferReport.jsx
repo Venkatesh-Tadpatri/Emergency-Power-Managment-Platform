@@ -41,7 +41,7 @@ export function AtsTransferReport({ report, system, company }) {
               <AtsField label="Serial Number" value={d.serial_number} link />
               <AtsField label="Switched to Emerg." value={d.switched_to_emergency} />
               <AtsField label="Switched to Normal" value={d.switched_to_normal} />
-              <AtsField label="Time to Buss" value={d.time_to_bus_sec != null ? `${d.time_to_bus_sec} sec` : null} />
+              <AtsField label="Time to Re-Xfer" value={d.time_to_bus_sec != null ? `${d.time_to_bus_sec} sec` : null} />
               <AtsField label="Time to Available" value={d.time_to_available_sec != null ? `${d.time_to_available_sec} sec` : null} />
             </div>
           </div>

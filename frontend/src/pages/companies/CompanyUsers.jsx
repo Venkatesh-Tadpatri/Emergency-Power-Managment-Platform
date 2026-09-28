@@ -23,7 +23,7 @@ export function CompanyUsers() {
     const [accessUser, setAccessUser] = useState(null);
     usePageHeader("Users", [{ label: company?.name || "", onClick: () => navigate(`/companies/${companyId}`) }]);
     const canManage = !!me?.permissions.manage_company_users;
-    return (_jsxs(_Fragment, { children: [canManage && companyId && _jsx(AssignExistingUser, { companyId: companyId }), _jsxs("table", { className: "data-table", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { children: "Name" }), _jsx("th", { children: "Email" }), _jsx("th", { children: "Role" }), _jsx("th", { children: "Scope" }), canManage && _jsx("th", { children: "Actions" })] }) }), _jsx("tbody", { children: (users || []).map((u) => (_jsxs("tr", { children: [_jsx("td", { style: { fontWeight: 600 }, children: u.display_name || u.email }), _jsx("td", { className: "mono", children: u.email }), _jsx("td", { children: u.role || _jsx("span", { style: { color: "var(--text-dim)" }, children: "Unassigned" }) }), _jsx("td", { children: u.scope_type === "assigned" ? "Assigned systems only" : u.scope_type === "company_wide" ? "Company-wide" : "—" }), canManage && (_jsxs("td", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [_jsxs("select", { defaultValue: u.role || "", onChange: (e) => {
+    return (_jsxs(_Fragment, { children: [canManage && companyId && _jsx(AssignExistingUser, { companyId: companyId }), _jsxs("table", { className: "data-table", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { children: "Name" }), _jsx("th", { children: "Email" }), _jsx("th", { children: "Role" }), _jsx("th", { children: "Scope" }), canManage && _jsx("th", { children: "Actions" })] }) }), _jsx("tbody", { children: (users || []).map((u) => (_jsxs("tr", { children: [_jsx("td", { style: { fontWeight: 600 }, children: u.display_name || u.email }), _jsx("td", { className: "mono", children: u.email }), _jsx("td", { children: u.role || _jsx("span", { style: { color: "var(--text-dim)" }, children: "Unassigned" }) }), _jsx("td", { children: u.scope_type === "assigned" ? "Assigned systems only" : u.scope_type === "company_wide" ? "Company-wide" : "—" }), canManage && (u.id === me?.id ? _jsx("td", { style: { color: "var(--text-dim)" }, children: "—" }) : _jsxs("td", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [_jsxs("select", { defaultValue: u.role || "", onChange: (e) => {
                                                 const role = e.target.value;
                                                 if (!role)
                                                     return;
@@ -38,8 +38,68 @@ function AccessPicker({ user, systems, saving, onClose, onSave }) {
     const [systemIds, setSystemIds] = useState(user.assigned_system_ids || []);
     const [siteIds, setSiteIds] = useState(user.assigned_site_ids || []);
     const sites = systems.reduce((groups, system) => { (groups[system.site_id] ||= { name: system.site_name || "Site", systems: [] }).systems.push(system); return groups; }, {});
-    const toggle = (ids, setIds, id) => setIds(ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]);
-    return _jsx(Modal, { title: `Access for ${user.display_name || user.email}`, onClose: onClose, children: _jsxs("div", { className: "system-assignment-picker", children: [_jsx("p", { children: "Select complete sites, or only the individual equipment this operator may access." }), Object.entries(sites).map(([siteId, group]) => _jsxs("fieldset", { children: [_jsx("legend", { children: _jsxs("label", { children: [_jsx("input", { type: "checkbox", checked: siteIds.includes(siteId), onChange: () => toggle(siteIds, setSiteIds, siteId) }), " Entire site: ", group.name] }) }), group.systems.map((system) => _jsxs("label", { children: [_jsx("input", { type: "checkbox", checked: systemIds.includes(system.id), onChange: () => toggle(systemIds, setSystemIds, system.id) }), " ", system.name] }, system.id))] }, siteId)), _jsxs("div", { className: "modal-actions", children: [_jsx("button", { className: "header-btn", onClick: onClose, children: "Cancel" }), _jsx("button", { className: "header-btn primary", disabled: saving, onClick: () => onSave(systemIds, siteIds), children: saving ? "Saving…" : "Save access" })] })] }) });
+    const toggleSite = (siteId) => setSiteIds((ids) => ids.includes(siteId) ? ids.filter((value) => value !== siteId) : [...ids, siteId]);
+    const toggleSystem = (systemId) => setSystemIds((ids) => ids.includes(systemId) ? ids.filter((value) => value !== systemId) : [...ids, systemId]);
+    const selectAll = () => setSiteIds(Object.keys(sites));
+    const clearAll = () => { setSystemIds([]); setSiteIds([]); };
+    const selectedEquipmentCount = new Set([
+        ...systemIds,
+        ...Object.entries(sites).filter(([siteId]) => siteIds.includes(siteId)).flatMap(([, group]) => group.systems.map((system) => system.id)),
+    ]).size;
+    return (
+        <Modal title={`Access for ${user.display_name || user.email}`} className="user-access-modal" onClose={onClose}>
+            <section className="system-assignment-picker" aria-label="Allowed sites and equipment">
+                <div className="assignment-picker-head">
+                    <div>
+                        <label>Allowed sites &amp; equipment</label>
+                        <p>Check a whole site to allow every device on it, or leave it unchecked and pick individual equipment below.</p>
+                    </div>
+                    <span className="assignment-count">{selectedEquipmentCount} equipment allowed</span>
+                </div>
+                <div className="assignment-picker-tools">
+                    <button type="button" className="assignment-action select-all" onClick={selectAll}>Select all sites</button>
+                    <button type="button" className="assignment-action clear" onClick={clearAll}>Clear selection</button>
+                </div>
+                <div className="assignment-site-list">
+                    {Object.entries(sites).map(([siteId, group]) => {
+                        const siteSelected = siteIds.includes(siteId);
+                        return (
+                            <fieldset key={siteId} className={siteSelected ? "assignment-site selected" : "assignment-site"}>
+                                <legend>
+                                    <label>
+                                        <input type="checkbox" checked={siteSelected} onChange={() => toggleSite(siteId)} />
+                                        <span>
+                                            <strong>{group.name}</strong>
+                                            <small>{siteSelected ? "All equipment allowed" : "Select to allow all equipment"}</small>
+                                        </span>
+                                    </label>
+                                </legend>
+                                <div className="assignment-equipment-grid">
+                                    {group.systems.map((system) => (
+                                        <label key={system.id} className={siteSelected ? "assignment-equipment site-inherited" : "assignment-equipment"}>
+                                            <input
+                                                type="checkbox"
+                                                checked={siteSelected || systemIds.includes(system.id)}
+                                                aria-disabled={siteSelected}
+                                                onClick={(event) => { if (siteSelected) event.preventDefault(); }}
+                                                onChange={() => { if (!siteSelected) toggleSystem(system.id); }}
+                                            />
+                                            <span>{system.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </fieldset>
+                        );
+                    })}
+                </div>
+                {!systems.length && <p className="assignment-empty">No systems are available for this customer.</p>}
+            </section>
+            <div className="modal-actions">
+                <button className="header-btn" onClick={onClose}>Cancel</button>
+                <button className="header-btn primary" disabled={saving} onClick={() => onSave(systemIds, siteIds)}>{saving ? "Saving…" : "Save access"}</button>
+            </div>
+        </Modal>
+    );
 }
 function AssignExistingUser({ companyId }) {
     const assignRole = useAssignRole();

@@ -291,7 +291,7 @@ def build_ats_transfer_pdf(report, system_name: str, company_name: str, logo_dat
         # instead of overflowing straight into the next cell — "Switched to Emerg." is wider than its
         # 0.8in column at this font size, which is exactly what was overlapping into "Switched to Normal".
         header_style = ParagraphStyle("atsHeader", fontName="Helvetica-Bold", fontSize=7, leading=9, textColor=colors.HexColor("#334155"), alignment=TA_LEFT)
-        header = [Paragraph(h, header_style) for h in ["ATS", "Branch", "Manufacturer", "Serial Number", "Switched to Emerg.", "Switched to Normal", "Time to Buss", "Time to Available", "On Emergency"]]
+        header = [Paragraph(h, header_style) for h in ["ATS", "Branch", "Manufacturer", "Serial Number", "Switched to Emerg.", "Switched to Normal", "Time to Re-Xfer", "Time to Available", "On Emergency"]]
         col_widths = [w * inch for w in (0.8, 0.75, 0.9, 1.05, 0.8, 0.8, 0.7, 0.75, 0.6)]
         cell_style = ParagraphStyle("atsCell", fontName="Helvetica", fontSize=7, leading=9, textColor=colors.HexColor("#0f172a"))
         bold_cell_style = ParagraphStyle("atsCellBold", fontName="Helvetica-Bold", fontSize=7, leading=9, textColor=colors.HexColor("#0f172a"))

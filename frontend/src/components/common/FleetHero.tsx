@@ -8,7 +8,6 @@ export function FleetHero() {
   return (
     <div className="fleet-hero">
       <div className="fleet-hero-bg" style={{ backgroundImage: "url(/images/hero-bg.jpg)" }} />
-      <div className="fleet-hero-bottom-scan" aria-hidden="true" />
       <div className="fleet-hero-text">
         <h1>
           Real-Time Power Visibility.

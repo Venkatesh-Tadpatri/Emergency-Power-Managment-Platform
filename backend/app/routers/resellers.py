@@ -65,3 +65,27 @@ def archive_reseller(
     if not reseller:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
     return crud.archive_reseller(db, reseller)
+
+
+@router.post("/{reseller_id}/unarchive", response_model=ResellerRead)
+def unarchive_reseller(
+    reseller_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    if not can_manage_resellers(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "only superadmin can manage resellers")
+    reseller = crud.get_reseller(db, reseller_id)
+    if not reseller:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
+    return crud.unarchive_reseller(db, reseller)
+
+
+@router.delete("/{reseller_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+def delete_reseller_permanently(
+    reseller_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    if not can_manage_resellers(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "only superadmin can manage resellers")
+    reseller = crud.get_reseller(db, reseller_id)
+    if not reseller:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
+    crud.delete_reseller(db, reseller)

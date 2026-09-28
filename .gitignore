@@ -9,6 +9,10 @@
 *.pfx
 *.crt
 
+# Deployed snapshot of frontend/ served to the customer-testing tunnel — deliberately not
+# the same tree as frontend/, and not tracked (it's a local copy, promoted manually).
+frontend-release/
+
 # JavaScript / Expo
 node_modules/
 **/node_modules/

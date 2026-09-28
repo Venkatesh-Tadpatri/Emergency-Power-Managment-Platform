@@ -79,7 +79,7 @@ export function InfoCard({
   icon: Icon,
 }: {
   title: string;
-  status: string;
+  status?: string;
   subtitle?: string | null;
   stats: InfoCardStat[];
   statusLabel?: string;
@@ -109,7 +109,7 @@ export function InfoCard({
           )}
           <div className="info-card-title">{title}</div>
         </div>
-        <StatusPill status={status} label={statusLabel} />
+        {status && <StatusPill status={status} label={statusLabel} />}
       </div>
       {subtitle && <div className="reseller-label">{subtitle}</div>}
       <div className="info-card-body">

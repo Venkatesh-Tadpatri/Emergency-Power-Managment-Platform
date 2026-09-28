@@ -1,0 +1,37 @@
+# Standalone compose project for a second, Cloudflare-tunneled frontend used for
+# customer/UAT testing — run this ALONGSIDE (not instead of) the main `docker compose up`.
+# It only defines its own frontend service; mysql/zitadel/backend/grafana keep running
+# from the main docker-compose.yml project and are reached through their own separate
+# `cloudflared` tunnels (see docs/cloudflare-customer-testing.md), not through this file.
+#
+# Serves from ./frontend-release, NOT ./frontend — deliberately separate from the folder
+# you edit for local dev (localhost:5173), so day-to-day changes never reach the customer
+# until you explicitly promote them. To release an update: sync your changes into
+# frontend-release (see docs/cloudflare-customer-testing.md's "Releasing to the customer
+# frontend" section), then `docker compose -f docker-compose.cloudflare.yml up -d --force-recreate frontend-cloudflare`.
+#
+# Start:  docker compose -f docker-compose.cloudflare.yml up -d --build
+# Stop:   docker compose -f docker-compose.cloudflare.yml down
+name: cpc-customer-testing
+
+services:
+  frontend-cloudflare:
+    build: ./frontend-release
+    restart: unless-stopped
+    env_file: .env.cloudflare
+    # Explicit --port 5174 (CLI flags override vite.config.ts's server.port default of
+    # 5173) so this instance never collides with the main frontend service on 5173.
+    command: npm run dev -- --host 0.0.0.0 --port 5174
+    ports:
+      - "5174:5174"
+    volumes:
+      - ./frontend-release:/app
+      # Named volume, not the host's node_modules: native deps (e.g. Rollup's per-platform
+      # binary) built by `npm ci` on Windows don't run inside this Linux container. Layering
+      # this after the bind mount above makes Docker seed it from the image's own
+      # Linux-built node_modules (from the Dockerfile's RUN npm install) instead of
+      # exposing the host's copy.
+      - frontend_release_node_modules:/app/node_modules
+
+volumes:
+  frontend_release_node_modules:

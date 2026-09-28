@@ -20,6 +20,7 @@ import { CompanyOnCall } from "./pages/companies/CompanyOnCall";
 import { CompanyReports } from "./pages/companies/CompanyReports";
 import { CompanyUsers } from "./pages/companies/CompanyUsers";
 import { ReportDetail } from "./pages/reports/ReportDetail";
+import { ArchivedResellers } from "./pages/resellers/ArchivedResellers";
 import { ResellerAlarms } from "./pages/resellers/ResellerAlarms";
 import { ResellerCompanies } from "./pages/resellers/ResellerCompanies";
 import { ResellerDashboard } from "./pages/resellers/ResellerDashboard";
@@ -67,6 +68,7 @@ function Gate() {
         <Route path="profile" element={<Profile />} />
 
         <Route path="resellers" element={<ResellersList />} />
+        <Route path="resellers/archived" element={<ArchivedResellers />} />
         <Route path="resellers/:resellerId" element={<ResellerDashboard />} />
         <Route path="resellers/:resellerId/companies" element={<ResellerCompanies />} />
         <Route path="resellers/:resellerId/users" element={<ResellerUsers />} />

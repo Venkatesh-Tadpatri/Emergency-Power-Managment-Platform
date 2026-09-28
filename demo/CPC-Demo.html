@@ -1278,7 +1278,7 @@ function systemDetailsHtml(sys){
   html+='</tbody></table></div></div>';
 
   html+='<div class="op-section"><div class="op-head"><div><span>Power distribution</span><h3>Automatic Transfer Switches</h3></div></div>';
-  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sl.</th><th>ATS name</th><th>Status</th><th>Test</th><th>Connected to</th><th>Source available</th><th>Time to xfer</th><th>Time on emergency</th></tr></thead><tbody>';
+  html+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sl.</th><th>ATS name</th><th>Status</th><th>Test</th><th>Connected to</th><th>Source available</th><th>Time to re-xfer</th><th>Time on emergency</th></tr></thead><tbody>';
   sys.ats.forEach(function(a,i){
     var em = a.connected==='GENERATOR';
     html+='<tr><td>'+pad2(i+1)+'</td><td><b>'+a.name+'</b><br><small style="color:var(--text-dim)">'+a.load+'</small></td>' +

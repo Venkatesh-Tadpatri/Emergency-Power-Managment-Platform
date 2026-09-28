@@ -72,14 +72,19 @@ def verify_token(token: str) -> dict:
         raise TokenValidationError("unknown signing key (kid)")
 
     try:
+        # jose's built-in `issuer=` check only accepts one exact string, but this backend
+        # may legitimately see tokens issued via any of several trusted hostnames (local
+        # dev, LAN IP, a Cloudflare customer-testing tunnel — see zitadel_issuer_list).
+        # Skip its check and verify against the whole allow-list manually instead.
         claims = jwt.decode(
             token,
             key,
             algorithms=[key.get("alg", "RS256")],
             audience=settings.zitadel_client_id or None,
-            issuer=settings.zitadel_issuer,
-            options={"verify_aud": bool(settings.zitadel_client_id)},
+            options={"verify_aud": bool(settings.zitadel_client_id), "verify_iss": False},
         )
     except JOSEError as exc:
         raise TokenValidationError(f"token verification failed: {exc}") from exc
+    if claims.get("iss") not in settings.zitadel_issuer_list:
+        raise TokenValidationError(f"untrusted issuer: {claims.get('iss')!r}")
     return claims

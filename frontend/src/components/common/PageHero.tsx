@@ -6,6 +6,8 @@ export function PageHero({
   icon: Icon,
   color = "#2563eb",
   bgImage,
+  showText = true,
+  showIcon = true,
 }: {
   title: string;
   subtitle?: string | null;
@@ -13,6 +15,8 @@ export function PageHero({
   color?: string;
   /** Optional background photo (e.g. "/images/hero-bg.jpg") shown under a colored gradient for legibility. */
   bgImage?: string;
+  showText?: boolean;
+  showIcon?: boolean;
 }) {
   return (
     <div
@@ -45,7 +49,7 @@ export function PageHero({
           }}
         />
       )}
-      <div
+      {showIcon && <div
         style={{
           width: 44,
           height: 44,
@@ -59,11 +63,11 @@ export function PageHero({
         }}
       >
         <Icon size={22} />
-      </div>
-      <div style={{ zIndex: 1 }}>
+      </div>}
+      {showText && <div style={{ zIndex: 1 }}>
         <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em" }}>{title}</div>
         {subtitle && <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{subtitle}</div>}
-      </div>
+      </div>}
       <div style={{ position: "absolute", right: 22, bottom: 14, opacity: 0.16, zIndex: 1 }}>
         <Icon size={86} />
       </div>

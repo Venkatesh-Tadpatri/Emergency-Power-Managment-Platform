@@ -1,6 +1,6 @@
 """Adds a handful of demo Generator Run / ATS Transfer reports for Aster Prime (CMP-0008), across its
 SYS-0047 and SYS-0053 systems, using their real generators/ATS units — so the Reports page (calendar,
-Initiating ATS Report, Time to Buss Report) has something to show/generate/download for that customer
+Initiating ATS Report, Time to Re-Xfer Report) has something to show/generate/download for that customer
 instead of all zeros. Safe to re-run — skips if report_code already exists. Run with:
   python -m app.seed.add_demo_reports_aster
 """

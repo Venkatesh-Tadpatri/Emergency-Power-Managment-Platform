@@ -9,20 +9,139 @@ import { telemetryFor, useTelemetrySnapshot, type AtsTelemetry, type GeneratorTe
 import { demoAtsTelemetry, demoGeneratorTelemetry } from "../../data/mepstraTelemetry";
 import { useAlarms } from "../../queries/alarms";
 import { useOneLine, useSaveOneLine } from "../../queries/systems";
+import boilerIcon from "../../assets/equipment/boiler.png";
+import chillerIcon from "../../assets/equipment/chiller.png";
+import coolingTowerIcon from "../../assets/equipment/cooling-tower.png";
+import elevatorIcon from "../../assets/equipment/elevator.png";
+import fanIcon from "../../assets/equipment/fan.png";
+import pumpIcon from "../../assets/equipment/pump.png";
+import generalIcon from "../../assets/equipment/general.png";
+import airCompressorIcon from "../../assets/equipment/air-compressor.png";
 
 type EquipmentSelection = { type: "ats"; id: string } | { type: "generator"; id: string };
-type TestTarget = EquipmentSelection;
+const atsNumber = (value: string | undefined) => value?.match(/ats[-\s]*(\d+)/i)?.[1]?.replace(/^0+/, "");
 
 /** Live telemetry first; falls back to the Mepstra demo register snapshot for the specific devices it covers. */
 export function resolveGeneratorTelemetry(generatorTelemetry: GeneratorTelemetry[] | undefined, id: string, name: string) {
   return telemetryFor(generatorTelemetry, id, name) || demoGeneratorTelemetry(id) || undefined;
 }
 export function resolveAtsTelemetry(atsTelemetry: AtsTelemetry[] | undefined, id: string, name: string) {
-  return telemetryFor(atsTelemetry, id, name) || demoAtsTelemetry(id) || undefined;
+  const exact = telemetryFor(atsTelemetry, id, name);
+  if (exact) return exact;
+
+  const targetNumber = atsNumber(id) || atsNumber(name);
+  const numbered = targetNumber
+    ? atsTelemetry?.find((item) => atsNumber(item.equipment_id) === targetNumber || atsNumber(item.equipment_name) === targetNumber)
+    : undefined;
+  return numbered || demoAtsTelemetry(id) || undefined;
 }
 
 const unavailableReading = "00";
 const reading = (value: number | undefined, digits = 0) => value === undefined ? unavailableReading : value.toFixed(digits);
+
+type DetailTab = "details" | "notes" | "documents";
+type StoredDocument = { name: string; size: number; type: string; addedAt: string; dataUrl: string };
+
+function readStored<T>(key: string, fallback: T): T {
+  try { return JSON.parse(localStorage.getItem(key) || "") as T; } catch { return fallback; }
+}
+
+function EquipmentRecordTabs({ recordKey, active, onChange, generatedDocument }: { recordKey: string; active: DetailTab; onChange: (tab: DetailTab) => void; generatedDocument?: React.ReactNode }) {
+  const notesKey = `cpc:equipment-notes:${recordKey}`;
+  const documentsKey = `cpc:equipment-documents:${recordKey}`;
+  const [notes, setNotes] = useState<string[]>(() => readStored(notesKey, []));
+  const [documents, setDocuments] = useState<StoredDocument[]>(() => readStored(documentsKey, []));
+  const [draft, setDraft] = useState("");
+  const saveNotes = (next: string[]) => { setNotes(next); localStorage.setItem(notesKey, JSON.stringify(next)); };
+  const saveDocuments = (next: StoredDocument[]) => {
+    setDocuments(next);
+    try { localStorage.setItem(documentsKey, JSON.stringify(next)); } catch { /* Browser storage full: keep the current-session copy. */ }
+  };
+  const addFiles = async (files: FileList | null) => {
+    const selected = Array.from(files || []);
+    const added = await Promise.all(selected.map((file) => new Promise<StoredDocument>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ name: file.name, size: file.size, type: file.type, addedAt: new Date().toISOString(), dataUrl: String(reader.result) });
+      reader.readAsDataURL(file);
+    })));
+    if (added.length) saveDocuments([...documents, ...added]);
+  };
+  return <>
+    <div className="equipment-record-tabs" role="tablist">
+      {(["details", "notes", "documents"] as DetailTab[]).map((tab) => <button type="button" role="tab" aria-selected={active === tab} className={active === tab ? "active" : ""} onClick={() => onChange(tab)} key={tab}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}
+    </div>
+    {active === "notes" && <div className="equipment-record-pane">
+      <div className="equipment-note-compose"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add a note about this equipment..." /><button type="button" disabled={!draft.trim()} onClick={() => { saveNotes([...notes, draft.trim()]); setDraft(""); }}>Add Note</button></div>
+      {notes.length ? <div className="equipment-note-list">{notes.map((note, index) => <div className="equipment-note" key={`${note}-${index}`}><span>{note}</span><button type="button" aria-label="Remove note" onClick={() => saveNotes(notes.filter((_, i) => i !== index))}>×</button></div>)}</div> : <p className="equipment-record-empty">No notes yet for this equipment.</p>}
+    </div>}
+    {active === "documents" && <div className="equipment-record-pane">
+      <label className="equipment-document-drop">⇧<strong>Choose files to upload</strong><small>Manuals, drawings, photos, and reports</small><input type="file" multiple onChange={(event) => addFiles(event.target.files)} /></label>
+      {generatedDocument}
+      {documents.length ? <div className="equipment-document-list">{documents.map((document, index) => <div className="equipment-document" key={`${document.name}-${index}`}><div><b>{document.name}</b><small>{Math.max(1, Math.round(document.size / 1024))} KB · added {new Date(document.addedAt).toLocaleDateString()}</small></div><span><a href={document.dataUrl} download={document.name}>↓</a><button type="button" aria-label="Remove document" onClick={() => saveDocuments(documents.filter((_, i) => i !== index))}>×</button></span></div>)}</div> : <p className="equipment-record-empty">No documents uploaded for this equipment.</p>}
+    </div>}
+  </>;
+}
+
+const cleanPanelText = (value: unknown) => String(value ?? "").replace(/â€”|â€“|ï¿½|�/g, "—").replace(/\s+—\s+/g, " — ");
+
+function downloadPanelSchedulePdf(piece: WizardPiece, fedFrom: string, emergency = false) {
+  const circuits = (piece.meta?.circuits as WizardCircuit[] | undefined) || [];
+  const voltage = String(piece.meta?.voltage || "-");
+  const amps = String(piece.meta?.mainAmps || "-").replace(/\s*A?\s*Main$/i, "");
+  const used = circuits.filter((circuit) => circuit.load && circuit.load.toLowerCase() !== "spare").length;
+  const safe = (value: unknown) => cleanPanelText(value).replace(/[^\x20-\x7E]/g, "-").replace(/([\\()])/g, "\\$1");
+  const rows = Array.from({ length: Math.ceil(circuits.length / 2) }, (_, index) => [circuits[index * 2], circuits[index * 2 + 1]]);
+  const escapeHtml = (value: unknown) => cleanPanelText(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const htmlRows = rows.map(([left, right]) => `<tr><td>${escapeHtml(left?.ckt || "")}</td><td class="${left?.load?.toLowerCase() === "spare" ? "spare" : ""}">${escapeHtml(left?.load || "")}</td><td>${escapeHtml(right?.ckt || "")}</td><td class="${right?.load?.toLowerCase() === "spare" ? "spare" : ""}">${escapeHtml(right?.load || "")}</td></tr>`).join("");
+  const htmlDocument = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(piece.name)} — Panel Schedule</title><style>
+    *{box-sizing:border-box}body{margin:0;padding:28px;background:#eaf1f7;color:#0b1d31;font-family:Arial,sans-serif}.actions{max-width:1120px;margin:0 auto 14px}.actions button{padding:11px 16px;border:0;border-radius:7px;background:#0b1d31;color:#fff;font-weight:800;cursor:pointer}.sheet{max-width:1120px;margin:auto;overflow:hidden;border-radius:12px;background:#fff;box-shadow:0 12px 35px rgba(14,42,70,.16)}.brand{display:flex;align-items:center;gap:14px;padding:20px 24px;background:linear-gradient(120deg,#071a2d,#0d3557);color:#fff}.logo{display:grid;place-items:center;width:54px;height:43px;border-radius:9px;background:linear-gradient(135deg,#2196f3,#15c777);font-weight:900}.brand-main{display:flex;flex:1;flex-direction:column;gap:3px}.brand-main strong{font-size:18px}.brand-main span{color:#9fc2df;font-size:10px;letter-spacing:.08em;text-transform:uppercase}.brand small{color:#b8d0e5;line-height:1.5;text-align:right;text-transform:uppercase}.title{display:flex;align-items:center;justify-content:space-between;padding:22px 24px 17px;border-bottom:1px solid #d7e3ef;background:linear-gradient(90deg,#f3f9ff,#fff)}.title span{color:#1680ca;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}h1{margin:5px 0 0;font-size:27px}.status{padding:8px 15px;border-radius:999px;background:${emergency ? "#e7373f" : "#16a760"};color:#fff;font-size:10px;letter-spacing:.06em;text-transform:uppercase}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;padding:15px 24px;background:#eef6fd}.meta div{display:flex;flex-direction:column;gap:5px;padding:11px 13px;border:1px solid #d3e3f1;border-radius:8px;background:#fff;color:#607b93;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.meta b{color:#0b1d31;font-size:14px;text-transform:none}table{width:100%;border-collapse:collapse;font-size:13px}th{padding:11px;border:1px solid #237bb5;background:#1680ca;color:#fff;font-size:10px;letter-spacing:.04em;text-align:left;text-transform:uppercase}td{padding:9px 11px;border:1px solid #d5e0ea}tbody tr:nth-child(even){background:#f4f8fc}th:nth-child(1),th:nth-child(3),td:nth-child(1),td:nth-child(3){width:54px;text-align:center}.spare{color:#77889a;font-style:italic}footer{display:flex;justify-content:space-between;padding:13px 24px;background:#0b1d31;color:#9eb8d5;font-size:10px}footer b{color:#fff}@media print{body{padding:0;background:#fff}.actions{display:none}.sheet{max-width:none;border-radius:0;box-shadow:none}@page{size:landscape;margin:10mm}}@media(max-width:700px){.meta{grid-template-columns:repeat(2,1fr)}.brand>small{display:none}h1{font-size:20px}}
+  </style></head><body><div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div><main class="sheet"><header class="brand"><div class="logo">CPC</div><div class="brand-main"><strong>Critical Power Command</strong><span>Emergency Power Management Platform</span></div><small>Equipment Document<br>Generated ${escapeHtml(new Date().toLocaleDateString())}</small></header><section class="title"><div><span>Electrical Distribution</span><h1>${escapeHtml(piece.name)} — Panel Schedule</h1></div><b class="status">${emergency ? "Emergency" : "Normal"}</b></section><section class="meta"><div>Rated Voltage<b>${escapeHtml(voltage)}</b></div><div>Rated Amperage<b>${escapeHtml(amps)}A</b></div><div>Fed From<b>${escapeHtml(fedFrom)}</b></div><div>Circuits Used<b>${used} of ${circuits.length}</b></div></section><table><thead><tr><th>CKT</th><th>Load Description</th><th>CKT</th><th>Load Description</th></tr></thead><tbody>${htmlRows}</tbody></table><footer><span>Auto-generated from the current CPC One-Line equipment record.</span><b>Critical Power Command · Controlled Document</b></footer></main></body></html>`;
+  const htmlUrl = URL.createObjectURL(new Blob([htmlDocument], { type: "text/html;charset=utf-8" }));
+  const htmlLink = document.createElement("a"); htmlLink.href = htmlUrl; htmlLink.download = `${piece.name}-panel-schedule.html`; htmlLink.click();
+  setTimeout(() => URL.revokeObjectURL(htmlUrl), 1000);
+  return;
+  const commands = [
+    "0.8 w", "0.035 0.11 0.2 rg 30 520 782 45 re f", "1 1 1 rg BT /F1 11 Tf 44 548 Td (CPC  |  CRITICAL POWER COMMAND) Tj ET", "0.55 0.75 0.95 rg BT /F1 7 Tf 44 532 Td (EMERGENCY POWER MANAGEMENT PLATFORM) Tj ET",
+    "0.05 0.23 0.4 rg 30 467 782 53 re f", "1 1 1 rg BT /F1 20 Tf 44 493 Td", `(${safe(piece.name)} - PANEL SCHEDULE) Tj`, "ET", "0.75 0.88 1 rg BT /F1 8 Tf 44 477 Td", `(Auto-generated equipment record  |  ${safe(new Date().toLocaleDateString())}) Tj ET`,
+    emergency ? "0.9 0.15 0.17 rg 680 481 112 22 re f" : "0.08 0.65 0.32 rg 680 481 112 22 re f", "1 1 1 rg BT /F1 8 Tf 702 489 Td", `(${emergency ? "EMERGENCY" : "NORMAL"}) Tj ET`,
+    "0.92 0.96 1 rg 30 420 782 39 re f", "0.05 0.12 0.2 rg BT /F1 8 Tf 44 442 Td", `(VOLTAGE  ${safe(voltage)}     AMPERAGE  ${safe(amps)}A     FED FROM  ${safe(fedFrom)}     CIRCUITS USED  ${used} OF ${circuits.length}) Tj ET`,
+    "0.08 0.45 0.72 rg 30 393 782 27 re f", "1 1 1 rg BT /F1 9 Tf 44 403 Td (CKT) Tj 43 0 Td (LOAD DESCRIPTION) Tj 347 0 Td (CKT) Tj 43 0 Td (LOAD DESCRIPTION) Tj ET",
+  ];
+  rows.forEach(([left, right], index) => {
+    const y = 365 - index * 28;
+    commands.push(index % 2 ? "0.95 0.97 0.99 rg" : "1 1 1 rg", `30 ${y} 782 28 re f`, "0.72 0.78 0.84 RG", `30 ${y} 782 28 re S`, `75 ${y} m 75 ${y + 28} l S`, `421 ${y} m 421 ${y + 28} l S`, `466 ${y} m 466 ${y + 28} l S`, "0.05 0.1 0.16 rg", `BT /F1 9 Tf 49 ${y + 10} Td (${safe(left?.ckt || "")}) Tj 38 0 Td (${safe(left?.load || "")}) Tj 347 0 Td (${safe(right?.ckt || "")}) Tj 38 0 Td (${safe(right?.load || "")}) Tj ET`);
+  });
+  commands.push("0.25 0.35 0.45 rg BT /F1 7 Tf 30 25 Td (Generated by Critical Power Command - Controlled equipment document) Tj ET");
+  const stream = commands.join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+  ];
+  let pdf = "%PDF-1.4\n"; const offsets = [0];
+  objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `).join("\n")}\ntrailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
+  const link = document.createElement("a"); link.href = url; link.download = `${piece.name}-panel-schedule.pdf`; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const generatorHasAlarm = (data?: Partial<GeneratorTelemetry>) => Boolean(
+  data?.fault_active ||
+  data?.low_fuel_alarm ||
+  data?.low_oil_pressure_alarm ||
+  data?.high_temperature_alarm ||
+  data?.low_battery_alarm ||
+  data?.overload_alarm ||
+  data?.status === "FAULT"
+);
+
+const generatorStatusClass = (data?: Partial<GeneratorTelemetry>) => {
+  if (data?.running || data?.status === "RUNNING") return "generator-running-state";
+  if (generatorHasAlarm(data) || data?.auto_mode === false) return "generator-warning-state";
+  return "ready";
+};
 
 const formatDuration = (seconds?: number) => {
   if (seconds === undefined || seconds === null) return "—";
@@ -32,38 +151,49 @@ const formatDuration = (seconds?: number) => {
 };
 
 type Alarm = { id: string; message: string; severity: string; occurred_at: string; ack_by?: string | null };
+type ActivityItem = { id: string; message: string; severity: string; occurred_at?: string | null; ack_by?: string | null };
 
-function eventTone(alarm: Alarm) {
+function eventTone(alarm: ActivityItem) {
   if (alarm.ack_by) return "resolved";
   if (alarm.severity === "critical" || alarm.severity === "alarm" || alarm.severity === "emergency") return "critical";
   if (alarm.severity === "warning") return "warning";
   return "info";
 }
 
-function EventsPanel({ alarms }: { alarms: Alarm[] }) {
+function EventsPanel({ alarms, events }: { alarms: Alarm[]; events: ActivityItem[] }) {
   const navigate = useNavigate();
-  const sorted = [...alarms].sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
-  const visible = sorted.slice(0, 4);
+  const [mode, setMode] = useState<"events" | "alarms">("events");
+  const items = mode === "events" ? events : alarms;
+  const sorted = [...items].sort((a, b) => new Date(b.occurred_at || 0).getTime() - new Date(a.occurred_at || 0).getTime());
+  const visible = sorted.slice(0, 25);
   const remaining = sorted.length - visible.length;
+  const emptyText = mode === "events" ? "No active events for this system." : "No active alarms for this system.";
   return <div className="operations-events-panel">
-    <div className="operations-events-title">Active Events</div>
+    <div className="operations-events-head">
+      <div className="operations-events-title">{mode === "events" ? "Active Events" : "Active Alarms"}</div>
+      <div className="operations-events-toggle" role="tablist" aria-label="Activity type">
+        <button type="button" className={mode === "events" ? "active" : ""} onClick={() => setMode("events")}>Events</button>
+        <button type="button" className={mode === "alarms" ? "active" : ""} onClick={() => setMode("alarms")}>Alarms</button>
+      </div>
+    </div>
     <ul className="operations-events-list">
-      {visible.map((alarm) => {
-        const tone = eventTone(alarm);
+      {visible.map((item) => {
+        const tone = eventTone(item);
         const Icon = tone === "resolved" ? IconCheckCircle : tone === "info" ? IconBell : IconAlert;
-        return <li className={`event-${tone}`} key={alarm.id}>
-          <time>{new Date(alarm.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+        return <li className={`event-${tone}`} key={item.id}>
+          <time>{item.occurred_at ? new Date(item.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--"}</time>
           <Icon size={12} strokeWidth={2.5} />
-          <span>{alarm.message}</span>
+          <span>{item.message}</span>
         </li>;
       })}
-      {!visible.length && <li className="operations-events-empty">No active events for this system.</li>}
+      {!visible.length && <li className="operations-events-empty">{emptyText}</li>}
     </ul>
     {remaining > 0 && <button type="button" className="operations-events-more" onClick={() => navigate("/alarms")}>+{remaining} Additional Events…</button>}
   </div>;
 }
 
 function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generatorTelemetry, onClose, extraSection, alwaysShowSourceAvailability, fedFromLabel }: { systemName: string; ats?: ATS; generator?: Generator; atsTelemetry?: Partial<AtsTelemetry>; generatorTelemetry?: Partial<GeneratorTelemetry>; onClose: () => void; extraSection?: React.ReactNode; alwaysShowSourceAvailability?: boolean; fedFromLabel?: string }) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("details");
   const isAts = Boolean(ats);
   const telemetry = isAts ? atsTelemetry : generatorTelemetry;
   const name = ats?.name || generator?.name || "Equipment";
@@ -112,7 +242,9 @@ function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generato
 
       <div className={`faceplate-v2-banner ${bannerTone}`}>{bannerText}</div>
 
-      {isAts ? (
+      <EquipmentRecordTabs recordKey={`${systemName}:${isAts ? "ats" : "generator"}:${ats?.id || generator?.id || name}`} active={activeTab} onChange={setActiveTab} />
+
+      {activeTab === "details" && <>{isAts ? (
         <>
           <div className="faceplate-v2-section-title">Source Status</div>
           <div className="faceplate-v2-source-grid">
@@ -217,7 +349,7 @@ function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generato
         <div className="faceplate-v2-load-box">{branchText}</div>
       </>}
 
-      {extraSection}
+      {extraSection}</>}
     </div>
   </Modal>;
 }
@@ -313,6 +445,28 @@ const WIZARD_EQUIPMENT_TYPES: { key: string; label: string; sub?: string; badge?
   { key: "equipment", label: "Equipment", badge: "Load", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="6" width="15" height="8" rx="3" stroke="currentColor" strokeWidth="1.4" /><circle cx="7" cy="10" r="1.1" fill="currentColor" /><circle cx="10" cy="10" r="1.1" fill="currentColor" /><circle cx="13" cy="10" r="1.1" fill="currentColor" /></svg> },
   { key: "area", label: "Area Served", badge: "Load", icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2 L17 6 V14 L10 18 L3 14 V6 Z" stroke="currentColor" strokeWidth="1.4" /></svg> },
 ];
+
+const LOAD_EQUIPMENT_TYPES: { key: string; label: string; icon: JSX.Element }[] = [
+  { key: "boiler", label: "Boiler", icon: <svg viewBox="0 0 64 64" fill="none"><path d="M13 27h38v22H13a11 11 0 0 1 0-22Z" stroke="currentColor" /><path d="M18 27v22M48 27v22M20 49v5m25-5v5M17 54h31M24 27v-8m16 8V13h7v7h-4v7" stroke="currentColor" /><circle cx="24" cy="14" r="7" stroke="currentColor" /><path d="m24 14 4-3M24 7v3m-7 4h3M31 14h-3" stroke="currentColor" /><circle cx="34" cy="38" r="8" stroke="currentColor" /><path d="M34 43c-5-3-3-7 0-11 0 3 5 5 2 9" stroke="currentColor" strokeLinejoin="round" /></svg> },
+  { key: "chiller", label: "Chiller", icon: <svg viewBox="0 0 64 64" fill="none"><rect x="10" y="20" width="44" height="32" rx="3" stroke="currentColor" /><path d="M15 20v32m34-32v32M18 16h28l4-6h10v7h-8l-3 4M7 27h3v18H7a3 3 0 0 1-3-3V30a3 3 0 0 1 3-3Zm47 0h3a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-3M20 30h11m-11 6h8m-8 6h6" stroke="currentColor" /><path d="M39 29v16m-7-12 14 8m0-8-14 8m7-12-3 4m3-4 3 4m4 0-4 1m4-1-1 4m0 4-3-1m3 1-1 4m-5 0 3-4m-3 4-3-4m-4 0 4-1m-4 1 1-4m0-4 3 1m-3-1 1-4" stroke="currentColor" strokeLinecap="round" /></svg> },
+  { key: "cooling-tower", label: "Cooling Tower", icon: <svg viewBox="0 0 64 64" fill="none"><path d="M14 21h36l4 29H10l4-29Zm-1 6h38M11 47h42M15 50v6m10-6v6m14-6v6m10-6v6M14 35h36M14 35l12 12m-12 0 12-12m12 0 12 12m-12 0 12-12" stroke="currentColor" strokeLinejoin="round" /><circle cx="32" cy="31" r="6" stroke="currentColor" /><path d="M32 31c-1-5 5-5 4-1-.5 2-2 2-4 1Zm0 0c5-1 5 5 1 4-2-.5-2-2-1-4Zm0 0c1 5-5 5-4 1 .5-2 2-2 4-1Z" stroke="currentColor" /><path d="M19 17c-3-4 3-5 0-9m13 9c-3-4 3-5 0-9m13 9c-3-4 3-5 0-9" stroke="currentColor" strokeLinecap="round" /></svg> },
+  { key: "elevator", label: "Elevator", icon: <svg viewBox="0 0 64 64" fill="none"><path d="M13 10h38v7h-3v38H16V17h-3v-7Zm10 45V22h18v33M32 22v33" stroke="currentColor" strokeLinejoin="round" /><rect x="25" y="11" width="14" height="9" rx="1" stroke="currentColor" /><path d="m29 16 3-4 3 4M50 26h9v19h-9zM54.5 30v5m-2-3 2-2 2 2m-2 9v-5m-2 3 2 2 2-2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" /></svg> },
+  { key: "fan", label: "Fan", icon: <svg viewBox="0 0 64 64" fill="none"><rect x="10" y="9" width="44" height="44" rx="2" stroke="currentColor" /><circle cx="32" cy="31" r="17" stroke="currentColor" /><circle cx="32" cy="31" r="3" stroke="currentColor" /><path d="M32 28c-5-12 8-13 9-5 .5 5-4 7-9 8m3 0c12-5 13 8 5 9-5 .5-7-4-8-9m0 3c5 12-8 13-9 5-.5-5 4-7 9-8m-3 0c-12 5-13-8-5-9 5-.5 7 4 8 9M14 56h36" stroke="currentColor" strokeLinejoin="round" /><circle cx="15" cy="14" r="1" fill="currentColor" /><circle cx="49" cy="14" r="1" fill="currentColor" /><circle cx="15" cy="48" r="1" fill="currentColor" /><circle cx="49" cy="48" r="1" fill="currentColor" /></svg> },
+  { key: "pump", label: "Pump", icon: <svg viewBox="0 0 64 64" fill="none"><path d="M8 50h49v6H8zM9 31h5v16H9zM15 35h5m22 0h4m12-2h3v13h-3" stroke="currentColor" /><circle cx="30" cy="38" r="12" stroke="currentColor" /><circle cx="30" cy="38" r="4" stroke="currentColor" /><path d="M30 26v-8h-5v-5h10v5h-5M42 30h7V24h9v28M46 29h12M46 47h12M49 34h9M49 39h9M49 44h9" stroke="currentColor" strokeLinejoin="round" /></svg> },
+  { key: "air-compressor", label: "Air Compressor", icon: <svg viewBox="0 0 28 28" fill="none"><rect x="3" y="12" width="22" height="10" rx="4" stroke="currentColor" strokeWidth="1.8" /><circle cx="9" cy="9" r="4" stroke="currentColor" strokeWidth="1.8" /><path d="M13 9h5v3M7 22v3m14-3v3" stroke="currentColor" strokeWidth="1.8" /></svg> },
+  { key: "general", label: "General", icon: <svg viewBox="0 0 28 28" fill="none"><rect x="4" y="8" width="20" height="13" rx="4" stroke="currentColor" strokeWidth="1.8" /><circle cx="10" cy="14.5" r="1.3" fill="currentColor" /><circle cx="14" cy="14.5" r="1.3" fill="currentColor" /><circle cx="18" cy="14.5" r="1.3" fill="currentColor" /></svg> },
+];
+
+const LOAD_EQUIPMENT_IMAGE_ICONS: Record<string, string> = {
+  boiler: boilerIcon,
+  chiller: chillerIcon,
+  "cooling-tower": coolingTowerIcon,
+  elevator: elevatorIcon,
+  fan: fanIcon,
+  pump: pumpIcon,
+  general: generalIcon,
+  "air-compressor": airCompressorIcon,
+};
 
 type WizardField =
   | { kind: "text"; key: string; label: string; placeholder?: string }
@@ -416,6 +570,8 @@ function summarizeWizardPieceMeta(piece: WizardPiece): string {
     if (meta.mainAmps) parts.push(`${meta.mainAmps}A Main`);
     const circuits = meta.circuits as WizardCircuit[] | undefined;
     if (circuits?.length) parts.push(`${circuits.length} circuit${circuits.length === 1 ? "" : "s"}`);
+  } else if (piece.type === "equipment" && meta.equipmentType) {
+    parts.push(String(meta.equipmentType));
   }
   return parts.join(" · ") || "—";
 }
@@ -440,6 +596,7 @@ function OneLineWizardTab({
   const [step, setStep] = useState<"start" | "equipment" | "connections">("start");
   const [activeType, setActiveType] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [selectedLoadType, setSelectedLoadType] = useState<string | null>(null);
   const [formCircuits, setFormCircuits] = useState<string[]>([]);
   const [circuitDraft, setCircuitDraft] = useState("");
   const [pendingContainer, setPendingContainer] = useState<{ name: string; meta: Record<string, string> } | null>(null);
@@ -558,6 +715,7 @@ function OneLineWizardTab({
     setFormValues({});
     setFormCircuits([]);
     setCircuitDraft("");
+    setSelectedLoadType(null);
     setActiveType(key);
   };
 
@@ -573,6 +731,7 @@ function OneLineWizardTab({
     setFormCircuits(piece.type === "panel" ? ((piece.meta?.circuits as WizardCircuit[] | undefined) || []).map((circuit) => circuit.load) : []);
     setCircuitDraft("");
     setPendingContainer(null);
+    setSelectedLoadType(piece.type === "equipment" ? String(piece.meta?.equipmentTypeKey || "general") : null);
     setActiveType(piece.type);
     setStep("equipment");
   };
@@ -592,6 +751,24 @@ function OneLineWizardTab({
   // by name), showing up twice with no way to individually pick either. Nothing previously stopped the
   // form from creating one.
   const nameTaken = (name: string) => pieces.some((piece) => piece.name === name && piece.name !== editingPiece?.name);
+
+  const chooseLoadEquipmentType = (equipmentType: { key: string; label: string }) => {
+    setSelectedLoadType(equipmentType.key);
+    if (!editingPiece) setFormValues({ name: "" });
+  };
+
+  const submitLoadEquipmentName = (event: React.FormEvent) => {
+    event.preventDefault();
+    const equipmentType = LOAD_EQUIPMENT_TYPES.find((item) => item.key === selectedLoadType);
+    const name = formValues.name?.trim();
+    if (!equipmentType || !name || nameTaken(name)) return;
+    const piece: WizardPiece = { type: "equipment", name, meta: { equipmentType: equipmentType.label, equipmentTypeKey: equipmentType.key } };
+    if (editingPiece) updatePiece(editingPiece.name, piece);
+    else addPiece(piece);
+    setEditingPiece(null);
+    setSelectedLoadType(null);
+    setActiveType(null);
+  };
 
   const submitEquipmentForm = (event: React.FormEvent) => {
     event.preventDefault();
@@ -656,6 +833,49 @@ function OneLineWizardTab({
                   <button type="button" className="wizard-equipment-card wizard-bus-card" onClick={() => chooseBusCount("3")}><b>3</b><small>Rare</small></button>
                 </div>
               </>
+            ) : step === "equipment" && activeType === "equipment" && selectedLoadType ? (
+              <form onSubmit={submitLoadEquipmentName}>
+                <div className="wizard-kicker">Equipment · {LOAD_EQUIPMENT_TYPES.find((item) => item.key === selectedLoadType)?.label}</div>
+                <h2>Name the equipment</h2>
+                <div className="wizard-form-row">
+                  <label>Name</label>
+                  <input
+                    required
+                    autoFocus
+                    value={formValues.name || ""}
+                    onChange={(event) => setField("name", event.target.value)}
+                    placeholder={`e.g. ${LOAD_EQUIPMENT_TYPES.find((item) => item.key === selectedLoadType)?.label} 1`}
+                  />
+                  {nameTaken(formValues.name?.trim() || "") && (
+                    <p className="wizard-form-error">A piece named "{formValues.name?.trim()}" already exists — pick a different name.</p>
+                  )}
+                </div>
+                <div className="wizard-form-actions wizard-load-name-actions">
+                  <button type="submit" className="header-btn primary" disabled={!formValues.name?.trim() || nameTaken(formValues.name?.trim() || "")}>{editingPiece ? "Save Changes" : "Continue"}</button>
+                  <button type="button" className="wizard-load-type-back" onClick={() => setSelectedLoadType(null)}>← Back to equipment type</button>
+                </div>
+              </form>
+            ) : step === "equipment" && activeType === "equipment" ? (
+              <div className="wizard-load-type-picker">
+                <div className="wizard-kicker">Equipment</div>
+                <h2>What type of equipment?</h2>
+                <p>Pick the icon shown for this load everywhere it appears. Pick General if none of these fit.</p>
+                <div className="wizard-load-type-grid">
+                  {LOAD_EQUIPMENT_TYPES.map((item) => (
+                    <button type="button" key={item.key} className="wizard-load-type-card" onClick={() => chooseLoadEquipmentType(item)}>
+                      <span className="wizard-load-type-icon">
+                        {LOAD_EQUIPMENT_IMAGE_ICONS[item.key]
+                          ? <img src={LOAD_EQUIPMENT_IMAGE_ICONS[item.key]} alt="" />
+                          : item.icon}
+                      </span>
+                      <b>{item.label}</b>
+                    </button>
+                  ))}
+                </div>
+                <div className="wizard-form-actions">
+                  <button type="button" className="header-btn" onClick={() => { setActiveType(null); setEditingPiece(null); }}>Back</button>
+                </div>
+              </div>
             ) : step === "equipment" && activeForm ? (
               <form onSubmit={submitEquipmentForm}>
                 <div className="wizard-kicker">{editingPiece ? `Editing ${editingPiece.name}` : activeForm.kicker}</div>
@@ -1353,6 +1573,25 @@ const WIZARD_LOAD_BOX_ICONS: Record<string, JSX.Element> = {
   area: WIZARD_LOAD_BOX_ICON_EQUIPMENT,
 };
 
+function equipmentImageIcon(piece: WizardPiece | undefined, name: string) {
+  if (piece?.type !== "equipment") return undefined;
+  const savedKey = String(piece.meta?.equipmentTypeKey || "").toLowerCase();
+  if (LOAD_EQUIPMENT_IMAGE_ICONS[savedKey]) return LOAD_EQUIPMENT_IMAGE_ICONS[savedKey];
+
+  // Older saved one-lines may predate equipmentTypeKey. Infer their icon from the saved type label or
+  // equipment name so they also upgrade from the generic three-dot load symbol automatically.
+  const label = String(piece.meta?.equipmentType || name).toLowerCase();
+  if (label.includes("cooling tower")) return coolingTowerIcon;
+  if (label.includes("boiler")) return boilerIcon;
+  if (label.includes("chiller") || label.includes("chillar")) return chillerIcon;
+  if (label.includes("elevator")) return elevatorIcon;
+  if (label.includes("fan")) return fanIcon;
+  if (label.includes("pump")) return pumpIcon;
+  if (label.includes("air compressor") || label.includes("compressor")) return airCompressorIcon;
+  if (label.includes("general")) return generalIcon;
+  return undefined;
+}
+
 /** The wide, dashed-bus "distribution gear" treatment (see WizardDistGearNode) is reserved for the
  * root the ATS feeds directly into (ResultBranchModal renders that explicitly) — a nested multi-output
  * device further down the tree (an MCC, a transformer) instead gets the same compact chain-node-plus-bus
@@ -1362,8 +1601,11 @@ function WizardTreeNodeView({ node, pieces, onViewSchedule, tone, parentLabel }:
   const { selectedContainerName, openContainer } = useOneLineInspector();
   const piece = pieces.find((item) => item.name === node.name);
   const circuits = piece?.type === "panel" ? (piece.meta?.circuits as WizardCircuit[] | undefined) : undefined;
-  const clickable = Boolean(piece && circuits?.length);
-  const loadIcon = WIZARD_LOAD_BOX_ICONS[node.type];
+  const clickable = Boolean(piece);
+  const equipmentImage = equipmentImageIcon(piece, node.name);
+  const loadIcon = equipmentImage
+    ? <img className="wizard-load-box-equipment-image" src={equipmentImage} alt="" />
+    : WIZARD_LOAD_BOX_ICONS[node.type];
 
   // A container explicitly built as a "Distribution Gear" (as opposed to a Motor Control Center,
   // Switchgear, etc.) always gets the full dashed-box-plus-bus treatment (see WizardDistGearNode),
@@ -1579,6 +1821,8 @@ function ResultBranchModal({
   const tree = resolveWizardTree(atsDownstream[ats.id], pieces, pieceDownstream);
   const emergency = atsTelemetry?.connected_source === "GENERATOR";
   const { containerRef, contentRef, scale, offset } = useFitScale<HTMLDivElement, HTMLDivElement>();
+  const [diagramZoom, setDiagramZoom] = useState(1);
+  const changeDiagramZoom = (change: number) => setDiagramZoom((current) => Math.min(2, Math.max(0.5, Number((current + change).toFixed(1)))));
   // Same faceplate the ATS grid's own switch opens (see SingleLineDiagram/onAtsClick) — this drill-down
   // view is otherwise a dead end for checking the ATS's own status/source availability once you're
   // already looking at its downstream tree.
@@ -1604,6 +1848,12 @@ function ResultBranchModal({
     <>
     <Modal title="" onClose={onClose} className="wizard-result-modal wizard-branch-modal">
       <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
+      <div className="wizard-diagram-zoom" aria-label="Diagram zoom controls">
+        <button type="button" aria-label="Zoom in" title="Zoom in" disabled={diagramZoom >= 2} onClick={() => changeDiagramZoom(0.1)}>+</button>
+        <output aria-live="polite">{Math.round(diagramZoom * 100)}%</output>
+        <button type="button" aria-label="Zoom out" title="Zoom out" disabled={diagramZoom <= 0.5} onClick={() => changeDiagramZoom(-0.1)}>−</button>
+        <button type="button" className="wizard-diagram-zoom-reset" onClick={() => setDiagramZoom(1)}>Reset</button>
+      </div>
       <div className="wizard-result-modal-body">
         <div className="wizard-branch-header">
           <h3>{title}</h3>
@@ -1614,7 +1864,7 @@ function ResultBranchModal({
               box by a fixed, never-negative pixel amount to center it when there's room, so scale must
               grow/shrink from that same top-left corner — a "center" origin would instead expand the box
               in all directions including back into negative territory, undoing the offset's guarantee. */}
-          <div className="wizard-branch-diagram-fit" ref={contentRef} style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: "top left" }}>
+          <div className="wizard-branch-diagram-fit" ref={contentRef} style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale * diagramZoom})`, transformOrigin: "top left" }}>
             <div className="wizard-branch-ats-glyph">
               {/* Name above the switch, not below it — the downstream wire (WizardBranchConnector,
                   rendered right after this glyph) needs to run straight down from the switch's own
@@ -1668,6 +1918,8 @@ function ResultBranchModal({
 }
 
 function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose }: { piece: WizardPiece; emergency: boolean; fedFrom: string; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("details");
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false);
   const circuits = (piece.meta?.circuits as WizardCircuit[] | undefined) || [];
   const odd = circuits.filter((circuit) => circuit.ckt % 2 === 1);
   const even = circuits.filter((circuit) => circuit.ckt % 2 === 0);
@@ -1678,22 +1930,31 @@ function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose }: { piec
   // strip it before appending our own, instead of risking "100A MainA Main".
   const mainAmps = mainAmpsRaw.replace(/\s*A?\s*Main$/i, "").trim();
 
+  const generatedDocument = piece.type === "panel" ? <div className="equipment-document generated-panel-document">
+    <span className="generated-document-badge">PDF</span>
+    <div><b>{piece.name} — Panel Schedule <em>AUTO-GENERATED</em></b><small>Panel Schedule · generated from the current circuit table</small></div>
+    <span><button type="button" className="generated-document-view" title="View panel schedule" aria-label="View panel schedule" onClick={() => setShowDocumentPreview(true)}>View</button><button type="button" title="Download PDF" aria-label="Download panel schedule PDF" onClick={() => downloadPanelSchedulePdf(piece, fedFrom, emergency)}>↓</button></span>
+  </div> : undefined;
+
   return (
+    <>
     <Modal title="" onClose={onClose} className="wizard-result-modal">
       <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
       <div className="wizard-result-modal-body">
         <div className="wizard-panel-schedule-header">
           <h3>{piece.name}</h3>
-          <p className="wizard-result-modal-meta">Panel{voltage ? ` · ${voltage}` : ""}{mainAmps ? ` · ${mainAmps}A Main` : ""}</p>
+          <p className="wizard-result-modal-meta">{piece.type === "panel" ? `Panel${voltage ? ` · ${voltage}` : ""}${mainAmps ? ` · ${mainAmps}A Main` : ""}` : String(piece.meta?.equipmentType || "Equipment load")}</p>
         </div>
         <div className={`wizard-result-banner ${emergency ? "emergency" : "ready"}`}>Energized · {emergency ? "Emergency" : "Normal"}</div>
+        <EquipmentRecordTabs recordKey={`wizard-piece:${piece.type}:${piece.name}`} active={activeTab} onChange={setActiveTab} generatedDocument={generatedDocument} />
+        {activeTab === "details" && <>
         {/* Plain label/value rows, not a colored badge — this is reference info, not a status to call
             attention to (the banner above already does that job). */}
         <div className="wizard-panel-schedule-info">
           <div className="wizard-panel-schedule-info-row"><span>Fed From</span><b>{fedFrom}</b></div>
-          <div className="wizard-panel-schedule-info-row"><span>Circuits Used</span><b>{usedCount} of {circuits.length}</b></div>
+          {piece.type === "panel" ? <div className="wizard-panel-schedule-info-row"><span>Circuits Used</span><b>{usedCount} of {circuits.length}</b></div> : <div className="wizard-panel-schedule-info-row"><span>Equipment Type</span><b>{String(piece.meta?.equipmentType || "General")}</b></div>}
         </div>
-        <div className="wizard-connections-section-title wizard-panel-schedule-title">Panel Schedule</div>
+        {piece.type === "panel" && <><div className="wizard-connections-section-title wizard-panel-schedule-title">Panel Schedule</div>
         {circuits.length ? (
           <div className="wizard-panel-schedule-wrap">
             <table className="wizard-panel-schedule">
@@ -1701,8 +1962,8 @@ function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose }: { piec
               <tbody>
                 {Array.from({ length: Math.max(odd.length, even.length) }).map((_, row) => (
                   <tr key={row}>
-                    <td className="mono">{odd[row]?.ckt ?? ""}</td><td>{odd[row]?.load ?? ""}</td>
-                    <td className="mono">{even[row]?.ckt ?? ""}</td><td>{even[row]?.load ?? ""}</td>
+                    <td className="mono">{odd[row]?.ckt ?? ""}</td><td>{cleanPanelText(odd[row]?.load)}</td>
+                    <td className="mono">{even[row]?.ckt ?? ""}</td><td>{cleanPanelText(even[row]?.load)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1710,9 +1971,24 @@ function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose }: { piec
           </div>
         ) : (
           <p className="operations-empty">No circuits were added for this panel in the Wizard.</p>
-        )}
+        )}</>}
+        </>}
       </div>
     </Modal>
+    {showDocumentPreview && <Modal title="" onClose={() => setShowDocumentPreview(false)} className="panel-document-preview-modal">
+      <button type="button" className="equipment-popup-close" aria-label="Close preview" onClick={() => setShowDocumentPreview(false)}>x</button>
+      <div className="panel-document-toolbar"><button type="button" onClick={() => downloadPanelSchedulePdf(piece, fedFrom, emergency)}>↓ Download PDF</button></div>
+      <article className="panel-document-sheet">
+        <header className="panel-document-brand"><div className="panel-document-logo">CPC</div><div><strong>Critical Power Command</strong><span>Emergency Power Management Platform</span></div><small>Equipment Document<br />Generated {new Date().toLocaleDateString()}</small></header>
+        <div className="panel-document-title"><div><span>Electrical Distribution</span><h2>{piece.name} — Panel Schedule</h2></div><b className={emergency ? "emergency" : "normal"}>{emergency ? "Emergency" : "Normal"}</b></div>
+        <div className="panel-document-meta"><span>Rated Voltage<b>{voltage || "—"}</b></span><span>Rated Amperage<b>{mainAmps ? `${mainAmps}A` : "—"}</b></span><span>Fed From<b>{fedFrom}</b></span><span>Circuits Used<b>{usedCount} of {circuits.length}</b></span></div>
+        <table><thead><tr><th>CKT</th><th>Load Description</th><th>CKT</th><th>Load Description</th></tr></thead><tbody>
+          {Array.from({ length: Math.max(odd.length, even.length) }).map((_, row) => <tr key={row}><td>{odd[row]?.ckt ?? ""}</td><td className={odd[row]?.load?.toLowerCase() === "spare" ? "spare" : ""}>{cleanPanelText(odd[row]?.load)}</td><td>{even[row]?.ckt ?? ""}</td><td className={even[row]?.load?.toLowerCase() === "spare" ? "spare" : ""}>{cleanPanelText(even[row]?.load)}</td></tr>)}
+        </tbody></table>
+        <footer><span>Auto-generated from the current CPC One-Line equipment record.</span><b>Critical Power Command · Controlled Document</b></footer>
+      </article>
+    </Modal>}
+    </>
   );
 }
 
@@ -1787,6 +2063,7 @@ type BreakerDetailData = {
 /** Popup for a single breaker in the generated spine — opened by clicking its glyph, matching the
  * highlighted-circle-then-popup interaction on the paper one-line reference. */
 function BreakerDetailModal({ detail, onClose }: { detail: BreakerDetailData; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("details");
   const subtitle = [detail.derived ? "Auto-derived" : "Configured", detail.style, detail.role].filter(Boolean).join(" · ");
   return (
     <Modal title="" onClose={onClose} className="wizard-result-modal">
@@ -1795,13 +2072,15 @@ function BreakerDetailModal({ detail, onClose }: { detail: BreakerDetailData; on
         <h3>{detail.name}</h3>
         <p className="wizard-result-modal-meta">{subtitle}</p>
         <div className={`wizard-result-banner ${detail.emergency ? "emergency" : "ready"}`}>{detail.position.toUpperCase()}{detail.emergency ? " · EMERGENCY" : ""}</div>
+        <EquipmentRecordTabs recordKey={`breaker:${detail.key}`} active={activeTab} onChange={setActiveTab} />
+        {activeTab === "details" &&
         <div className="wizard-panel-schedule-info">
           {detail.role && <div className="wizard-panel-schedule-info-row"><span>Role</span><b>{detail.role}</b></div>}
           <div className="wizard-panel-schedule-info-row"><span>Style</span><b>{detail.style}</b></div>
           <div className="wizard-panel-schedule-info-row"><span>Position</span><b>{detail.position}</b></div>
           {detail.poweredBy && <div className="wizard-panel-schedule-info-row"><span>Powered By</span><b>{detail.poweredBy}</b></div>}
           {detail.feeds && <div className="wizard-panel-schedule-info-row"><span>Feeds</span><b>{detail.feeds}</b></div>}
-        </div>
+        </div>}
       </div>
     </Modal>
   );
@@ -1812,6 +2091,7 @@ type ContainerDetailData = { piece: WizardPiece; feeds: string[]; feedsLabel?: s
 /** Popup for a container box itself (switchgear, distribution gear, etc.) — opened by clicking its
  * label, wherever it appears: the main spine's "GEN SWBD" or any nested box in a downstream branch. */
 function ContainerDetailModal({ piece, feeds, feedsLabel = "Feeders", poweredBy, onClose }: { piece: WizardPiece; feeds: string[]; feedsLabel?: string; poweredBy?: string; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("details");
   const containerType = typeof piece.meta?.containerType === "string" ? piece.meta.containerType : "";
   const voltage = typeof piece.meta?.voltage === "string" ? piece.meta.voltage : "";
   const busCount = typeof piece.meta?.busCount === "string" ? piece.meta.busCount : "";
@@ -1822,13 +2102,15 @@ function ContainerDetailModal({ piece, feeds, feedsLabel = "Feeders", poweredBy,
         <h3>{piece.name}</h3>
         <p className="wizard-result-modal-meta">{containerType || "Container"}</p>
         <div className="wizard-result-banner ready">{busCount ? `${busCount} BUS${busCount === "1" ? "" : "ES"}` : "CONTAINER"} · {feeds.length} {feedsLabel.toUpperCase()}</div>
+        <EquipmentRecordTabs recordKey={`container:${piece.name}`} active={activeTab} onChange={setActiveTab} />
+        {activeTab === "details" &&
         <div className="wizard-panel-schedule-info">
           {poweredBy && <div className="wizard-panel-schedule-info-row"><span>Fed From</span><b>{poweredBy}</b></div>}
           <div className="wizard-panel-schedule-info-row"><span>Container Type</span><b>{containerType || "—"}</b></div>
           <div className="wizard-panel-schedule-info-row"><span>Voltage</span><b>{voltage || "—"}</b></div>
           <div className="wizard-panel-schedule-info-row"><span>Buses</span><b>{busCount ? `${busCount} (${busCount === "1" ? "single bus" : "multi-bus"})` : "—"}</b></div>
           <div className="wizard-panel-schedule-info-row"><span>{feedsLabel}</span><b>{feeds.length ? feeds.join(", ") : "—"}</b></div>
-        </div>
+        </div>}
       </div>
     </Modal>
   );
@@ -1881,7 +2163,7 @@ function SwitchgearLabelButton({ switchgear, feeds }: { switchgear: WizardPiece;
   );
 }
 
-function ResultTab({
+export function ResultTab({
   systemName, ats, generators, atsTelemetry, generatorTelemetry, pieces, sourceLinks, atsDownstream, pieceDownstream, generated,
 }: { systemName: string; ats: ATS[]; generators: Generator[]; atsTelemetry?: AtsTelemetry[]; generatorTelemetry?: GeneratorTelemetry[]; pieces: WizardPiece[]; sourceLinks: Record<string, string>; atsDownstream: Record<string, string>; pieceDownstream: Record<string, string[]>; generated: boolean }) {
   const [openAts, setOpenAts] = useState<ATS | null>(null);
@@ -1972,7 +2254,7 @@ function ResultTab({
 
   return (
     <OneLineInspectorContext.Provider value={inspectorApi}>
-    <section className="operations-section wizard-section">
+    <section className="operations-section wizard-section wizard-section-result">
       <div className="wizard-header-bar">
         <span className="wizard-brand">CPC</span>
         <span className="wizard-header-label">Generated One-Line</span>
@@ -2186,10 +2468,10 @@ function ResultTab({
   );
 }
 
-export function SystemOperationsOverview({ systemId, systemName, ats, generators, view, onViewChange }: { systemId: string; systemName: string; ats: ATS[]; generators: Generator[]; view: "details" | "wizard" | "result"; onViewChange: (view: "details" | "wizard" | "result") => void }) {
+export function SystemOperationsOverview({ systemId, systemName, ats, generators, view, onViewChange, canEditOneLine = false }: { systemId: string; systemName: string; ats: ATS[]; generators: Generator[]; view: "details" | "wizard" | "result"; onViewChange: (view: "details" | "wizard" | "result") => void; canEditOneLine?: boolean }) {
   const navigate = useNavigate();
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentSelection | null>(null);
-  const [testWizardTarget, setTestWizardTarget] = useState<TestTarget | null>(null);
+  const [testWizardOpen, setTestWizardOpen] = useState(false);
   // Lifted here (rather than inside OneLineWizardTab) so the built one-line survives switching
   // to the Result tab and back — both tabs are children of this same, always-mounted component.
   // Backed by the server (system_one_lines table) so it also survives a page refresh.
@@ -2240,6 +2522,24 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
   const { data: alarms } = useAlarms({ systemId });
   const activeAlarms = (alarms || []).filter((alarm) => alarm.status === "active");
   const onEmergency = ats.some((item) => resolveAtsTelemetry(telemetry?.ats, item.id, item.name)?.connected_source === "GENERATOR");
+  const systemEvents: ActivityItem[] = [
+    ...generators.flatMap((generator) => {
+      const data = resolveGeneratorTelemetry(telemetry?.generators, generator.id, generator.name);
+      if (!data) return [];
+      if (data.running || data.status === "RUNNING") return [{ id: `gen-running-${generator.id}`, severity: "critical", message: `${generator.name} running`, occurred_at: data.timestamp }];
+      if (generatorHasAlarm(data)) return [{ id: `gen-alarm-${generator.id}`, severity: "warning", message: `${generator.name} alarm active`, occurred_at: data.timestamp }];
+      if (data.auto_mode === false) return [{ id: `gen-auto-${generator.id}`, severity: "warning", message: `${generator.name} not in auto`, occurred_at: data.timestamp }];
+      return [];
+    }),
+    ...ats.flatMap((item) => {
+      const data = resolveAtsTelemetry(telemetry?.ats, item.id, item.name);
+      if (!data) return [];
+      if (data.status === "EMERGENCY" || data.connected_source === "GENERATOR") return [{ id: `ats-emergency-${item.id}`, severity: "critical", message: `${item.name} connected to generator`, occurred_at: data.timestamp }];
+      if (data.status === "FAULT" || data.status === "OFFLINE") return [{ id: `ats-fault-${item.id}`, severity: "warning", message: `${item.name} ${data.status.toLowerCase()}`, occurred_at: data.timestamp }];
+      if (data.status === "TRANSFERING" || data.transfer_in_progress) return [{ id: `ats-transfer-${item.id}`, severity: "info", message: `${item.name} transfer in progress`, occurred_at: data.timestamp }];
+      return [];
+    }),
+  ];
   const openGeneratorDetail = () => {
     setSelectedEquipment(null);
     navigate(`/systems/${systemId}/generators`);
@@ -2270,13 +2570,13 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
         </span>
         <div className="operations-view-tabs">
           <button type="button" className={`view-tab ${view === "details" ? "active" : ""}`} onClick={() => onViewChange("details")}>System Details</button>
-          <button type="button" className={`view-tab ${view === "wizard" ? "active" : ""}`} onClick={() => onViewChange("wizard")}>One-Line Wizard</button>
+          {canEditOneLine && <button type="button" className={`view-tab ${view === "wizard" ? "active" : ""}`} onClick={() => onViewChange("wizard")}>One-Line Wizard</button>}
           <button type="button" className={`view-tab ${view === "result" ? "active" : ""}`} onClick={() => onViewChange("result")}>One-Line</button>
         </div>
       </div>
-      <EventsPanel alarms={activeAlarms} />
+      <EventsPanel alarms={activeAlarms} events={systemEvents} />
     </div>
-    {view === "wizard" ? (
+    {view === "wizard" && canEditOneLine ? (
       <OneLineWizardTab
         systemName={systemName} ats={ats} generators={generators}
         pieces={wizardPieces} addPiece={(piece) => setWizardPieces((current) => [...current, piece])}
@@ -2340,7 +2640,7 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
     ) : (
       <>
         <section className="operations-section generator-section">
-          <div className="operations-section-title"><div><span>Emergency power</span><h3>Generators</h3></div><button onClick={openGeneratorDetail}>View details</button></div>
+          <div className="operations-section-title"><div><span>Emergency power</span><h3>Generators</h3></div><div style={{ display: "flex", gap: 8 }}><button className="device-test-btn" onClick={() => setTestWizardOpen(true)}>Test</button><button onClick={openGeneratorDetail}>View details</button></div></div>
           <div className="operations-table-wrap">
             <table className="operations-table generator-overview-table">
               <thead>
@@ -2348,7 +2648,6 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
                   <th rowSpan={2}>Sl.</th>
                   <th rowSpan={2}>Generator</th>
                   <th rowSpan={2}>Status</th>
-                  <th rowSpan={2}>Test</th>
                   <th colSpan={5} className="table-group-header engine">Engine data</th>
                   <th colSpan={9} className="table-group-header electrical">Electrical data</th>
                 </tr>
@@ -2358,20 +2657,20 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
                 </tr>
               </thead>
               <tbody>
-                {generators.map((generator, index) => { const data = resolveGeneratorTelemetry(telemetry?.generators, generator.id, generator.name); return <tr key={generator.id}><td className="serial-cell">{String(index + 1).padStart(2, "0")}</td><td className="device-name-cell">{generator.name}</td><td className={data?.status === "FAULT" ? "emergency-state" : "ready"}>{data?.status || "WAITING"}</td><td><button className="device-test-btn" onClick={() => setTestWizardTarget({ type: "generator", id: generator.id })}>Test Gen</button></td><td>{reading(data?.fuel_level_percent, 0)}%</td><td>{reading(data?.engine_hours, 1)}</td><td>{reading(data?.oil_pressure_psi, 1)}</td><td>{data ? `${reading(data.coolant_temperature_c, 1)}°C` : "—"}</td><td>{reading(data?.battery_voltage, 1)}</td><td>{reading(data?.voltage_ab, 1)}</td><td>{reading(data?.voltage_bc, 1)}</td><td>{reading(data?.voltage_ca, 1)}</td><td>{reading(data?.current_a, 1)}</td><td>{reading(data?.current_b, 1)}</td><td>{reading(data?.current_c, 1)}</td><td>{reading(data?.frequency, 1)}</td><td>{reading(data?.active_power_kw, 1)}</td><td>{reading(data?.load_percentage, 1)}</td></tr>; })}
-                {!generators.length && <tr><td colSpan={18} className="operations-empty">No generator registered for this system.</td></tr>}
+                {generators.map((generator, index) => { const data = resolveGeneratorTelemetry(telemetry?.generators, generator.id, generator.name); return <tr className="equipment-detail-row" title={`View details for ${generator.name}`} key={generator.id} onClick={() => setSelectedEquipment({ type: "generator", id: generator.id })}><td className="serial-cell">{String(index + 1).padStart(2, "0")}</td><td className="device-name-cell">{generator.name}</td><td className={generatorStatusClass(data)}>{data?.status || "WAITING"}</td><td>{reading(data?.fuel_level_percent, 0)}%</td><td>{reading(data?.engine_hours, 1)}</td><td>{reading(data?.oil_pressure_psi, 1)}</td><td>{data ? `${reading(data.coolant_temperature_c, 1)}°C` : "—"}</td><td>{reading(data?.battery_voltage, 1)}</td><td>{reading(data?.voltage_ab, 1)}</td><td>{reading(data?.voltage_bc, 1)}</td><td>{reading(data?.voltage_ca, 1)}</td><td>{reading(data?.current_a, 1)}</td><td>{reading(data?.current_b, 1)}</td><td>{reading(data?.current_c, 1)}</td><td>{reading(data?.frequency, 1)}</td><td>{reading(data?.active_power_kw, 1)}</td><td>{reading(data?.load_percentage, 1)}</td></tr>; })}
+                {!generators.length && <tr><td colSpan={17} className="operations-empty">No generator registered for this system.</td></tr>}
               </tbody>
             </table>
           </div>
         </section>
         <section className="operations-section ats-section">
           <div className="operations-section-title"><div><span>Power distribution</span><h3>Automatic Transfer Switches</h3></div><button onClick={openAtsDetail}>View details</button></div>
-          <div className="ats-overview-grid">{atsBanks.map((bank, bankIndex) => <div className="ats-overview-card" key={bankIndex}><table className="operations-table"><thead><tr><th>Sl.</th><th>ATS name</th><th>Status</th><th>Test</th><th>Connected to</th><th>Source available</th><th>Time to xfer</th><th>Time to bus</th></tr></thead><tbody>{bank.map((item, index) => { const serial = (bankIndex ? leftBankSize : 0) + index + 1; const data = resolveAtsTelemetry(telemetry?.ats, item.id, item.name); const emergency = data?.connected_source === "GENERATOR"; return <tr className={emergency ? "ats-emergency-demo" : ""} key={item.id}><td className="serial-cell">{String(serial).padStart(2, "0")}</td><td className="device-name-cell">{item.name}</td><td className={data?.status === "EMERGENCY" || data?.status === "FAULT" ? "emergency-state" : "ready"}>{data?.status || "WAITING"}</td><td><button className="device-test-btn" onClick={() => setTestWizardTarget({ type: "ats", id: item.id })}>Test ATS</button></td><td className={emergency ? "emergency-state" : "ready"}>{data?.connected_source || "—"}</td><td><span className={`source-light ${data?.utility_available ? "live" : ""}`} /> <span className={`source-light ${data?.generator_available ? "live emergency-source" : ""}`} /></td><td>{data?.transfer_time_seconds ?? "—"}</td><td>{data?.time_on_emergency_seconds ?? "—"}</td></tr>; })}</tbody></table></div>)}</div>
+          <div className="ats-overview-grid">{atsBanks.map((bank, bankIndex) => <div className="ats-overview-card" key={bankIndex}><table className="operations-table"><thead><tr><th>Sl.</th><th>ATS name</th><th>Status</th><th>Connected to</th><th>Source available</th><th>Time to re-xfer</th><th>Time to bus</th></tr></thead><tbody>{bank.map((item, index) => { const serial = (bankIndex ? leftBankSize : 0) + index + 1; const data = resolveAtsTelemetry(telemetry?.ats, item.id, item.name) || telemetry?.ats.find((entry) => atsNumber(entry.equipment_id) === String(serial) || atsNumber(entry.equipment_name) === String(serial)); const emergency = data?.connected_source === "GENERATOR" || data?.status === "EMERGENCY"; const sourceClass = emergency ? "live emergency-source" : data?.utility_available ? "live utility-source" : ""; return <tr className={`equipment-detail-row ${emergency ? "ats-emergency-demo" : ""}`} title={`View details for ${item.name}`} key={item.id} onClick={() => setSelectedEquipment({ type: "ats", id: item.id })}><td className="serial-cell">{String(serial).padStart(2, "0")}</td><td className="device-name-cell">{item.name}</td><td className={data?.status === "EMERGENCY" || data?.status === "FAULT" ? "emergency-state ats-status-cell" : "ready"}>{data?.status || "WAITING"}</td><td className={emergency ? "ats-connected-emergency" : "ready"}>{data?.connected_source || "—"}</td><td><span className={`source-light ${sourceClass}`} /></td><td>{data?.transfer_time_seconds ?? "—"}</td><td>{data?.time_on_emergency_seconds ?? "—"}</td></tr>; })}</tbody></table></div>)}</div>
           {!ats.length && <div className="operations-empty">No ATS units registered for this system.</div>}
         </section>
       </>
     )}
     {(selectedAts || selectedGenerator) && <EquipmentFaceplate systemName={systemName} ats={selectedAts} generator={selectedGenerator} atsTelemetry={selectedAtsTelemetry} generatorTelemetry={selectedGeneratorTelemetry} onClose={() => setSelectedEquipment(null)} />}
-    {testWizardTarget && <TestWizard systemName={systemName} ats={ats} generators={generators} initialTarget={testWizardTarget} onClose={() => setTestWizardTarget(null)} />}
+    {testWizardOpen && <TestWizard systemName={systemName} ats={ats} generators={generators} onClose={() => setTestWizardOpen(false)} />}
   </div>;
 }

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 
+import { fetchWeather, type WeatherInfo } from "../../utils/weather";
+
 export interface MapMarker {
   id: string;
   lat: number;
@@ -8,6 +10,20 @@ export interface MapMarker {
   status: string;
   label: string;
   sublabel?: string;
+}
+
+function tooltipHtml(m: MapMarker, weather?: WeatherInfo | null): string {
+  const weatherRow = weather
+    ? `<div style="margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:2px;color:#334155;font-size:10px">
+        <span>🌡️ ${weather.tempC}°C</span>
+        <span>${weather.emoji} Rain: ${weather.rainChancePct}%</span>
+        <span>💨 Wind: ${weather.windKmh} km/h</span>
+        <span>${weather.emoji} ${weather.description}</span>
+      </div>`
+    : "";
+  return `<div style="font-family:Inter,sans-serif;font-size:12px"><div style="font-weight:700;margin-bottom:4px">${m.label}</div>${
+    m.sublabel ? `<div style="color:#94a3b8;font-size:10px">${m.sublabel}</div>` : ""
+  }${weatherRow}</div>`;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -83,12 +99,12 @@ export function LeafletMap({
         fillColor: col,
         fillOpacity: 1,
       }).addTo(layer);
-      mk.bindTooltip(
-        `<div style="font-family:Inter,sans-serif;font-size:12px"><div style="font-weight:700;margin-bottom:4px">${m.label}</div>${
-          m.sublabel ? `<div style="color:#94a3b8;font-size:10px">${m.sublabel}</div>` : ""
-        }</div>`,
-        { direction: "top", offset: [0, -10], className: "cpc-map-tooltip" }
-      );
+      mk.bindTooltip(tooltipHtml(m), { direction: "top", offset: [0, -10], className: "cpc-map-tooltip" });
+      // Prefetched (not fetched per-hover) so weather is already in place by the time anyone
+      // hovers — fetchWeather's own cache collapses nearby facilities into one request.
+      fetchWeather(m.lat, m.lng).then((weather) => {
+        if (weather) mk.setTooltipContent(tooltipHtml(m, weather));
+      });
       L.marker([m.lat, m.lng], {
         icon: L.divIcon({
           className: "cpc-map-label",

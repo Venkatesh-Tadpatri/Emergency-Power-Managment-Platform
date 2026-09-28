@@ -43,3 +43,22 @@ export function useArchiveReseller() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["resellers"] }),
   });
 }
+
+export function useUnarchiveReseller() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      (await api.post<Reseller>(`/api/resellers/${id}/unarchive`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["resellers"] }),
+  });
+}
+
+export function useDeleteReseller() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/api/resellers/${id}/permanent`);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["resellers"] }),
+  });
+}
