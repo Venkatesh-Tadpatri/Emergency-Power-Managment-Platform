@@ -1738,6 +1738,12 @@ button.wizard-chain-node.wizard-chain-node-clickable:hover { box-shadow:0 0 0 2.
   margin-top:-56px;
   margin-bottom:-56px;
 }
+/* The explicit breaker column has its own downstream connector. Give it enough reach to
+   overlap the row seam as well, so the wire leaving a real F1/F2 breaker stays continuous. */
+.result-feeder-row > .result-ats-col > .result-connector:last-child {
+  height:72px;
+  margin-bottom:-16px;
+}
 /* Reusing the real one-line diagram's N/E switch box here — suppress its bus-connector pseudo-lines
    since this diagram already draws its own connector + breaker above each ATS. */
 .result-ats-node { padding-top:0; }
