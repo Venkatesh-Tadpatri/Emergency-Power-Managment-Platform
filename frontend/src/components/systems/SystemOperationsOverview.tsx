@@ -2374,22 +2374,25 @@ export function ResultTab({
                     // a plain wire; the wizard must never invent a 52-F breaker for it.
                     const feederPiece = pieces.find((piece) => piece.type === "breaker" &&
                       (pieceDownstream[piece.name] || []).includes(item.name));
-                    if (!feederPiece) return null;
                     const feederKey = `feeder-${item.id}`;
-                    const feederName = feederPiece.name;
+                    const feederName = feederPiece?.name || "";
                     const feederDetail: BreakerDetailData = {
-                      key: feederKey, name: feederName, role: "Feeder", style: feederPiece.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount", derived: false,
+                      key: feederKey, name: feederName, role: "Feeder", style: feederPiece?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount", derived: false,
                       position: "Closed", emergency: true, poweredBy: switchgear?.name || "Bus", feeds: item.name,
                     };
                     return (
                     <div className="result-ats-col" key={item.id}>
                       <span className="result-connector emergency" />
-                      <span className="sld-breaker-with-tag">
-                        <BreakerHitButton detail={feederDetail}>
-                          {feederPiece.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone="emergency" /> : <BreakerSymbol tone="emergency" size={38} centered />}
-                        </BreakerHitButton>
-                        <div className="sld-breaker-tag emergency-source">{feederName}</div>
-                      </span>
+                      {feederPiece ? (
+                        <span className="sld-breaker-with-tag">
+                          <BreakerHitButton detail={feederDetail}>
+                            {feederPiece.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone="emergency" /> : <BreakerSymbol tone="emergency" size={38} centered />}
+                          </BreakerHitButton>
+                          <div className="sld-breaker-tag emergency-source">{feederName}</div>
+                        </span>
+                      ) : (
+                        <span className="sld-gear-connector emergency" aria-hidden="true" />
+                      )}
                       <span className="result-connector emergency" />
                     </div>
                     );
