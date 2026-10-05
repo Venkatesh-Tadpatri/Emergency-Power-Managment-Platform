@@ -2307,12 +2307,16 @@ export function ResultTab({
                     (Draw-Out gets the same square glyph it would anywhere else in this app, Fixed-Mount
                     or nothing wired keeps the plain arc) with its own real name, instead of an unlabeled
                     generic breaker regardless of what was actually created. */}
-                <span className="sld-breaker-with-tag">
-                  <BreakerHitButton detail={leadDetail}>
-                    {leadBreaker?.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone={breakerTone} /> : <BreakerSymbol tone={breakerTone} size={38} centered />}
-                  </BreakerHitButton>
-                  {leadBreaker && <div className={`sld-breaker-tag ${lineClass}`}>{leadBreaker.name}</div>}
-                </span>
+                {leadBreaker ? (
+                  <span className="sld-breaker-with-tag">
+                    <BreakerHitButton detail={leadDetail}>
+                      {leadBreaker.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone={breakerTone} /> : <BreakerSymbol tone={breakerTone} size={38} centered />}
+                    </BreakerHitButton>
+                    <div className={`sld-breaker-tag ${lineClass}`}>{leadBreaker.name}</div>
+                  </span>
+                ) : (
+                  <span className={`sld-gear-connector ${lineClass}`} aria-hidden="true" />
+                )}
                 <span className={`result-crossing-wire ${lineClass}`} aria-hidden="true" />
               </div>
               );
@@ -2364,11 +2368,17 @@ export function ResultTab({
                 <div className="result-ats-row result-feeder-row">
                   {/* These feeders all drop off the same emergency bus, so — like the bus itself — they
                       stay red regardless of any one ATS's current normal/emergency state. */}
-                  {wiredAts.map((item, index) => {
+                  {wiredAts.map((item) => {
+                    // A feeder breaker is rendered only when the saved path actually contains a
+                    // breaker immediately before this ATS. A direct GEN SWBD -> ATS connection is
+                    // a plain wire; the wizard must never invent a 52-F breaker for it.
+                    const feederPiece = pieces.find((piece) => piece.type === "breaker" &&
+                      (pieceDownstream[piece.name] || []).includes(item.name));
+                    if (!feederPiece) return null;
                     const feederKey = `feeder-${item.id}`;
-                    const feederName = `52-F${index + 1}`;
+                    const feederName = feederPiece.name;
                     const feederDetail: BreakerDetailData = {
-                      key: feederKey, name: feederName, role: "Feeder", style: "Fixed-Mount", derived: true,
+                      key: feederKey, name: feederName, role: "Feeder", style: feederPiece.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount", derived: false,
                       position: "Closed", emergency: true, poweredBy: switchgear?.name || "Bus", feeds: item.name,
                     };
                     return (
@@ -2376,7 +2386,7 @@ export function ResultTab({
                       <span className="result-connector emergency" />
                       <span className="sld-breaker-with-tag">
                         <BreakerHitButton detail={feederDetail}>
-                          <BreakerSymbol tone="emergency" size={38} centered />
+                          {feederPiece.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone="emergency" /> : <BreakerSymbol tone="emergency" size={38} centered />}
                         </BreakerHitButton>
                         <div className="sld-breaker-tag emergency-source">{feederName}</div>
                       </span>
