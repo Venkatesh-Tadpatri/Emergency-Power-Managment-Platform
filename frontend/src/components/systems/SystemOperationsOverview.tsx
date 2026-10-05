@@ -2391,7 +2391,7 @@ export function ResultTab({
                           <div className="sld-breaker-tag emergency-source">{feederName}</div>
                         </span>
                       ) : (
-                        <span className="sld-gear-connector emergency" aria-hidden="true" />
+                        <span className="result-connector emergency" aria-hidden="true" />
                       )}
                       <span className="result-connector emergency" />
                     </div>
