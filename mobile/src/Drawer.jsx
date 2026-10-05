@@ -5,8 +5,8 @@ import { useTheme } from "./theme";
 const sections = (isSuperAdmin) => [
   { label: "Overview", items: [["home", "Dashboard"], ["systems", "Systems"]] },
   ...(isSuperAdmin ? [{ label: "Hierarchy", items: [["resellers", "Resellers"], ["customers", "Customers"]] }] : []),
-  { label: "Monitoring", items: [["alarms", "Alarms"], ["analytics", "Analytics"]] },
-  { label: "Platform", items: [...(isSuperAdmin ? [["users", "Platform users"]] : []), ["reports", "Reports"], ["profile", "Profile"]] },
+  { label: "Monitoring", items: [["alarms", "All Alarms"], ["analytics", "Analytics"]] },
+  { label: "Platform", items: [...(isSuperAdmin ? [["users", "Users"]] : []), ["reports", "Reports"], ["profile", "Settings"]] },
 ];
 
 export function Drawer({ visible, screen, isSuperAdmin, onSelect, onClose }) {

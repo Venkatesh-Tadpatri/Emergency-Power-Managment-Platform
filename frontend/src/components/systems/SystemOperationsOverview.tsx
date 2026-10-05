@@ -82,7 +82,10 @@ function EquipmentRecordTabs({ recordKey, active, onChange, generatedDocument }:
   </>;
 }
 
-const cleanPanelText = (value: unknown) => String(value ?? "").replace(/â€”|â€“|ï¿½|�/g, "—").replace(/\s+—\s+/g, " — ");
+const cleanPanelText = (value: unknown) => String(value ?? "")
+  .replace(/(?:â€”|â€“|ï¿½|�)+/g, "—")
+  .replace(/\s*—+\s*/g, " — ")
+  .trim();
 
 function downloadPanelSchedulePdf(piece: WizardPiece, fedFrom: string, emergency = false) {
   const circuits = (piece.meta?.circuits as WizardCircuit[] | undefined) || [];
@@ -584,7 +587,7 @@ const WIZARD_PASS_THROUGH_TYPES = ["breaker", "container", "transformer"];
 function OneLineWizardTab({
   systemName, ats, generators, pieces, addPiece, removePiece, updatePiece,
   sourceLinks, setSourceLink, removeSourceLink, atsDownstream, setAtsDownstreamLink, removeAtsLink, pieceDownstream, setPieceDownstreamLink, removePieceLink,
-  onGenerate,
+  onGenerate, editPieceRequest, onEditRequestHandled,
 }: {
   systemName: string; ats: ATS[]; generators: Generator[];
   pieces: WizardPiece[]; addPiece: (piece: WizardPiece) => void; removePiece: (name: string) => void; updatePiece: (oldName: string, piece: WizardPiece) => void;
@@ -592,6 +595,7 @@ function OneLineWizardTab({
   atsDownstream: Record<string, string>; setAtsDownstreamLink: (id: string, destination: string) => void; removeAtsLink: (id: string) => void;
   pieceDownstream: Record<string, string[]>; setPieceDownstreamLink: (name: string, destination: string) => void; removePieceLink: (name: string, destination: string) => void;
   onGenerate: () => void;
+  editPieceRequest?: WizardPiece | null; onEditRequestHandled?: () => void;
 }) {
   const [step, setStep] = useState<"start" | "equipment" | "connections">("start");
   const [activeType, setActiveType] = useState<string | null>(null);
@@ -728,13 +732,21 @@ function OneLineWizardTab({
       Object.entries(piece.meta || {}).filter((entry): entry is [string, string] => typeof entry[1] === "string")
     );
     setFormValues({ name: piece.name, ...stringFields });
-    setFormCircuits(piece.type === "panel" ? ((piece.meta?.circuits as WizardCircuit[] | undefined) || []).map((circuit) => circuit.load) : []);
+    setFormCircuits(piece.type === "panel" ? ((piece.meta?.circuits as WizardCircuit[] | undefined) || []).map((circuit) => cleanPanelText(circuit.load)) : []);
     setCircuitDraft("");
     setPendingContainer(null);
     setSelectedLoadType(piece.type === "equipment" ? String(piece.meta?.equipmentTypeKey || "general") : null);
     setActiveType(piece.type);
     setStep("equipment");
   };
+
+  useEffect(() => {
+    if (!editPieceRequest) return;
+    openEditForm(editPieceRequest);
+    onEditRequestHandled?.();
+    // The request object is consumed once when the wizard opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editPieceRequest]);
 
   const setField = (key: string, value: string) => setFormValues((current) => ({ ...current, [key]: value }));
   const addCircuit = () => {
@@ -781,7 +793,7 @@ function OneLineWizardTab({
     const meta: Record<string, string | WizardCircuit[]> = {};
     if (activeType === "breaker") { meta.style = formValues.style || ""; meta.frameSize = formValues.frameSize || ""; meta.tripRating = formValues.tripRating || ""; }
     if (activeType === "transformer") { meta.primaryVoltage = formValues.primaryVoltage || ""; meta.secondaryVoltage = formValues.secondaryVoltage || ""; meta.kva = formValues.kva || ""; }
-    if (activeType === "panel") { meta.voltage = formValues.voltage || ""; meta.mainAmps = formValues.mainAmps || ""; meta.circuits = formCircuits.map((load, i) => ({ ckt: i + 1, load })); }
+    if (activeType === "panel") { meta.voltage = formValues.voltage || ""; meta.mainAmps = formValues.mainAmps || ""; meta.circuits = formCircuits.map((load, i) => ({ ckt: i + 1, load: cleanPanelText(load) })); }
     if (editingPiece) updatePiece(editingPiece.name, { type: activeType, name: formValues.name.trim(), meta });
     else addPiece({ type: activeType, name: formValues.name.trim(), meta });
     setEditingPiece(null);
@@ -1917,7 +1929,7 @@ function ResultBranchModal({
   );
 }
 
-function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose }: { piece: WizardPiece; emergency: boolean; fedFrom: string; onClose: () => void }) {
+function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose, onEdit }: { piece: WizardPiece; emergency: boolean; fedFrom: string; onClose: () => void; onEdit?: () => void }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("details");
   const [showDocumentPreview, setShowDocumentPreview] = useState(false);
   const circuits = (piece.meta?.circuits as WizardCircuit[] | undefined) || [];
@@ -1942,8 +1954,9 @@ function ResultPanelScheduleModal({ piece, emergency, fedFrom, onClose }: { piec
       <button type="button" className="equipment-popup-close" aria-label="Close" onClick={onClose}>x</button>
       <div className="wizard-result-modal-body">
         <div className="wizard-panel-schedule-header">
-          <h3>{piece.name}</h3>
-          <p className="wizard-result-modal-meta">{piece.type === "panel" ? `Panel${voltage ? ` · ${voltage}` : ""}${mainAmps ? ` · ${mainAmps}A Main` : ""}` : String(piece.meta?.equipmentType || "Equipment load")}</p>
+          <div><h3>{piece.name}</h3>
+          <p className="wizard-result-modal-meta">{piece.type === "panel" ? `Panel${voltage ? ` · ${voltage}` : ""}${mainAmps ? ` · ${mainAmps}A Main` : ""}` : String(piece.meta?.equipmentType || "Equipment load")}</p></div>
+          {onEdit && <button type="button" className="header-btn primary" onClick={onEdit}>Edit</button>}
         </div>
         <div className={`wizard-result-banner ${emergency ? "emergency" : "ready"}`}>Energized · {emergency ? "Emergency" : "Normal"}</div>
         <EquipmentRecordTabs recordKey={`wizard-piece:${piece.type}:${piece.name}`} active={activeTab} onChange={setActiveTab} generatedDocument={generatedDocument} />
@@ -2164,8 +2177,8 @@ function SwitchgearLabelButton({ switchgear, feeds }: { switchgear: WizardPiece;
 }
 
 export function ResultTab({
-  systemName, ats, generators, atsTelemetry, generatorTelemetry, pieces, sourceLinks, atsDownstream, pieceDownstream, generated,
-}: { systemName: string; ats: ATS[]; generators: Generator[]; atsTelemetry?: AtsTelemetry[]; generatorTelemetry?: GeneratorTelemetry[]; pieces: WizardPiece[]; sourceLinks: Record<string, string>; atsDownstream: Record<string, string>; pieceDownstream: Record<string, string[]>; generated: boolean }) {
+  systemName, ats, generators, atsTelemetry, generatorTelemetry, pieces, sourceLinks, atsDownstream, pieceDownstream, generated, onEditPiece,
+}: { systemName: string; ats: ATS[]; generators: Generator[]; atsTelemetry?: AtsTelemetry[]; generatorTelemetry?: GeneratorTelemetry[]; pieces: WizardPiece[]; sourceLinks: Record<string, string>; atsDownstream: Record<string, string>; pieceDownstream: Record<string, string[]>; generated: boolean; onEditPiece?: (piece: WizardPiece) => void }) {
   const [openAts, setOpenAts] = useState<ATS | null>(null);
   const [openGenerator, setOpenGenerator] = useState<Generator | null>(null);
   const [branchAts, setBranchAts] = useState<ATS | null>(null);
@@ -2450,7 +2463,7 @@ export function ResultTab({
         />
       )}
       {scheduleView && (
-        <ResultPanelScheduleModal piece={scheduleView.piece} emergency={scheduleView.tone === "emergency"} fedFrom={scheduleView.fedFrom} onClose={() => setScheduleView(null)} />
+        <ResultPanelScheduleModal piece={scheduleView.piece} emergency={scheduleView.tone === "emergency"} fedFrom={scheduleView.fedFrom} onClose={() => setScheduleView(null)} onEdit={onEditPiece ? () => { onEditPiece(scheduleView.piece); setScheduleView(null); } : undefined} />
       )}
       {showLegend && <ResultLegendModal onClose={() => setShowLegend(false)} />}
       {breakerDetail && <BreakerDetailModal detail={breakerDetail} onClose={() => setBreakerDetail(null)} />}
@@ -2485,6 +2498,7 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
   // then, even though the wizard's own pieces/connections exist as soon as they're wired up.
   const [oneLineGenerated, setOneLineGenerated] = useState(false);
   const [oneLineHydrated, setOneLineHydrated] = useState(false);
+  const [wizardEditRequest, setWizardEditRequest] = useState<WizardPiece | null>(null);
 
   useEffect(() => {
     if (savedOneLine === undefined) return; // still loading
@@ -2518,7 +2532,7 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oneLineHydrated, wizardPieces, wizardSourceLinks, wizardAtsDownstream, wizardPieceDownstream, oneLineGenerated]);
 
-  const telemetry = useTelemetrySnapshot();
+  const telemetry = useTelemetrySnapshot(systemId);
   const { data: alarms } = useAlarms({ systemId });
   const activeAlarms = (alarms || []).filter((alarm) => alarm.status === "active");
   const onEmergency = ats.some((item) => resolveAtsTelemetry(telemetry?.ats, item.id, item.name)?.connected_source === "GENERATOR");
@@ -2568,6 +2582,12 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
           {onEmergency ? <IconAlert size={14} strokeWidth={2.5} /> : <IconCheckCircle size={14} strokeWidth={2.5} />}
           {onEmergency ? "Emergency" : "Normal operation"}
         </span>
+        {systemId === "SYS-0006" && telemetry?.storage && (
+          <div style={{ marginTop: 10, fontSize: 10, color: "var(--text-dim)", lineHeight: 1.5 }}>
+            <b style={{ color: telemetry.storage.has_data ? "#22c55e" : "#f59e0b" }}>{telemetry.storage.has_data ? "LIVE MQTT" : "MQTT WAITING"}</b> · Stored in {telemetry.storage.engine}<br />
+            {telemetry.storage.org} / {telemetry.storage.bucket} / {telemetry.storage.measurement}
+          </div>
+        )}
         <div className="operations-view-tabs">
           <button type="button" className={`view-tab ${view === "details" ? "active" : ""}`} onClick={() => onViewChange("details")}>System Details</button>
           {canEditOneLine && <button type="button" className={`view-tab ${view === "wizard" ? "active" : ""}`} onClick={() => onViewChange("wizard")}>One-Line Wizard</button>}
@@ -2630,12 +2650,15 @@ export function SystemOperationsOverview({ systemId, systemName, ats, generators
           return next;
         })}
         onGenerate={() => setOneLineGenerated(true)}
+        editPieceRequest={wizardEditRequest}
+        onEditRequestHandled={() => setWizardEditRequest(null)}
       />
     ) : view === "result" ? (
       <ResultTab
         systemName={systemName} ats={ats} generators={generators} atsTelemetry={telemetry?.ats} generatorTelemetry={telemetry?.generators}
         pieces={wizardPieces} sourceLinks={wizardSourceLinks} atsDownstream={wizardAtsDownstream} pieceDownstream={wizardPieceDownstream}
         generated={oneLineGenerated}
+        onEditPiece={canEditOneLine ? (piece) => { setWizardEditRequest(piece); onViewChange("wizard"); } : undefined}
       />
     ) : (
       <>

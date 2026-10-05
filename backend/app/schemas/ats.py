@@ -10,6 +10,7 @@ class ATSBase(BaseModel):
     source_type: str = "utility"
     rated_amps: float | None = None
     rated_volts: float | None = None
+    mqtt_topic: str | None = None
     panel_id: str
 
 
@@ -26,6 +27,7 @@ class ATSUpdate(BaseModel):
     source_type: str | None = None
     rated_amps: float | None = None
     rated_volts: float | None = None
+    mqtt_topic: str | None = None
     panel_id: str | None = None
 
 

@@ -58,6 +58,7 @@ export interface ATS {
   source_type?: "utility" | "generator" | string;
   rated_amps?: number | null;
   rated_volts?: number | null;
+  mqtt_topic?: string | null;
   panel_id: string;
 }
 
@@ -70,6 +71,7 @@ export interface Generator {
   rated_volts?: number | null;
   rated_amps?: number | null;
   rated_kw?: number | null;
+  mqtt_topic?: string | null;
   panel_id: string;
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { assignUserSystems, getAllAts, getAllGenerators, getAllPanels, getCompanies, getResellers, getSites, getSystems, getUsers } from "./api";
+import { assignUserSystems, getAllAts, getAllGenerators, getAllPanels, getCompanies, getResellers, getScopedAlarms, getSites, getSystems, getUsers } from "./api";
 import { roleName } from "./roles";
 import { useTheme } from "./theme";
 import { resolveAtsTelemetry, resolveGeneratorTelemetry } from "./telemetry";
@@ -50,33 +50,60 @@ function StatusPill({ status, styles }) {
   const pulse = useBlink(emergency);
   return (
     <Animated.View style={[styles.status, active ? styles.statusGood : styles.statusBad, emergency && { opacity: pulse }]}>
-      <Text style={[styles.statusText, !active && styles.statusBadText]}>{(status || "unknown").toUpperCase()}</Text>
+      <Text style={[styles.statusText, !active && styles.statusBadText]}>{status === "normal" ? "ONLINE" : (status || "unknown").toUpperCase()}</Text>
     </Animated.View>
   );
+}
+
+function Total({ label, value, tone, styles }) {
+  return <View style={[styles.totalCard, { borderTopColor: tone }]}><Text style={[styles.totalValue, { color: tone }]}>{value}</Text><Text style={styles.totalLabel}>{label}</Text></View>;
+}
+
+function Metric({ label, value, danger, styles }) {
+  return <View style={styles.metric}><Text style={[styles.metricValue, danger && styles.metricDanger]}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>;
 }
 
 export function Resellers({ token, onOpen }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const { items, loading, refreshing, refresh } = useList(() => getResellers(token), [token]);
+  const { items: companies } = useList(() => getCompanies(token), [token]);
+  const { items: sites } = useList(() => getSites(token), [token]);
+  const { items: systems } = useList(() => getSystems(token), [token]);
+  const activeItems = items.filter((item) => item.status !== "archived");
+  const activeSites = sites.filter((site) => site.status !== "archived");
   return (
     <FlatList
       style={styles.list}
-      data={items}
+      data={activeItems}
       keyExtractor={(item) => item.id}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-      ListHeaderComponent={<Text style={styles.sectionTitle}>Reseller partners</Text>}
+      ListHeaderComponent={<View><View style={styles.totalGrid}>
+        <Total label="Total Resellers" value={activeItems.length} tone={theme.purple} styles={styles} />
+        <Total label="Total Customers" value={companies.length} tone={theme.blue} styles={styles} />
+        <Total label="Total Sites" value={activeSites.length} tone={theme.amber} styles={styles} />
+        <Total label="Total Systems" value={systems.length} tone={theme.cyan} styles={styles} />
+      </View><Text style={styles.sectionTitle}>Resellers</Text></View>}
       ListEmptyComponent={!loading && <Text style={styles.empty}>No resellers available</Text>}
-      renderItem={({ item }) => (
+      renderItem={({ item }) => {
+        const resellerCompanies = companies.filter((company) => company.reseller_id === item.id);
+        const companyIds = new Set(resellerCompanies.map((company) => company.id));
+        const resellerSystems = systems.filter((system) => companyIds.has(system.company_id));
+        const resellerSites = activeSites.filter((site) => companyIds.has(site.customer_id));
+        const offline = resellerSystems.filter((system) => system.status === "offline").length;
+        return (
         <Pressable style={styles.card} onPress={() => onOpen(item)}>
           <View style={styles.cardTop}>
             <View style={styles.cardTitleRow}><Avatar letter="R" color={theme.purple} styles={styles} /><Text style={styles.name}>{item.name}</Text></View>
-            <StatusPill status={item.status} styles={styles} />
           </View>
-          {item.contact_name && <Text style={styles.muted}>{item.contact_name}</Text>}
-          {item.contact_email && <Text style={styles.muted}>{item.contact_email}</Text>}
+          <View style={styles.metricsRow}>
+            <Metric label="Customers" value={resellerCompanies.length} styles={styles} />
+            <Metric label="Sites" value={resellerSites.length} styles={styles} />
+            <Metric label="Total systems" value={resellerSystems.length} styles={styles} />
+            <Metric label="Offline devices" value={offline} danger={offline > 0} styles={styles} />
+          </View>
         </Pressable>
-      )}
+      );}}
     />
   );
 }
@@ -85,29 +112,66 @@ export function ResellerDetail({ reseller, token, onOpenCustomer }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const { items, loading, refreshing, refresh } = useList(() => getCompanies(token, reseller.id), [token, reseller.id]);
+  const { items: allSites, refresh: refreshSites } = useList(() => getSites(token), [token]);
+  const { items: allSystems, refresh: refreshSystems } = useList(() => getSystems(token), [token]);
+  const { items: panels, refresh: refreshPanels } = useList(() => getAllPanels(token), [token]);
+  const { items: generators, refresh: refreshGenerators } = useList(() => getAllGenerators(token), [token]);
+  const { items: alarms, refresh: refreshAlarms } = useList(() => getScopedAlarms(token, { resellerId: reseller.id }), [token, reseller.id]);
+  const companyIds = new Set(items.map((item) => item.id));
+  const sites = allSites.filter((site) => site.status !== "archived" && companyIds.has(site.customer_id));
+  const systems = allSystems.filter((system) => companyIds.has(system.company_id));
+  const activeAlarms = alarms.filter((alarm) => alarm.status === "active");
+  const panelIdsByCompany = new Map();
+  panels.forEach((panel) => {
+    const system = systems.find((candidate) => candidate.id === panel.system_id);
+    if (!system) return;
+    if (!panelIdsByCompany.has(system.company_id)) panelIdsByCompany.set(system.company_id, new Set());
+    panelIdsByCompany.get(system.company_id).add(panel.id);
+  });
+  const refreshAll = async () => {
+    await Promise.all([refresh(), refreshSites(), refreshSystems(), refreshPanels(), refreshGenerators(), refreshAlarms()]);
+  };
   return (
     <FlatList
       style={styles.list}
       data={items}
       keyExtractor={(item) => item.id}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshAll} />}
       ListHeaderComponent={
         <View>
           <Text style={styles.sectionTitle}>{reseller.name}</Text>
           {reseller.contact_email && <Text style={styles.muted}>{reseller.contact_email}</Text>}
+          <View style={styles.summaryStrip}>
+            <Metric label="Total customers" value={items.length} styles={styles} />
+            <Metric label="Total sites" value={sites.length} styles={styles} />
+            <Metric label="Total systems" value={systems.length} styles={styles} />
+          </View>
           <Text style={styles.subheading}>Customers</Text>
         </View>
       }
       ListEmptyComponent={!loading && <Text style={styles.empty}>No customers under this reseller</Text>}
-      renderItem={({ item }) => (
-        <Pressable style={styles.card} onPress={() => onOpenCustomer(item)}>
+      renderItem={({ item }) => {
+        const customerSites = sites.filter((site) => site.customer_id === item.id);
+        const customerSystems = systems.filter((system) => system.company_id === item.id);
+        const systemIds = new Set(customerSystems.map((system) => system.id));
+        const customerAlarms = activeAlarms.filter((alarm) => systemIds.has(alarm.system_id));
+        const panelIds = panelIdsByCompany.get(item.id) || new Set();
+        const customerGenerators = generators.filter((generator) => panelIds.has(generator.panel_id));
+        const offline = customerSystems.filter((system) => system.status === "offline").length;
+        return <Pressable style={styles.card} onPress={() => onOpenCustomer(item)}>
           <View style={styles.cardTop}>
             <View style={styles.cardTitleRow}><Avatar letter="C" color={theme.blue} styles={styles} /><Text style={styles.name}>{item.name}</Text></View>
-            <StatusPill status={item.status} styles={styles} />
           </View>
           {item.address && <Text style={styles.muted}>{item.address}</Text>}
+          <View style={styles.metricsRow}>
+            <Metric label="Sites" value={customerSites.length} styles={styles} />
+            <Metric label="Systems" value={customerSystems.length} styles={styles} />
+            <Metric label="Offline devices" value={offline} danger={offline > 0} styles={styles} />
+            <Metric label="Active alarms" value={customerAlarms.length} danger={customerAlarms.length > 0} styles={styles} />
+            <Metric label="Generators" value={customerGenerators.length} styles={styles} />
+          </View>
         </Pressable>
-      )}
+      }}
     />
   );
 }
@@ -166,22 +230,38 @@ export function CustomerDetail({ customer, token, onOpenSite, onOpenSystem }) {
   const { items: systems, loading: loadingSystems, refresh: refreshSystems } = useList(() => getSystems(token, { companyId: customer.id }), [token, customer.id]);
   const sites = allSites.filter((s) => s.status !== "archived");
   const unsitedSystems = systems.filter((s) => !s.site_id);
+  const offline = systems.filter((system) => system.status === "offline").length;
+  const events = systems.filter((system) => system.status !== "normal").length;
   const loading = loadingSites || loadingSystems;
   const refresh = async () => { await Promise.all([refreshSites(), refreshSystems()]); };
   return (
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />} contentContainerStyle={styles.list}>
       <Text style={styles.sectionTitle}>{customer.name}</Text>
       {customer.address && <Text style={styles.muted}>{customer.address}</Text>}
+      <View style={styles.summaryStrip}>
+        <Metric label="Total sites" value={sites.length} styles={styles} />
+        <Metric label="Total systems" value={systems.length} styles={styles} />
+        <Metric label="Offline devices" value={offline} danger={offline > 0} styles={styles} />
+        <Metric label="Events" value={events} danger={events > 0} styles={styles} />
+      </View>
       <Text style={styles.subheading}>Sites</Text>
-      {sites.map((site) => (
+      {sites.map((site, index) => {
+        const siteSystems = systems.filter((system) => system.site_id === site.id);
+        const online = siteSystems.filter((system) => system.status === "normal").length;
+        const siteEvents = siteSystems.length - online;
+        return (
         <Pressable key={site.id} style={styles.card} onPress={() => onOpenSite(site)}>
           <View style={styles.cardTop}>
-            <View style={styles.cardTitleRow}><Avatar letter="S" color={theme.cyan} styles={styles} /><Text style={styles.name}>{site.name}</Text></View>
-            <StatusPill status={site.status} styles={styles} />
+            <View style={styles.cardTitleRow}><Text style={styles.siteIndex}>{String(index + 1).padStart(2, "0")}</Text><Avatar letter="S" color={theme.cyan} styles={styles} /><Text style={styles.name}>{site.name}</Text></View>
           </View>
           {site.address && <Text style={styles.muted}>{site.address}</Text>}
+          <View style={styles.metricsRow}>
+            <Metric label="Systems" value={siteSystems.length} styles={styles} />
+            <Metric label="Online" value={online} styles={styles} />
+            <Metric label="Events" value={siteEvents} danger={siteEvents > 0} styles={styles} />
+          </View>
         </Pressable>
-      ))}
+      );})}
       {!loading && sites.length === 0 && <Text style={styles.empty}>No sites registered</Text>}
       {unsitedSystems.length > 0 && (
         <>
@@ -282,7 +362,6 @@ export function SiteDetail({ site, token, onOpenSystem }) {
               </View>
               <View style={styles.actionRow}>
                 <Pressable style={styles.actionBtn} onPress={() => onOpenSystem(item, "details")}><Text style={styles.actionBtnText}>Detail</Text></Pressable>
-                <Pressable style={styles.actionBtn} onPress={() => onOpenSystem(item, "one-line")}><Text style={styles.actionBtnText}>One-Line</Text></Pressable>
                 <Pressable style={styles.actionBtn} onPress={() => setTestTarget({ system: item, ats: assets.ats, generators: assets.generators })}><Text style={styles.actionBtnText}>Test</Text></Pressable>
               </View>
             </View>
@@ -431,14 +510,25 @@ export function UserDetail({ user, token }) {
 function makeStyles(theme) {
   return StyleSheet.create({
     list: { padding: 16 },
+    totalGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 },
+    totalCard: { width: "48%", backgroundColor: theme.surface, borderWidth: 1, borderTopWidth: 3, borderColor: theme.border, borderRadius: 12, padding: 12 },
+    totalValue: { fontSize: 22, fontWeight: "800" },
+    totalLabel: { fontSize: 10, color: theme.textDim, textTransform: "uppercase", marginTop: 4 },
+    summaryStrip: { flexDirection: "row", marginTop: 14, paddingVertical: 12, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 10 },
     sectionTitle: { fontSize: 17, fontWeight: "800", color: theme.text, marginBottom: 4 },
     subheading: { fontSize: 14, fontWeight: "800", color: theme.text, marginTop: 20, marginBottom: 10 },
     card: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14, marginBottom: 9, shadowColor: "#000", shadowOpacity: theme.mode === "dark" ? 0 : 0.03, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
     cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
+    metricsRow: { flexDirection: "row", marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderColor: theme.border },
+    metric: { flex: 1, alignItems: "center", paddingHorizontal: 3 },
+    metricValue: { color: theme.cyan, fontSize: 16, fontWeight: "800" },
+    metricDanger: { color: theme.red },
+    metricLabel: { color: theme.textMuted, fontSize: 7.5, textAlign: "center", textTransform: "uppercase", marginTop: 3 },
     cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 1 },
     avatar: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
     avatarLetter: { color: "#fff", fontSize: 13, fontWeight: "800" },
     name: { fontSize: 14, fontWeight: "700", color: theme.text, flexShrink: 1 },
+    siteIndex: { width: 20, fontSize: 10, fontWeight: "800", color: theme.textMuted },
     muted: { fontSize: 13, color: theme.textDim, marginTop: 3 },
     role: { fontSize: 12, color: theme.blue, fontWeight: "700", marginTop: 6, marginBottom: 6 },
     status: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: theme.redSoft },

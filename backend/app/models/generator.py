@@ -14,6 +14,7 @@ class Generator(Base, UUIDPKMixin, TimestampMixin):
     rated_volts: Mapped[float | None] = mapped_column(Float)
     rated_amps: Mapped[float | None] = mapped_column(Float)
     rated_kw: Mapped[float | None] = mapped_column(Float)
+    mqtt_topic: Mapped[str | None] = mapped_column(String(512), index=True)
     panel_id: Mapped[str] = mapped_column(ForeignKey("panels.id"), nullable=False)
 
     panel: Mapped["Panel"] = relationship(back_populates="generators")

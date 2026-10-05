@@ -89,6 +89,17 @@ services:
       SEED_ON_START: ${SEED_ON_START}
       SUPERADMIN_ZITADEL_SUB: ${SUPERADMIN_ZITADEL_SUB}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL}
+      MQTT_ENABLED: ${MQTT_ENABLED:-false}
+      MQTT_HOST: ${MQTT_HOST:-host.docker.internal}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_TOPIC_FILTER: "${MQTT_TOPIC_FILTER:-#}"
+      MQTT_TLS: ${MQTT_TLS:-false}
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-cpc-development-token-change-me}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-cpc}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
     ports:
       - "8000:8000"
     volumes:
@@ -96,6 +107,28 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      influxdb:
+        condition: service_healthy
+
+  influxdb:
+    image: influxdb:2.7
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-cpc}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-cpc-development-password}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-cpc}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-cpc-development-token-change-me}
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping", "--host", "http://localhost:8086"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
   frontend:
     build: ./frontend
@@ -135,3 +168,4 @@ volumes:
   mysql_data:
   zitadel_pg_data:
   frontend_node_modules:
+  influxdb_data:

@@ -169,7 +169,13 @@ export function SiteSystems() {
   const testAssets = testSystemId ? assetsFor(testSystemId) : null;
 
   return <>
-    <PageHero title={site?.name || "Site"} subtitle={`${customer?.name || "Customer"}${site?.address ? ` · ${site.address}` : ""}`} icon={IconMap} color={activeAlarms.length ? "#dc2626" : "#0ea5e9"} bgImage="/images/hero-bg.jpg" />
+    <PageHero title={site?.name || "Site"} subtitle={`${customer?.name || "Customer"}${site?.address ? ` · ${site.address}` : ""}`} icon={IconMap} color={activeAlarms.length ? "#dc2626" : "#0ea5e9"} bgImage="/images/hero-bg.jpg" showText={false} showIcon={false} />
+    <div className="reseller-page-heading">
+      <div className="reseller-page-heading-icon" style={{ color: activeAlarms.length ? "#dc2626" : "#0ea5e9", background: activeAlarms.length ? "rgba(220,38,38,.14)" : "rgba(14,165,233,.14)" }}><IconMap size={19} /></div>
+      <div className="reseller-page-heading-copy">
+        <h2>{site?.name || "Site"}</h2>
+      </div>
+    </div>
     <StatsGrid stats={[
       { label: "Systems", value: siteSystems.length, color: "var(--cyan)", icon: IconPanel },
       { label: "Online", value: normal, color: "var(--green)", icon: IconCheckCircle },

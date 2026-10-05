@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import * as SecureStore from "expo-secure-store";
 
 export const lightTheme = {
   mode: "light",
@@ -16,6 +17,7 @@ export const lightTheme = {
   red: "#dc2626",
   redSoft: "#fee2e2",
   purple: "#7c3aed",
+  amber: "#d97706",
   cyan: "#0891b2",
   statusBar: "dark-content",
 };
@@ -36,16 +38,33 @@ export const darkTheme = {
   red: "#f87171",
   redSoft: "#3a1414",
   purple: "#a78bfa",
+  amber: "#f59e0b",
   cyan: "#22d3ee",
   statusBar: "light-content",
 };
 
-const ThemeContext = createContext({ theme: lightTheme, toggleTheme: () => {} });
+const THEME_KEY = "cpc.theme";
+const ThemeContext = createContext({ theme: darkTheme, toggleTheme: () => {} });
 
 export function ThemeProvider({ children }) {
-  const [mode, setMode] = useState("light");
+  // Match the web app: dark is the default, while an explicit light selection is
+  // remembered on the device for later launches and sign-ins.
+  const [mode, setMode] = useState("dark");
+
+  useEffect(() => {
+    SecureStore.getItemAsync(THEME_KEY)
+      .then((savedMode) => {
+        if (savedMode === "light" || savedMode === "dark") setMode(savedMode);
+      })
+      .catch(() => {});
+  }, []);
+
   const theme = mode === "dark" ? darkTheme : lightTheme;
-  const toggleTheme = () => setMode((m) => (m === "dark" ? "light" : "dark"));
+  const toggleTheme = () => setMode((current) => {
+    const next = current === "dark" ? "light" : "dark";
+    SecureStore.setItemAsync(THEME_KEY, next).catch(() => {});
+    return next;
+  });
   const value = useMemo(() => ({ theme, toggleTheme }), [theme]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

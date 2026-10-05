@@ -19,6 +19,17 @@ class Settings(BaseSettings):
     seed_on_start: bool = True
     superadmin_zitadel_sub: str = ""
     superadmin_email: str = "admin@cpc.local"
+    mqtt_enabled: bool = False
+    mqtt_host: str = "localhost"
+    mqtt_port: int = 1883
+    mqtt_username: str = ""
+    mqtt_password: str = ""
+    mqtt_topic_filter: str = "#"
+    mqtt_tls: bool = False
+    influxdb_url: str = "http://influxdb:8086"
+    influxdb_token: str = "cpc-development-token-change-me"
+    influxdb_org: str = "cpc"
+    influxdb_bucket: str = "telemetry"
 
     @property
     def cors_origin_list(self) -> list[str]:

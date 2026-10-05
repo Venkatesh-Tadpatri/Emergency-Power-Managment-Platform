@@ -53,7 +53,9 @@ export function Header() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("cpc-theme") === "dark");
+  // Dark is the application default. Once a user explicitly selects light mode,
+  // preserve that preference instead of resetting it on every page load/login.
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("cpc-theme") !== "light");
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

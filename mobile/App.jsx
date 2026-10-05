@@ -2,17 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, FlatList, ImageBackground, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import { createAts, createGenerator, getAlarms, getAllAts, getAllGenerators, getAllPanels, getAts, getCompanies, getGenerators, getMe, getOnCall, getPanels, getReports, getResellers, getSystems } from "./src/api";
-import { HealthDonut } from "./src/HealthDonut";
+import { createAts, createGenerator, getAlarms, getAllAts, getAllGenerators, getAllPanels, getAts, getCompanies, getGenerators, getMe, getOnCall, getPanels, getReports, getResellers, getSites, getSystems } from "./src/api";
 import { clearToken, exchangeAuthorizationCode, readToken, redirectUri } from "./src/auth";
 import { SolutionLogo } from "./src/SolutionLogo";
 import { Landing } from "./src/Landing";
 import { Customers, CustomerDetail, PlatformUsers, Resellers, ResellerDetail, SiteDetail, UserDetail } from "./src/AdminLists";
 import { Analytics } from "./src/Analytics";
 import { Drawer } from "./src/Drawer";
-import { SLD } from "./src/SLD";
-import { OneLineWizard } from "./src/OneLineWizard";
-import { OneLineResult } from "./src/OneLineResult";
 import { DeviceFaceplateScreen, EquipmentDetailModal } from "./src/DeviceFaceplates";
 import { TestWizard } from "./src/TestWizard";
 import { roleName } from "./src/roles";
@@ -22,7 +18,7 @@ import { ThemeProvider, useTheme } from "./src/theme";
 const clientId = process.env.EXPO_PUBLIC_ZITADEL_CLIENT_ID;
 WebBrowser.maybeCompleteAuthSession();
 
-const SCREEN_TITLES = { home: "Dashboard", systems: "Systems", alarms: "Alarms", analytics: "Analytics", reports: "Reports", resellers: "Resellers", customers: "Customers", users: "Platform users", profile: "Profile" };
+const SCREEN_TITLES = { home: "Dashboard", systems: "Systems", alarms: "All Alarms", analytics: "Analytics", reports: "Reports", resellers: "Resellers", customers: "Customers", users: "Users", profile: "Settings" };
 
 export default function App() {
   return <ThemeProvider><AppInner /></ThemeProvider>;
@@ -86,21 +82,18 @@ function AppInner() {
   );
 }
 
-function Home({ me, systems, alarms, reports, onCall, refresh, refreshing, isSuperAdmin, token, onViewAlarms, onNavigate }) {
+function Home({ me, systems, refresh, refreshing, isSuperAdmin, token, onNavigate }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const active = alarms.filter((alarm) => alarm.status === "active");
-  const critical = new Set(["alarm", "emergency"]);
-  const normalCount = systems.filter((s) => s.status === "normal").length;
-  const criticalCount = systems.filter((s) => critical.has(s.status)).length;
-  const warningCount = systems.length - normalCount - criticalCount;
-
   const [resellers, setResellers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [sites, setSites] = useState([]);
   useEffect(() => {
     if (!isSuperAdmin) return;
-    Promise.all([getResellers(token), getCompanies(token)]).then(([r, c]) => { setResellers(r); setCompanies(c); }).catch(() => {});
+    Promise.all([getResellers(token), getCompanies(token), getSites(token)]).then(([r, c, s]) => { setResellers(r); setCompanies(c); setSites(s); }).catch(() => {});
   }, [isSuperAdmin, token]);
+
+  const activeSites = sites.filter((site) => site.status !== "archived");
 
   const rollups = resellers.map((reseller) => {
     const companyIds = new Set(companies.filter((c) => c.reseller_id === reseller.id).map((c) => c.id));
@@ -109,8 +102,8 @@ function Home({ me, systems, alarms, reports, onCall, refresh, refreshing, isSup
       reseller,
       customerCount: companyIds.size,
       systemCount: resellerSystems.length,
-      normalCount: resellerSystems.filter((s) => s.status === "normal").length,
-      eventCount: resellerSystems.filter((s) => s.status !== "normal").length,
+      siteCount: activeSites.filter((site) => companyIds.has(site.customer_id)).length,
+      offlineCount: resellerSystems.filter((s) => s.status === "offline").length,
     };
   });
 
@@ -129,43 +122,39 @@ function Home({ me, systems, alarms, reports, onCall, refresh, refreshing, isSup
         </View>
       </ImageBackground>
 
-      <Text style={styles.greeting}>Hello, {me?.display_name || me?.email || "there"}</Text>
-      <Text style={styles.muted}>{roleName(me?.role)}</Text>
-      <View style={styles.cardRow}>
-        <Stat label="Systems" value={systems.length} />
-        <Stat label="Normal" value={normalCount} green />
-        <Stat label="Active" value={active.length} danger={active.length > 0} />
+      <View style={styles.totalGrid}>
+        <Stat label="Total Resellers" value={resellers.length} tone="purple" />
+        <Stat label="Total Customers" value={companies.length} tone="blue" />
+        <Stat label="Total Sites" value={activeSites.length} tone="amber" />
+        <Stat label="Total Systems" value={systems.length} tone="cyan" />
       </View>
-
-      <Text style={styles.sectionTitle}>System health overview</Text>
-      <HealthDonut normal={normalCount} warning={warningCount} critical={criticalCount} />
 
       {isSuperAdmin && rollups.length > 0 && (
         <>
           <Text style={styles.sectionTitle}>Reseller overview</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-            {rollups.map(({ reseller, customerCount, systemCount, normalCount: n, eventCount }) => (
+            {rollups.map(({ reseller, customerCount, siteCount, systemCount, offlineCount }) => (
               <View key={reseller.id} style={styles.rollupCard}>
                 <Text style={styles.rollupName} numberOfLines={1}>{reseller.name}</Text>
                 <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Customers</Text><Text style={styles.rollupValue}>{customerCount}</Text></View>
-                <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Systems</Text><Text style={styles.rollupValue}>{systemCount}</Text></View>
-                <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Normal</Text><Text style={[styles.rollupValue, styles.green]}>{n}</Text></View>
-                <View style={[styles.rollupRow, styles.rollupRowLast]}><Text style={styles.rollupLabel}>Events</Text><Text style={[styles.rollupValue, eventCount > 0 && styles.danger]}>{eventCount}</Text></View>
+                <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Sites</Text><Text style={styles.rollupValue}>{siteCount}</Text></View>
+                <View style={styles.rollupRow}><Text style={styles.rollupLabel}>Total systems</Text><Text style={styles.rollupValue}>{systemCount}</Text></View>
+                <View style={[styles.rollupRow, styles.rollupRowLast]}><Text style={styles.rollupLabel}>Offline devices</Text><Text style={[styles.rollupValue, offlineCount > 0 ? styles.danger : styles.green]}>{offlineCount}</Text></View>
               </View>
             ))}
           </ScrollView>
         </>
       )}
 
-      <View style={styles.sectionHeadRow}>
-        <Text style={styles.sectionTitle}>Recent alarms</Text>
-        {onViewAlarms && <Pressable onPress={onViewAlarms}><Text style={styles.viewAll}>View all</Text></Pressable>}
-      </View>
-      {active.slice(0, 3).map((alarm) => <AlarmCard key={alarm.id} alarm={alarm} />)}
-      {active.length === 0 && <Empty text="No active alarms" />}
-      <Text style={styles.sectionTitle}>Latest report</Text>
-      {reports[0] ? <ReportCard report={reports[0]} /> : <Empty text="No reports available" />}
-      {onCall[0] && <><Text style={styles.sectionTitle}>On-call coverage</Text><OnCallCard shift={onCall[0]} /></>}
+      {isSuperAdmin && <>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionGrid}>
+          <QuickAction label="Resellers" onPress={() => onNavigate("resellers")} />
+          <QuickAction label="All Alarms" onPress={() => onNavigate("alarms")} danger />
+          <QuickAction label="Users" onPress={() => onNavigate("users")} />
+          <QuickAction label="Settings" onPress={() => onNavigate("profile")} />
+        </View>
+      </>}
     </ScrollView>
   );
 }
@@ -308,7 +297,6 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
   const [loading, setLoading] = useState(true);
   const [addModal, setAddModal] = useState(null);
   const [testTarget, setTestTarget] = useState(null);
-  const [view, setView] = useState(system.initialView === "one-line" ? "one-line" : "details");
   const [selectedDevice, setSelectedDevice] = useState(null);
 
   const loadDevices = async (panel) => {
@@ -339,32 +327,7 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
     <ScrollView contentContainerStyle={styles.screen}>
       {(system.address || system.lat) && <Pressable style={styles.directionsButton} onPress={openDirections}><Text style={styles.directionsText}>Open directions</Text></Pressable>}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.viewTabRow}>
-        <Pressable style={[styles.viewTab, view === "details" && styles.viewTabActive]} onPress={() => setView("details")}><Text style={[styles.viewTabText, view === "details" && styles.viewTabTextActive]}>System Details</Text></Pressable>
-        <Pressable style={[styles.viewTab, view === "one-line" && styles.viewTabActive]} onPress={() => setView("one-line")}><Text style={[styles.viewTabText, view === "one-line" && styles.viewTabTextActive]}>One-Line</Text></Pressable>
-        <Pressable style={[styles.viewTab, view === "wizard" && styles.viewTabActive]} onPress={() => setView("wizard")}><Text style={[styles.viewTabText, view === "wizard" && styles.viewTabTextActive]}>Wizard</Text></Pressable>
-        <Pressable style={[styles.viewTab, view === "result" && styles.viewTabActive]} onPress={() => setView("result")}><Text style={[styles.viewTabText, view === "result" && styles.viewTabTextActive]}>Result</Text></Pressable>
-      </ScrollView>
-
-      {view === "one-line" ? (
-        loading ? <Loading /> : (
-          <SLD
-            ats={devices.ats}
-            generators={devices.generators}
-            onSelectAts={(item) => setSelectedDevice({ kind: "ats", item })}
-            onSelectGenerator={(item) => setSelectedDevice({ kind: "generator", item })}
-          />
-        )
-      ) : view === "wizard" ? (
-        loading ? <Loading /> : (
-          <OneLineWizard systemId={system.id} systemName={system.name} ats={devices.ats} generators={devices.generators} token={token} />
-        )
-      ) : view === "result" ? (
-        loading ? <Loading /> : (
-          <OneLineResult systemId={system.id} ats={devices.ats} generators={devices.generators} token={token} />
-        )
-      ) : (
-        <>
+      <>
           <View style={styles.sectionHeadRow}>
             <Text style={styles.sectionTitle}>Generators</Text>
             <View style={styles.headActions}>
@@ -384,8 +347,7 @@ function SystemDetail({ system, token, isSuperAdmin, onPush }) {
           </View>
           {!loading && devices.ats.map((item) => <AtsReadingCard key={item.id} item={item} onTest={() => setTestTarget({ type: "ats", id: item.id })} />)}
           {!loading && devices.ats.length === 0 && <Empty text="No ATS units" />}
-        </>
-      )}
+      </>
 
       {addModal && (
         <AddDeviceModal
@@ -653,10 +615,17 @@ function QuickLink({ label, icon, onPress }) {
   );
 }
 
-function Stat({ label, value, green, danger }) {
+function Stat({ label, value, tone }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  return <View style={styles.stat}><Text style={[styles.statValue, green && styles.green, danger && styles.danger]}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+  const color = { purple: theme.purple, blue: theme.blue, amber: theme.amber, cyan: theme.cyan }[tone];
+  return <View style={[styles.stat, color && { borderTopColor: color, borderTopWidth: 3 }]}><Text style={[styles.statValue, color && { color }]}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+}
+
+function QuickAction({ label, onPress, danger }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
+  return <Pressable style={styles.quickAction} onPress={onPress}><Text style={[styles.quickActionText, danger && { color: theme.red }]}>{label}</Text></Pressable>;
 }
 
 function useStatusBlink(active) {
@@ -682,7 +651,7 @@ function Status({ status }) {
   const pulse = useStatusBlink(emergency);
   return (
     <Animated.View style={[styles.status, status === "normal" ? styles.statusGood : styles.statusBad, emergency && { opacity: pulse }]}>
-      <Text style={[styles.statusText, status !== "normal" && styles.statusBadText]}>{(status || "unknown").toUpperCase()}</Text>
+      <Text style={[styles.statusText, status !== "normal" && styles.statusBadText]}>{status === "normal" ? "ONLINE" : (status || "unknown").toUpperCase()}</Text>
     </Animated.View>
   );
 }
@@ -728,8 +697,8 @@ function makeStyles(theme) {
     screen: { padding: 16, paddingBottom: 28 },
     greeting: { fontSize: 22, fontWeight: "800", color: theme.text },
     muted: { fontSize: 13, color: theme.textDim, marginTop: 3 },
-    cardRow: { flexDirection: "row", gap: 8, marginVertical: 20 },
-    stat: { flex: 1, backgroundColor: theme.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: theme.border },
+    totalGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginVertical: 16 },
+    stat: { width: "48%", minHeight: 82, backgroundColor: theme.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: theme.border },
     statValue: { fontSize: 23, fontWeight: "800", color: theme.text },
     statLabel: { fontSize: 11, color: theme.textDim, marginTop: 5 },
     green: { color: theme.green },
@@ -753,6 +722,9 @@ function makeStyles(theme) {
     quickLink: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
     quickLinkIcon: { fontSize: 13, color: "#fff" },
     quickLinkLabel: { fontSize: 11.5, color: "#fff", fontWeight: "700" },
+    quickActionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+    quickAction: { width: "48%", minHeight: 58, justifyContent: "center", backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 12, paddingHorizontal: 14 },
+    quickActionText: { color: theme.blue, fontSize: 13, fontWeight: "800" },
     rollupCard: { width: 172, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 14, padding: 14 },
     rollupName: { fontSize: 13, fontWeight: "800", color: theme.text, marginBottom: 10, paddingBottom: 10, borderBottomWidth: 1, borderColor: theme.border },
     rollupRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderColor: theme.surface2 },

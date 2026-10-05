@@ -2044,7 +2044,8 @@ button.wizard-load-box-wrap.wizard-load-box-clickable:hover .wizard-load-box { b
    plain white/grey and reads as "missing" rather than "not currently connected". */
 .wizard-branch-ats-glyph .sld-terminal.normal-terminal { background:#22c55e; border-color:#fff; color:#fff; }
 .wizard-branch-ats-glyph .sld-terminal.emergency-terminal { background:#ef4444; border-color:#fff; color:#fff; }
-.wizard-panel-schedule-header { text-align:center; }
+.wizard-panel-schedule-header { position:relative; text-align:center; }
+.wizard-panel-schedule-header > .header-btn { position:absolute; top:0; right:44px; z-index:2; }
 .wizard-panel-schedule-header h3 { margin:0 0 4px; }
 .wizard-panel-schedule-title { text-align:center; }
 .wizard-panel-schedule-info { margin:0 0 18px; border:1px solid #1d3a56; border-radius:10px; overflow:hidden; }

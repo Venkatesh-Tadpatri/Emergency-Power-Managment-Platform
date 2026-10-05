@@ -29,7 +29,7 @@ export function GeneratorDetail() {
   const { systemId, generatorId } = useParams();
   const { data: panels } = usePanels(systemId);
   const { data: generators } = useGenerators(panels?.[0]?.id);
-  const telemetry = useTelemetrySnapshot();
+  const telemetry = useTelemetrySnapshot(systemId);
   return <DetailShell title="Generator Detail View" type="generator">
     <h2 className="legacy-device-section-heading">Generator Detail</h2>
     <section className="generator-detail-grid">{(generators || []).filter((generator) => !generatorId || generator.id === generatorId).map((generator) => { const capacity = generator.rated_kw ?? 0; const data = telemetryFor(telemetry?.generators, generator.id, generator.name); return <article className="generator-monitor-card" key={generator.id}>
@@ -53,7 +53,7 @@ export function AtsDetail() {
   const { data: system } = useSystem(systemId);
   const { data: panels } = usePanels(systemId);
   const { data: atsData } = useAts(panels?.[0]?.id);
-  const telemetry = useTelemetrySnapshot();
+  const telemetry = useTelemetrySnapshot(systemId);
   const ats = atsId ? (atsData || []).filter((item) => item.id === atsId) : atsData;
   const emergency = telemetry?.ats.some((item) => item.connected_source === "GENERATOR") || system?.status === "emergency" || system?.status === "alarm";
   const stateLabel = emergency ? "Utility power failed — on emergency" : "Utility power normal — on utility";

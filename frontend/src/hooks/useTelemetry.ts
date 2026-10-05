@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { api } from "../api/client";
 
 export type GeneratorTelemetry = {
   equipment_id: string;
@@ -69,10 +70,11 @@ export type TelemetrySnapshot = {
   refresh_interval_ms: number;
   generators: GeneratorTelemetry[];
   ats: AtsTelemetry[];
+  storage?: { engine: string; url: string; org: string; bucket: string; measurement: string; has_data: boolean };
 };
 
 /** Temporary JSON telemetry source. Replace this fetch with the telemetry API after MQTT ingestion is available. */
-export function useTelemetry() {
+export function useTelemetry(systemId?: string) {
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,29 +83,33 @@ export function useTelemetry() {
     let timer: number | undefined;
     const load = async () => {
       try {
-        const response = await fetch(`/data/telemetry.json?_=${Date.now()}`, { cache: "no-store" });
-        if (!response.ok) throw new Error("Unable to load telemetry fixture");
-        const snapshot = await response.json() as TelemetrySnapshot;
+        const isHassenfeld = systemId === "SYS-0006";
+        const snapshot = isHassenfeld
+          ? (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`)).data
+          : await fetch(`/data/telemetry.json?_=${Date.now()}`, { cache: "no-store" }).then((response) => {
+              if (!response.ok) throw new Error("Unable to load telemetry fixture");
+              return response.json() as Promise<TelemetrySnapshot>;
+            });
         if (!active) return;
         setTelemetry(snapshot);
         setError(null);
         timer = window.setTimeout(load, snapshot.refresh_interval_ms || 5000);
       } catch (error) {
         console.warn("Telemetry fixture could not be loaded", error);
-        if (active) setError("Telemetry data could not be loaded. Check frontend/public/data/telemetry.json.");
+        if (active) setError(systemId === "SYS-0006" ? "Live MQTT telemetry is unavailable." : "Telemetry data could not be loaded. Check frontend/public/data/telemetry.json.");
         if (active) timer = window.setTimeout(load, 5000);
       }
     };
     void load();
     return () => { active = false; if (timer) window.clearTimeout(timer); };
-  }, []);
+  }, [systemId]);
 
   return { telemetry, error };
 }
 
 /** Convenience hook for screens that only need the latest snapshot. */
-export function useTelemetrySnapshot() {
-  return useTelemetry().telemetry;
+export function useTelemetrySnapshot(systemId?: string) {
+  return useTelemetry(systemId).telemetry;
 }
 
 export function telemetryFor<T extends { equipment_id: string; equipment_name: string }>(items: T[] | undefined, id: string, name: string) {

@@ -122,8 +122,22 @@ function SelectOrCustom({ label, unit, options, value, onChange, placeholder, re
   );
 }
 
-const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "", branch: "equipment", source_type: "utility", rated_amps: "", rated_volts: "" };
-const emptyGenForm = { name: "", make: "", model: "", serial_number: "", rated_volts: "", rated_amps: "", rated_kw: "" };
+const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "", branch: "equipment", source_type: "utility", rated_amps: "", rated_volts: "", mqtt_topic: "" };
+const emptyGenForm = { name: "", make: "", model: "", serial_number: "", rated_volts: "", rated_amps: "", rated_kw: "", mqtt_topic: "" };
+
+function MqttMappingHelp() {
+  return (
+    <details style={{ marginTop: 6, fontSize: 11, color: "var(--text-dim)" }}>
+      <summary style={{ cursor: "pointer" }}>View incoming metric mapping</summary>
+      <div style={{ marginTop: 8, lineHeight: 1.7 }}>
+        <b>POWER / metrics:</b> [0] L1-L2 V, [1] L2-L3 V, [2] L3-L1 V, [3] L1-N V,
+        [4] L2-N V, [5] L3-N V, [6] L1 A, [7] L2 A, [8] L3 A, [9] power factor %.<br />
+        <b>STATUS / metrics:</b> [0] operating-state code, [1] utility available,
+        [2] generator available, [3] alarm active.
+      </div>
+    </details>
+  );
+}
 
 export function DeviceManager({ systemId }: { systemId: string }) {
   const navigate = useNavigate();
@@ -178,6 +192,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       source_type: a.source_type || "utility",
       rated_amps: a.rated_amps?.toString() || "",
       rated_volts: a.rated_volts?.toString() || "",
+      mqtt_topic: a.mqtt_topic || "",
     });
     setAtsEditing(a);
   };
@@ -193,6 +208,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       source_type: atsForm.source_type,
       rated_amps: atsForm.rated_amps ? Number(atsForm.rated_amps) : undefined,
       rated_volts: atsForm.rated_volts ? Number(atsForm.rated_volts) : undefined,
+      mqtt_topic: atsForm.mqtt_topic.trim() || undefined,
     };
     if (atsEditing === "new") {
       const pid = await ensurePanelId();
@@ -216,6 +232,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       rated_volts: g.rated_volts?.toString() || "",
       rated_amps: g.rated_amps?.toString() || "",
       rated_kw: g.rated_kw?.toString() || "",
+      mqtt_topic: g.mqtt_topic || "",
     });
     setGenEditing(g);
   };
@@ -230,6 +247,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       rated_volts: genForm.rated_volts ? Number(genForm.rated_volts) : undefined,
       rated_amps: genForm.rated_amps ? Number(genForm.rated_amps) : undefined,
       rated_kw: genForm.rated_kw ? Number(genForm.rated_kw) : undefined,
+      mqtt_topic: genForm.mqtt_topic.trim() || undefined,
     };
     if (genEditing === "new") {
       const pid = await ensurePanelId();
@@ -336,6 +354,16 @@ export function DeviceManager({ systemId }: { systemId: string }) {
                 <input value={atsForm.serial_number} onChange={(e) => setAtsForm({ ...atsForm, serial_number: e.target.value })} />
               </div>
             </div>
+            <div className="form-row">
+              <label>MQTT Topic Address</label>
+              <input
+                value={atsForm.mqtt_topic}
+                onChange={(e) => setAtsForm({ ...atsForm, mqtt_topic: e.target.value })}
+                placeholder="00:E0:62:30:D3:5A/DEMO/P01/A1"
+              />
+              <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Enter the base address; /POWER and /STATUS are mapped automatically.</span>
+              <MqttMappingHelp />
+            </div>
             <div className="modal-actions">
               <button type="button" className="header-btn" onClick={() => setAtsEditing(null)}>Cancel</button>
               <button type="submit" className="header-btn primary">Save</button>
@@ -366,6 +394,16 @@ export function DeviceManager({ systemId }: { systemId: string }) {
               <SelectOrCustom label="Rated kW" unit="kW" options={GEN_RATED_KW} value={genForm.rated_kw} onChange={(v) => setGenForm({ ...genForm, rated_kw: v })} />
               <SelectOrCustom label="Rated Volts" unit="V" options={GEN_RATED_VOLTS} value={genForm.rated_volts} onChange={(v) => setGenForm({ ...genForm, rated_volts: v })} />
               <SelectOrCustom label="Rated Amps" unit="A" options={GEN_RATED_AMPS} value={genForm.rated_amps} onChange={(v) => setGenForm({ ...genForm, rated_amps: v })} />
+            </div>
+            <div className="form-row">
+              <label>MQTT Topic Address</label>
+              <input
+                value={genForm.mqtt_topic}
+                onChange={(e) => setGenForm({ ...genForm, mqtt_topic: e.target.value })}
+                placeholder="00:E0:62:30:D3:5A/DEMO/P01/G1"
+              />
+              <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Enter the base address; /POWER and /STATUS are mapped automatically.</span>
+              <MqttMappingHelp />
             </div>
             <div className="modal-actions">
               <button type="button" className="header-btn" onClick={() => setGenEditing(null)}>Cancel</button>

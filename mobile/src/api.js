@@ -51,6 +51,13 @@ export const saveOneLine = (systemId, data, token) => api(`/api/systems/${system
 export const getReports = (token, companyId, isSuperAdmin) =>
   companyId ? api(`/api/reports?company_id=${companyId}`, token) : isSuperAdmin ? api("/api/reports", token) : Promise.resolve([]);
 export const getOnCall = (companyId, token) => companyId ? api(`/api/oncall?company_id=${companyId}`, token) : Promise.resolve([]);
+export const getScopedAlarms = (token, { resellerId, companyId } = {}) => {
+  const params = new URLSearchParams();
+  if (resellerId) params.set("reseller_id", resellerId);
+  if (companyId) params.set("company_id", companyId);
+  const query = params.toString();
+  return api(`/api/alarms${query ? `?${query}` : ""}`, token);
+};
 
 export function getAlarms(me, token) {
   const params = me.role === "superadmin"

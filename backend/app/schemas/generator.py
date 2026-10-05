@@ -9,6 +9,7 @@ class GeneratorBase(BaseModel):
     rated_volts: float | None = None
     rated_amps: float | None = None
     rated_kw: float | None = None
+    mqtt_topic: str | None = None
     panel_id: str
 
 
@@ -24,6 +25,7 @@ class GeneratorUpdate(BaseModel):
     rated_volts: float | None = None
     rated_amps: float | None = None
     rated_kw: float | None = None
+    mqtt_topic: str | None = None
     panel_id: str | None = None
 
 
