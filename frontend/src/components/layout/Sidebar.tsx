@@ -66,7 +66,7 @@ export function Sidebar() {
   const resellerMatch = useMatch("/resellers/:resellerId/*");
   const companyMatch = useMatch("/companies/:companyId/*");
   const siteMatch = useMatch("/companies/:companyId/sites/:siteId");
-  const systemMatch = useMatch("/systems/:systemId");
+  const systemMatch = useMatch("/systems/:systemId/*");
 
   const resellerId =
     resellerMatch?.params.resellerId === "archived" ? undefined : resellerMatch?.params.resellerId;
@@ -142,6 +142,7 @@ export function Sidebar() {
             </>
           )}
           <NavItem icon={IconReport} color="#2563eb" label="Reports" active={path.includes("/reports")} onClick={() => navigate(`/companies/${companyId}/reports`)} />
+          {systemId && <NavItem icon={IconSettings} color="#0891b2" label="Monitored Assets" active={path.endsWith("/monitored-assets")} onClick={() => navigate(`/systems/${systemId}/monitored-assets`)} />}
         </div>
       </div>
     );

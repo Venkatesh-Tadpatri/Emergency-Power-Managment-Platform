@@ -73,7 +73,7 @@ export type TelemetrySnapshot = {
   storage?: { engine: string; url: string; org: string; bucket: string; measurement: string; has_data: boolean };
 };
 
-/** Temporary JSON telemetry source. Replace this fetch with the telemetry API after MQTT ingestion is available. */
+/** Poll the system-scoped API; the backend enforces hierarchy and queries Influx by system_id. */
 export function useTelemetry(systemId?: string) {
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,21 +82,16 @@ export function useTelemetry(systemId?: string) {
     let active = true;
     let timer: number | undefined;
     const load = async () => {
+      if (!systemId) return;
       try {
-        const isHassenfeld = systemId === "SYS-0006";
-        const snapshot = isHassenfeld
-          ? (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`)).data
-          : await fetch(`/data/telemetry.json?_=${Date.now()}`, { cache: "no-store" }).then((response) => {
-              if (!response.ok) throw new Error("Unable to load telemetry fixture");
-              return response.json() as Promise<TelemetrySnapshot>;
-            });
+        const snapshot = (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`)).data;
         if (!active) return;
         setTelemetry(snapshot);
         setError(null);
         timer = window.setTimeout(load, snapshot.refresh_interval_ms || 5000);
       } catch (error) {
-        console.warn("Telemetry fixture could not be loaded", error);
-        if (active) setError(systemId === "SYS-0006" ? "Live MQTT telemetry is unavailable." : "Telemetry data could not be loaded. Check frontend/public/data/telemetry.json.");
+        console.warn("Live telemetry could not be loaded", error);
+        if (active) setError("Live MQTT telemetry is unavailable.");
         if (active) timer = window.setTimeout(load, 5000);
       }
     };
@@ -129,8 +124,8 @@ export type TelemetryHistory = Map<string, TelemetryHistoryPoint[]>;
 export const historyKey = (type: "generator" | "ats", equipmentId: string) => `${type}:${equipmentId}`;
 
 /** Wraps useTelemetry and accumulates a bounded in-memory trend buffer per equipment, sampled as snapshots arrive. */
-export function useTelemetryHistory(maxPoints = 60) {
-  const { telemetry, error } = useTelemetry();
+export function useTelemetryHistory(systemId?: string, maxPoints = 60) {
+  const { telemetry, error } = useTelemetry(systemId);
   const historyRef = useRef<TelemetryHistory>(new Map());
   const [, setTick] = useState(0);
 

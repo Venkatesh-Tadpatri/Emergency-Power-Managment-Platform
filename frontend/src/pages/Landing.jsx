@@ -38,7 +38,7 @@ export function Landing() {
         <nav className="marketing-nav">
           <a className="marketing-brand" href="#top" aria-label="CPC home"><img className="marketing-logo" src="/images/solution61-logo.svg" alt="Solution 61" /><span><strong>CPC</strong><small>Critical Power Command</small></span></a>
           <div className="marketing-links"><a href="#platform">Platform</a><a href="#solutions">Solutions</a><a href="#mobile">Mobile app</a><a href="#resources">Resources</a></div>
-          <div className="marketing-actions"><button className="marketing-login" onClick={signIn}>Log in</button><button className="marketing-signin" onClick={signIn}>Sign in</button></div>
+          <div className="marketing-actions"><button className="marketing-signin" onClick={signIn}>Sign in</button></div>
         </nav>
         <div className="marketing-hero-image" />
         <div className="marketing-hero-copy" id="top">

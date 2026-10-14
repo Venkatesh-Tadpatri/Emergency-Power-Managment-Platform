@@ -46,7 +46,26 @@ export interface Panel {
   panel_mqtt_id?: string | null;
   system_id: string;
   connection_status: string;
+  plc_serial?: string | null;
+  location?: string | null;
+  slot_count?: number;
+  sync_status?: string;
 }
+
+export interface MonitoredAsset {
+  id: string; system_id: string; panel_id?: string | null; asset_type: "ats" | "generator" | "meter" | "breaker" | "ups" | "fuel_tank" | string;
+  asset_tag: string; description?: string | null; manufacturer?: string | null; model?: string | null; serial_number?: string | null;
+  install_date?: string | null; location?: string | null; slot?: string | null; connection_mode: string; mqtt_topic?: string | null; command_topic?: string | null;
+  branch?: string | null; rating_amps?: number | null; voltage?: number | null; poles?: string | null; transition_type?: string | null;
+  power_topic?: string | null; controller?: string | null; rating_kw?: number | null; rating_kva?: number | null; fuel_type?: string | null; engine?: string | null;
+  meter_model?: string | null; measured_asset_id?: string | null; measures?: string | null; ct_ratio?: string | null; pt_ratio?: string | null; voltage_label?: string | null;
+  trip_amps?: number | null; interrupting_ka?: number | null; trip_unit?: string | null; fed_from?: string | null; feeds?: string | null;
+  input_voltage?: string | null; output_voltage?: string | null; topology?: string | null; battery?: string | null; runtime_minutes?: number | null;
+  tank_read_mode?: string | null; tank_gauge_model?: string | null; served_generator_ids?: string[] | null; capacity_gal?: number | null; tank_type?: string | null; construction?: string | null; low_level_percent?: number | null; runtime_hours?: number | null;
+  linked_asset_id?: string | null; notes?: string | null; status: string;
+}
+
+export interface PanelPush { id: string; panel_id: string; pushed_at: string; pushed_by?: string | null; summary: string; status: string; }
 
 export interface ATS {
   id: string;
@@ -59,6 +78,7 @@ export interface ATS {
   rated_amps?: number | null;
   rated_volts?: number | null;
   mqtt_topic?: string | null;
+  power_mqtt_topic?: string | null;
   panel_id: string;
 }
 

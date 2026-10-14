@@ -38,12 +38,16 @@ ID_PREFIXES = {
     "meters": "MTR",
     "users": "USR",
     "user_assigned_systems": "UAS",
+    "user_assigned_sites": "UAT",
     "alarms": "ALM",
     "reports": "RPT",
     "oncall_shifts": "ONC",
     "alert_schedules": "ASC",
     "alert_rules": "ARL",
     "system_one_lines": "OLN",
+    "monitored_assets": "AST",
+    "panel_pushes": "PSH",
+    "mqtt_topic_mappings": "MQT",
 }
 
 

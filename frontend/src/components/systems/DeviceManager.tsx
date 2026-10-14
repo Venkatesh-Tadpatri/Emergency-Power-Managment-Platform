@@ -122,7 +122,7 @@ function SelectOrCustom({ label, unit, options, value, onChange, placeholder, re
   );
 }
 
-const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "", branch: "equipment", source_type: "utility", rated_amps: "", rated_volts: "", mqtt_topic: "" };
+const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "", branch: "equipment", source_type: "utility", rated_amps: "", rated_volts: "", mqtt_topic: "", power_mqtt_topic: "" };
 const emptyGenForm = { name: "", make: "", model: "", serial_number: "", rated_volts: "", rated_amps: "", rated_kw: "", mqtt_topic: "" };
 
 function MqttMappingHelp() {
@@ -130,10 +130,12 @@ function MqttMappingHelp() {
     <details style={{ marginTop: 6, fontSize: 11, color: "var(--text-dim)" }}>
       <summary style={{ cursor: "pointer" }}>View incoming metric mapping</summary>
       <div style={{ marginTop: 8, lineHeight: 1.7 }}>
-        <b>POWER / metrics:</b> [0] L1-L2 V, [1] L2-L3 V, [2] L3-L1 V, [3] L1-N V,
-        [4] L2-N V, [5] L3-N V, [6] L1 A, [7] L2 A, [8] L3 A, [9] power factor %.<br />
-        <b>STATUS / metrics:</b> [0] operating-state code, [1] utility available,
-        [2] generator available, [3] alarm active.
+        <b>Topic:</b> PLC-SERIAL/CUSTOMER-CODE/P01/G1 (generator) or /A1 (ATS).<br />
+        <b>POWER values:</b> VAB, VBC, VCA, VAN, VBN, VCN, Amps A, Amps B, Amps C,
+        kW; generator topics may then include kVA, kVAR, Hz and PF.<br />
+        <b>Generator STATUS:</b> status word, oil pressure, water temperature, battery voltage,
+        fuel level and engine hours. <b>ATS STATUS:</b> status word, time to bus and time to transfer.<br />
+        Payload can be CSV, a JSON array, or JSON with a <code>metrics</code>/<code>values</code> array.
       </div>
     </details>
   );
@@ -193,6 +195,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       rated_amps: a.rated_amps?.toString() || "",
       rated_volts: a.rated_volts?.toString() || "",
       mqtt_topic: a.mqtt_topic || "",
+      power_mqtt_topic: a.power_mqtt_topic || "",
     });
     setAtsEditing(a);
   };
@@ -209,6 +212,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       rated_amps: atsForm.rated_amps ? Number(atsForm.rated_amps) : undefined,
       rated_volts: atsForm.rated_volts ? Number(atsForm.rated_volts) : undefined,
       mqtt_topic: atsForm.mqtt_topic.trim() || undefined,
+      power_mqtt_topic: atsForm.power_mqtt_topic.trim() || undefined,
     };
     if (atsEditing === "new") {
       const pid = await ensurePanelId();
@@ -355,7 +359,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
               </div>
             </div>
             <div className="form-row">
-              <label>MQTT Topic Address</label>
+              <label>ATS Status Topic Base</label>
               <input
                 value={atsForm.mqtt_topic}
                 onChange={(e) => setAtsForm({ ...atsForm, mqtt_topic: e.target.value })}
@@ -363,6 +367,15 @@ export function DeviceManager({ systemId }: { systemId: string }) {
               />
               <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Enter the base address; /POWER and /STATUS are mapped automatically.</span>
               <MqttMappingHelp />
+            </div>
+            <div className="form-row">
+              <label>Electrical Meter Topic Base</label>
+              <input
+                value={atsForm.power_mqtt_topic}
+                onChange={(e) => setAtsForm({ ...atsForm, power_mqtt_topic: e.target.value })}
+                placeholder="00:E0:62:30:D3:5A/DEMO/P01/M1"
+              />
+              <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Optional M1-M4 base; its /POWER values are merged into this ATS only.</span>
             </div>
             <div className="modal-actions">
               <button type="button" className="header-btn" onClick={() => setAtsEditing(null)}>Cancel</button>

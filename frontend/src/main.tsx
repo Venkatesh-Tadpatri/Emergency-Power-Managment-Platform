@@ -6,16 +6,21 @@ import "leaflet/dist/leaflet.css";
 
 import { App } from "./App";
 import { oidcConfig } from "./auth/oidcConfig";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
+import { installGlobalErrorHandlers } from "./utils/errorReporting";
 import "./styles/global.css";
 
 const queryClient = new QueryClient();
+installGlobalErrorHandlers();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthProvider {...oidcConfig}>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider {...oidcConfig}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   </StrictMode>
 );

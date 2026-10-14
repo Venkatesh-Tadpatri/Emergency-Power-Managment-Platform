@@ -38,8 +38,13 @@ def fixtures(db):
     db.add_all([company_a1, company_b1])
     db.flush()
 
-    system_a1_1 = System(name="Sys A1-1", company_id=company_a1.id)
-    system_a1_2 = System(name="Sys A1-2", company_id=company_a1.id)
+    site_a = Site(name="Site A", customer_id=company_a1.id)
+    site_b = Site(name="Site B", customer_id=company_a1.id)
+    db.add_all([site_a, site_b])
+    db.flush()
+
+    system_a1_1 = System(name="Sys A1-1", company_id=company_a1.id, site_id=site_a.id)
+    system_a1_2 = System(name="Sys A1-2", company_id=company_a1.id, site_id=site_b.id)
     db.add_all([system_a1_1, system_a1_2])
     db.flush()
     db.commit()
@@ -49,6 +54,8 @@ def fixtures(db):
         "reseller_b": reseller_b,
         "company_a1": company_a1,
         "company_b1": company_b1,
+        "site_a": site_a,
+        "site_b": site_b,
         "system_a1_1": system_a1_1,
         "system_a1_2": system_a1_2,
     }
@@ -124,12 +131,8 @@ def test_assigned_scope_operator_sees_only_assigned_systems(db, fixtures):
 
 
 def test_assigned_site_grants_all_its_systems_but_not_other_sites(db, fixtures):
-    site_a = Site(name="Site A", customer_id=fixtures["company_a1"].id)
-    site_b = Site(name="Site B", customer_id=fixtures["company_a1"].id)
-    db.add_all([site_a, site_b])
-    db.flush()
-    fixtures["system_a1_1"].site_id = site_a.id
-    fixtures["system_a1_2"].site_id = site_b.id
+    site_a = fixtures["site_a"]
+    site_b = fixtures["site_b"]
     user = User(zitadel_sub="sub-site", email="site@x.com", role="system_operator", scope_type="assigned", company_id=fixtures["company_a1"].id)
     db.add(user)
     db.flush()

@@ -47,7 +47,14 @@ export function Analytics() {
 
   const [view, setView] = useState<(typeof VIEWS)[number]>(VIEWS[0]);
   const [selected, setSelected] = useState<SelectedDevice | null>(null);
-  const { telemetry, error, history } = useTelemetryHistory();
+  // The telemetry API is system-scoped. A selected site with one system gives us
+  // the required ID; without it the telemetry hook intentionally makes no request.
+  const selectedSystemId = useMemo(() => {
+    if (!siteFilter) return undefined;
+    const systemsAtSite = (allSystems ?? []).filter((system) => system.site_id === siteFilter);
+    return systemsAtSite.length === 1 ? systemsAtSite[0].id : undefined;
+  }, [allSystems, siteFilter]);
+  const { telemetry, error, history } = useTelemetryHistory(selectedSystemId);
   const openGrafana = () => window.open(viewGrafanaUrl(view), "_blank", "noopener,noreferrer");
 
   const systemById = useMemo(() => new Map((allSystems ?? []).map((s) => [s.id, s])), [allSystems]);
@@ -98,7 +105,7 @@ export function Analytics() {
   const onSelect = (item: EquipmentRow) => { if (item.live) setSelected({ kind: item.kind, equipment_id: item.live.equipment_id }); };
 
   return <div>
-    <section className="analytics-intro"><div><h2>Grafana analytics and live telemetry</h2><p>{telemetry ? "Live readings are refreshed automatically. Click a device for its trends, or open Grafana for the complete dashboard workspace and historical charts." : "Loading the latest telemetry…"}</p></div><div className="analytics-actions"><button type="button" className="analytics-open-btn" onClick={openGrafana}>Open in Grafana ↗</button><span className={`analytics-live-status${telemetry ? " online" : ""}`}>● {telemetry ? "Live data" : "Connecting"}</span></div></section>
+    <section className="analytics-intro"><div><h2>Grafana analytics and live telemetry</h2><p>{telemetry?.storage?.has_data ? "Live readings are refreshed automatically. Click a device for its trends, or open Grafana for the complete dashboard workspace and historical charts." : selectedSystemId ? "Waiting for the latest MQTT telemetry…" : "Select a site to load its system telemetry."}</p></div><div className="analytics-actions"><button type="button" className="analytics-open-btn" onClick={openGrafana}>Open in Grafana ↗</button><span className={`analytics-live-status${telemetry?.storage?.has_data ? " online" : ""}`}>● {telemetry?.storage?.has_data ? "Live data" : selectedSystemId ? "Connecting" : "Select site"}</span></div></section>
     <div className="analytics-filters">
       <label>Customer<select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}><option value="">All customers</option>{(companies ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label>Site<select value={siteFilter} onChange={(e) => setSiteFilter(e.target.value)} disabled={!companyFilter}><option value="">All sites</option>{(sites ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>

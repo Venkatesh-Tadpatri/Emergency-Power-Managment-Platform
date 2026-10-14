@@ -96,14 +96,19 @@ services:
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
       MQTT_TOPIC_FILTER: "${MQTT_TOPIC_FILTER:-#}"
       MQTT_TLS: ${MQTT_TLS:-false}
+      TELEMETRY_SAMPLE_INTERVAL_SECONDS: ${TELEMETRY_SAMPLE_INTERVAL_SECONDS:-5}
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-cpc-development-token-change-me}
       INFLUXDB_ORG: ${INFLUXDB_ORG:-cpc}
       INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
+      LOG_DIR: /app/logs
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-30}
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./logs:/app/logs
     depends_on:
       mysql:
         condition: service_healthy

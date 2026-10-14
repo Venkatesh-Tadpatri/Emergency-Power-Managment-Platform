@@ -30,3 +30,22 @@ def test_ats_status_metrics_are_mapped_by_position():
 
 def test_topic_normalization():
     assert normalize_topic(" /customer/panel/A1/ ") == "customer/panel/A1"
+
+
+def test_excel_style_csv_generator_status_payload():
+    assert map_payload("SERIAL/DEMO/P01/G1/STATUS", "3,45,82,26.4,74,119.5") == {
+        "status_word": 3,
+        "oil_pressure_psi": 45,
+        "coolant_temperature_c": 82,
+        "battery_voltage": 26.4,
+        "fuel_level_percent": 74,
+        "engine_hours": 119.5,
+    }
+
+
+def test_values_json_array_is_accepted():
+    assert map_payload("SERIAL/DEMO/P01/A1/STATUS", '{"values":[9,12,4]}') == {
+        "status_word": 9,
+        "time_to_bus_seconds": 12,
+        "time_to_transfer_seconds": 4,
+    }

@@ -6,7 +6,6 @@ import { Modal } from "../common/Modal";
 import { TestWizard } from "./TestWizard";
 import type { ATS, Generator } from "../../types/entities";
 import { telemetryFor, useTelemetrySnapshot, type AtsTelemetry, type GeneratorTelemetry } from "../../hooks/useTelemetry";
-import { demoAtsTelemetry, demoGeneratorTelemetry } from "../../data/mepstraTelemetry";
 import { useAlarms } from "../../queries/alarms";
 import { useOneLine, useSaveOneLine } from "../../queries/systems";
 import boilerIcon from "../../assets/equipment/boiler.png";
@@ -21,9 +20,9 @@ import airCompressorIcon from "../../assets/equipment/air-compressor.png";
 type EquipmentSelection = { type: "ats"; id: string } | { type: "generator"; id: string };
 const atsNumber = (value: string | undefined) => value?.match(/ats[-\s]*(\d+)/i)?.[1]?.replace(/^0+/, "");
 
-/** Live telemetry first; falls back to the Mepstra demo register snapshot for the specific devices it covers. */
+/** Match only telemetry returned for the current system; never borrow demo or another system's data. */
 export function resolveGeneratorTelemetry(generatorTelemetry: GeneratorTelemetry[] | undefined, id: string, name: string) {
-  return telemetryFor(generatorTelemetry, id, name) || demoGeneratorTelemetry(id) || undefined;
+  return telemetryFor(generatorTelemetry, id, name);
 }
 export function resolveAtsTelemetry(atsTelemetry: AtsTelemetry[] | undefined, id: string, name: string) {
   const exact = telemetryFor(atsTelemetry, id, name);
@@ -33,7 +32,7 @@ export function resolveAtsTelemetry(atsTelemetry: AtsTelemetry[] | undefined, id
   const numbered = targetNumber
     ? atsTelemetry?.find((item) => atsNumber(item.equipment_id) === targetNumber || atsNumber(item.equipment_name) === targetNumber)
     : undefined;
-  return numbered || demoAtsTelemetry(id) || undefined;
+  return numbered;
 }
 
 const unavailableReading = "00";
@@ -357,12 +356,49 @@ function EquipmentFaceplate({ systemName, ats, generator, atsTelemetry, generato
   </Modal>;
 }
 
+function UtilityFaceplate({ systemName, leadBreaker, entryBreaker, switchgearName, onClose }: { systemName: string; leadBreaker?: WizardPiece; entryBreaker?: WizardPiece; switchgearName?: string; onClose: () => void }) {
+  return <Modal title="" onClose={onClose} className="equipment-detail-modal">
+    <button type="button" className="equipment-popup-close" aria-label="Close utility details" onClick={onClose}>x</button>
+    <div className="faceplate-v2" role="dialog" aria-label="Utility details">
+      <header className="faceplate-v2-header">
+        <div><h3>Utility</h3><p className="faceplate-v2-line2">{systemName} | Normal power source</p></div>
+        <span className="faceplate-v2-branch-pill blue">Normal Source</span>
+      </header>
+      <div className="faceplate-v2-tag-row"><div className="faceplate-v2-tag">Electrical Utility</div><div className="faceplate-v2-tag">Grid Supply</div></div>
+      <div className="faceplate-v2-banner ready">AVAILABLE</div>
+      <div className="faceplate-v2-section-title">Connection Path</div>
+      <div className="faceplate-v2-source-grid">
+        <div className="faceplate-v2-source-col">
+          <div className="faceplate-v2-source-box on normal"><span>Source</span><b>Utility</b></div>
+          <div className="faceplate-v2-info-box"><span>First Breaker</span><b>{leadBreaker?.name || "Direct connection"}</b></div>
+        </div>
+        <div className="faceplate-v2-source-col">
+          <div className="faceplate-v2-info-box"><span>Incomer</span><b>{entryBreaker?.name || "Direct connection"}</b></div>
+          <div className="faceplate-v2-info-box"><span>Feeds</span><b className="normal">{switchgearName || "Switchgear"}</b></div>
+        </div>
+      </div>
+      <div className="faceplate-v2-section-title">Supply Status</div>
+      <div className="faceplate-v2-electrical-grid utility-detail-grid">
+        <div className="faceplate-v2-electrical-col"><div className="faceplate-v2-col-title">Source</div><div className="faceplate-v2-row"><span>Type</span><b>UTILITY</b></div><div className="faceplate-v2-row"><span>Status</span><b>AVAILABLE</b></div></div>
+        <div className="faceplate-v2-electrical-col"><div className="faceplate-v2-col-title">Connection</div><div className="faceplate-v2-row"><span>Position</span><b>CLOSED</b></div><div className="faceplate-v2-row"><span>Bus</span><b>ENERGIZED</b></div></div>
+      </div>
+    </div>
+  </Modal>;
+}
+
 function TransformerSymbol({ size = 20 }: { size?: number }) {
   return <svg width={size} height={size * 1.1} viewBox="0 0 22 24" fill="none" aria-hidden="true" className="sld-symbol sld-transformer-symbol">
     <path d="M2 9 a3.2 3.2 0 0 1 6.4 0 a3.2 3.2 0 0 1 6.4 0 a3.2 3.2 0 0 1 6.4 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     <path d="M2 15 a3.2 3.2 0 0 0 6.4 0 a3.2 3.2 0 0 0 6.4 0 a3.2 3.2 0 0 0 6.4 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     <line x1="11" y1="0" x2="11" y2="6" stroke="currentColor" strokeWidth="1.6" />
     <line x1="11" y1="17.5" x2="11" y2="24" stroke="currentColor" strokeWidth="1.6" />
+  </svg>;
+}
+
+function UtilityTowerSymbol({ size = 46 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+    <path d="M27 5h10m-14 8h18M18 22h28M13 34h38M9 47h46M27 5 11 59m26-54 16 54M23 13l18 9-23 12 33 13-40 12m30-46-18 9 23 12-33 13 40 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M6 59h13m26 0h13" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
   </svg>;
 }
 
@@ -2181,6 +2217,7 @@ export function ResultTab({
 }: { systemName: string; ats: ATS[]; generators: Generator[]; atsTelemetry?: AtsTelemetry[]; generatorTelemetry?: GeneratorTelemetry[]; pieces: WizardPiece[]; sourceLinks: Record<string, string>; atsDownstream: Record<string, string>; pieceDownstream: Record<string, string[]>; generated: boolean; onEditPiece?: (piece: WizardPiece) => void }) {
   const [openAts, setOpenAts] = useState<ATS | null>(null);
   const [openGenerator, setOpenGenerator] = useState<Generator | null>(null);
+  const [utilityOpen, setUtilityOpen] = useState(false);
   const [branchAts, setBranchAts] = useState<ATS | null>(null);
   const [scheduleView, setScheduleView] = useState<{ piece: WizardPiece; tone: "emergency" | "normal"; fedFrom: string } | null>(null);
   const [showJson, setShowJson] = useState(false);
@@ -2255,6 +2292,24 @@ export function ResultTab({
   // load yet (atsDownstream) — that's separate, still shown as "Not Wired" inside an otherwise-visible
   // ATS box below.
   const wiredGeneratorViews = generatorViews.filter(({ generator }) => Boolean(sourceLinks[generator.id]));
+  let utilityLeadBreaker: WizardPiece | undefined;
+  let utilityEntryBreaker: WizardPiece | undefined;
+  if (sourceLinks.utility) {
+    const seen = new Set<string>();
+    let current: string | undefined = sourceLinks.utility;
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      const piece = pieces.find((item) => item.name === current);
+      if (piece?.type !== "breaker") break;
+      if (!utilityLeadBreaker) utilityLeadBreaker = piece;
+      else if (!utilityEntryBreaker) { utilityEntryBreaker = piece; break; }
+      current = (pieceDownstream[current] || [])[0];
+    }
+  }
+  const utilityWired = Boolean(sourceLinks.utility);
+  const hasWiredSources = utilityWired || wiredGeneratorViews.length > 0;
+  const busIsUtilityOnly = utilityWired && wiredGeneratorViews.length === 0;
+  const busToneClass = busIsUtilityOnly ? "normal" : "emergency";
   const reachableFromSources = new Set<string>();
   const reachStack = Object.values(sourceLinks);
   while (reachStack.length) {
@@ -2278,7 +2333,7 @@ export function ResultTab({
       <div className="result-spine-wrap">
         <div className="result-spine-header">
           <div>
-            <div className="wizard-kicker">Generators → {switchgear ? switchgear.name : "Switchgear"} → ATS</div>
+            <div className="wizard-kicker">Sources → {switchgear ? switchgear.name : "Switchgear"} → ATS</div>
             <p className="result-spine-sub">The spine — click any ATS to view its downstream load.</p>
           </div>
         </div>
@@ -2289,6 +2344,23 @@ export function ResultTab({
               inside the box below) so the border crosses the middle of a plain wire, the same way the
               bottom border crosses the wire between the feeder breaker and the ATS below it. */}
           <div className="sld-generators result-gen-row result-gen-lead-row">
+            {utilityWired && (() => {
+              const leadDetail: BreakerDetailData = {
+                key: "lead-utility", name: utilityLeadBreaker?.name || "Utility Breaker",
+                style: utilityLeadBreaker?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount",
+                derived: !utilityLeadBreaker, position: "Closed", emergency: false,
+                poweredBy: "Utility", feeds: utilityEntryBreaker?.name || switchgear?.name || "Bus",
+              };
+              return <div className="sld-generator-column result-utility-column" key="utility">
+                <button type="button" className="result-utility-source" title="Open Utility" aria-label="Open Utility details" onClick={() => setUtilityOpen(true)}><span>UTILITY</span><small>Available</small><UtilityTowerSymbol /></button>
+                <span className="sld-gear-connector normal-source" aria-hidden="true" />
+                {utilityLeadBreaker ? <span className="sld-breaker-with-tag">
+                  <BreakerHitButton detail={leadDetail}>{utilityLeadBreaker.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone="tie" /> : <BreakerSymbol tone="tie" size={38} centered />}</BreakerHitButton>
+                  <div className="sld-breaker-tag normal-source">{utilityLeadBreaker.name}</div>
+                </span> : <span className="sld-gear-connector normal-source" aria-hidden="true" />}
+                <span className="result-crossing-wire normal-source" aria-hidden="true" />
+              </div>;
+            })()}
             {wiredGeneratorViews.map(({ generator, data, running, structuralTone, lineClass, breakerTone, leadBreaker, entryBreaker }) => {
               const leadKey = `lead-${generator.id}`;
               const leadName = leadBreaker?.name || `${generator.name} Breaker`;
@@ -2321,16 +2393,37 @@ export function ResultTab({
               </div>
               );
             })}
-            {!wiredGeneratorViews.length && <p className="operations-empty">No generators wired yet — connect one in the Connections step.</p>}
+            {!hasWiredSources && <p className="operations-empty">No utility or generators wired yet — connect a source in the Connections step.</p>}
           </div>
           {switchgear && (
             <div className="result-switchgear-box">
               <SwitchgearLabelButton
                 switchgear={switchgear}
-                feeds={wiredGeneratorViews.map(({ entryBreaker, leadBreaker, index }) => entryBreaker?.name || leadBreaker?.name || `52-G${index + 1}`)}
+                feeds={[
+                  ...(utilityWired ? [utilityEntryBreaker?.name || utilityLeadBreaker?.name || "Utility"] : []),
+                  ...wiredGeneratorViews.map(({ entryBreaker, leadBreaker, index }) => entryBreaker?.name || leadBreaker?.name || `52-G${index + 1}`),
+                ]}
               />
-              {Boolean(wiredGeneratorViews.length) && (
+              {hasWiredSources && (
                 <div className="sld-generators result-gen-row result-gen-entry-row">
+                  {utilityWired && (() => {
+                    const entryDetail: BreakerDetailData = {
+                      key: "entry-utility", name: utilityEntryBreaker?.name || "Utility Incomer", role: "Incomer",
+                      style: utilityEntryBreaker?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount",
+                      derived: !utilityEntryBreaker, position: "Closed", emergency: false,
+                      poweredBy: utilityLeadBreaker?.name || "Utility", feeds: "Bus",
+                    };
+                    return <div className="sld-generator-column result-utility-column" key="utility-entry">
+                      <span className="result-crossing-wire normal-source" aria-hidden="true" />
+                      <span className="result-drawout-slot">
+                        {utilityEntryBreaker ? <span className="sld-breaker-with-tag">
+                          <BreakerHitButton detail={entryDetail}>{utilityEntryBreaker.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone="tie" /> : <BreakerSymbol tone="tie" size={38} centered />}</BreakerHitButton>
+                          <div className="sld-breaker-tag normal-source">{utilityEntryBreaker.name}</div>
+                        </span> : <span className="sld-gear-connector normal-source" aria-hidden="true" />}
+                      </span>
+                      <span className="sld-gear-connector tail normal-source" aria-hidden="true" />
+                    </div>;
+                  })()}
                   {wiredGeneratorViews.map(({ generator, lineClass, breakerTone, entryBreaker, leadBreaker, running, index }) => {
                     const entryKey = `entry-${generator.id}`;
                     const entryName = entryBreaker?.name || `52-G${index + 1}`;
@@ -2363,7 +2456,7 @@ export function ResultTab({
                   })}
                 </div>
               )}
-              {Boolean(wiredGeneratorViews.length) && <div className="result-bus" />}
+              {hasWiredSources && <div className={`result-bus ${busToneClass}`} />}
               {Boolean(wiredAts.length) && (
                 <div className="result-ats-row result-feeder-row">
                   {/* These feeders all drop off the same emergency bus, so — like the bus itself — they
@@ -2378,22 +2471,22 @@ export function ResultTab({
                     const feederName = feederPiece?.name || "";
                     const feederDetail: BreakerDetailData = {
                       key: feederKey, name: feederName, role: "Feeder", style: feederPiece?.meta?.style === "draw-out" ? "Draw-Out" : "Fixed-Mount", derived: false,
-                      position: "Closed", emergency: true, poweredBy: switchgear?.name || "Bus", feeds: item.name,
+                      position: "Closed", emergency: !busIsUtilityOnly, poweredBy: switchgear?.name || "Bus", feeds: item.name,
                     };
                     return (
                     <div className="result-ats-col" key={item.id}>
-                      <span className="result-connector emergency" />
+                      <span className={`result-connector ${busToneClass}`} />
                       {feederPiece ? (
                         <span className="sld-breaker-with-tag">
                           <BreakerHitButton detail={feederDetail}>
-                            {feederPiece.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone="emergency" /> : <BreakerSymbol tone="emergency" size={38} centered />}
+                            {feederPiece.meta?.style === "draw-out" ? <DrawoutBreakerGlyph tone={busIsUtilityOnly ? "tie" : "emergency"} /> : <BreakerSymbol tone={busIsUtilityOnly ? "tie" : "emergency"} size={38} centered />}
                           </BreakerHitButton>
-                          <div className="sld-breaker-tag emergency-source">{feederName}</div>
+                          <div className={`sld-breaker-tag ${busIsUtilityOnly ? "normal-source" : "emergency-source"}`}>{feederName}</div>
                         </span>
                       ) : (
-                        <span className="result-connector emergency" aria-hidden="true" />
+                        <span className={`result-connector ${busToneClass}`} aria-hidden="true" />
                       )}
-                      <span className="result-connector emergency" />
+                      <span className={`result-connector ${busToneClass}`} />
                     </div>
                     );
                   })}
@@ -2408,7 +2501,7 @@ export function ResultTab({
               const downstream = atsDownstream[item.id];
               return (
                 <div className="result-ats-col" key={item.id}>
-                  <span className="result-connector emergency" aria-hidden="true" />
+                  <span className={`result-connector ${busToneClass}`} aria-hidden="true" />
                   <div className={`sld-ats result-ats-node ${emergency ? "on-emergency" : "on-normal"}`}>
                     <button type="button" className="sld-switch" aria-label={`Open ${item.name}: ${emergency ? "connected to emergency" : "connected to normal"}`} onClick={() => setOpenAts(item)}>
                       <span className={`sld-terminal normal-terminal ${!emergency ? "active" : ""}`}>N</span>
@@ -2454,6 +2547,7 @@ export function ResultTab({
           }
         />
       )}
+      {utilityOpen && <UtilityFaceplate systemName={systemName} leadBreaker={utilityLeadBreaker} entryBreaker={utilityEntryBreaker} switchgearName={switchgear?.name} onClose={() => setUtilityOpen(false)} />}
       {openGenerator && (
         <EquipmentFaceplate
           systemName={systemName}

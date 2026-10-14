@@ -114,6 +114,15 @@ export function useCreatePanel() {
   });
 }
 
+export function useUpdatePanel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Panel> }) =>
+      (await api.patch<Panel>(`/api/panels/${id}`, data)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["panels"] }),
+  });
+}
+
 export function useAts(panelId: string | undefined) {
   return useQuery({
     queryKey: ["ats", { panelId }],

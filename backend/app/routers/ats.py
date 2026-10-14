@@ -33,7 +33,11 @@ def create_ats(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "panel not found")
     if not can_write_system(user, db, panel.system.company_id, panel.system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to add ATS devices here")
-    return crud.create_ats(db, data)
+    try:
+        return crud.create_ats(db, data)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.get("/{ats_id}", response_model=ATSRead)
@@ -57,7 +61,11 @@ def update_ats(
     system = ats.panel.system
     if not can_write_system(user, db, system.company_id, system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this ATS")
-    return crud.update_ats(db, ats, data)
+    try:
+        return crud.update_ats(db, ats, data)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.delete("/{ats_id}", status_code=status.HTTP_204_NO_CONTENT)

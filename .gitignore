@@ -51,6 +51,8 @@ data/
 !mobile/src/data/telemetry.json
 !mobile/src/data/mepstra-telemetry.json
 coverage/
+logs/
+backend/logs/
 
 # Local identity-provider discovery and credentials
 zitadel_*.json

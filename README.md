@@ -31,7 +31,7 @@ The exact application dependencies are committed in `backend/requirements.txt`, 
 ## Clone and start the web stack
 
 ```bash
-git clone https://github.com/Venkatesh-Tadpatri/Emergency-Power-Managment-Platform.git
+git clone --branch Updated_code_with_monitored_assets --single-branch https://github.com/Venkatesh-Tadpatri/Emergency-Power-Managment-Platform.git
 cd Emergency-Power-Managment-Platform
 cp .env.example .env
 ```
@@ -49,6 +49,20 @@ openssl rand -base64 24
 ```
 
 The generated master key must be exactly 32 characters. Never commit `.env` or credentials; `.env.example` is the safe template to share.
+
+### Update an existing clone to this branch
+
+Keep any local work before switching branches. Then run:
+
+```bash
+git fetch origin
+git switch Updated_code_with_monitored_assets
+git pull --ff-only origin Updated_code_with_monitored_assets
+cp .env.example .env
+docker compose up --build
+```
+
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`. If you already have a configured `.env`, do not overwrite it; compare it with `.env.example` and add any missing variables instead. The backend container automatically runs `alembic upgrade head` before starting, so a fresh or existing database receives all schema updates.
 
 ### Configure Zitadel once
 
@@ -170,6 +184,23 @@ cd backend
 alembic upgrade head
 ```
 
+## Monitored assets and MQTT telemetry
+
+- The **Monitored Assets** system page manages panel-connected equipment, PLC slots, asset metadata, and MQTT assignments.
+- Migrations `0019` through `0028` create the monitored-assets and topic-mapping tables and add the supported equipment fields. Docker applies them automatically at backend startup.
+- MySQL stores the customer/site/system/device hierarchy and MQTT mappings. InfluxDB stores time-series telemetry. Both use named Docker volumes, so normal container recreation keeps the data.
+- Set `MQTT_ENABLED=true` and configure the `MQTT_*` and `INFLUXDB_*` entries in `.env` to ingest live data. Leave `MQTT_ENABLED=false` to run without a broker.
+- See [`docs/mqtt-influx-telemetry.md`](docs/mqtt-influx-telemetry.md) for topic formats, accepted payloads, ownership isolation, and runtime checks.
+
+After startup, confirm the migration and services with:
+
+```bash
+docker compose ps
+docker compose logs backend --tail 100
+```
+
+The backend log should show `Running migrations...` followed by the API startup message. If a clean demonstration database is required, `docker compose down -v` removes all database volumes; this is destructive and should not be used for an installation whose data must be retained.
+
 ## Troubleshooting
 
 **Grafana container stuck restarting / crash-looping.** Usually stale internal SQLite state left over from a previous run conflicting with datasource provisioning (`data source with the same uid already exists` in `docker compose logs grafana`). Since Grafana's data directory isn't a mounted volume, recreating the container gives it a clean state:
@@ -191,3 +222,18 @@ docker compose up -d --force-recreate zitadel backend frontend
 ## SMTP (optional)
 
 SMTP is needed for Zitadel registration, activation, and password-reset emails. Set the `ZITADEL_SMTP_*` values before the first Zitadel startup, or configure and activate SMTP later in the Zitadel Console under **Instance → Settings → Notifications**.
+
+## Application logs
+
+Backend, API request, telemetry, and browser errors are written to the local `logs/`
+folder when the stack is run with Docker Compose:
+
+- `logs/application.log` contains all events at the configured level.
+- `logs/errors.log` contains errors and stack traces only.
+- Files rotate at local midnight; rotated names include the date and are retained for
+  30 days by default.
+- Every API response includes an `X-Request-ID`, which can be searched in the log.
+
+Configure this with `LOG_LEVEL` and `LOG_RETENTION_DAYS` in `.env`. Browser errors are
+sent to `POST /client-errors`; request bodies, authorization headers, and access tokens
+are deliberately not recorded.

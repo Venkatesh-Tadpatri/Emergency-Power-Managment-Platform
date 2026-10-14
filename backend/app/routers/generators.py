@@ -33,7 +33,11 @@ def create_generator(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "panel not found")
     if not can_write_system(user, db, panel.system.company_id, panel.system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to add generators here")
-    return crud.create_generator(db, data)
+    try:
+        return crud.create_generator(db, data)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.get("/{generator_id}", response_model=GeneratorRead)
@@ -59,7 +63,11 @@ def update_generator(
     system = generator.panel.system
     if not can_write_system(user, db, system.company_id, system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this generator")
-    return crud.update_generator(db, generator, data)
+    try:
+        return crud.update_generator(db, generator, data)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.delete("/{generator_id}", status_code=status.HTTP_204_NO_CONTENT)

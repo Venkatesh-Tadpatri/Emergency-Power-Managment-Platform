@@ -18,6 +18,7 @@ class ATS(Base, UUIDPKMixin, TimestampMixin):
     rated_amps: Mapped[float | None] = mapped_column(Float)
     rated_volts: Mapped[float | None] = mapped_column(Float)
     mqtt_topic: Mapped[str | None] = mapped_column(String(512), index=True)
+    power_mqtt_topic: Mapped[str | None] = mapped_column(String(512), index=True)
     panel_id: Mapped[str] = mapped_column(ForeignKey("panels.id"), nullable=False)
 
     panel: Mapped["Panel"] = relationship(back_populates="ats_devices")

@@ -26,10 +26,14 @@ class Settings(BaseSettings):
     mqtt_password: str = ""
     mqtt_topic_filter: str = "#"
     mqtt_tls: bool = False
+    telemetry_sample_interval_seconds: int = 5
     influxdb_url: str = "http://influxdb:8086"
     influxdb_token: str = "cpc-development-token-change-me"
     influxdb_org: str = "cpc"
     influxdb_bucket: str = "telemetry"
+    log_dir: str = "logs"
+    log_level: str = "INFO"
+    log_retention_days: int = 30
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { reportClientError } from "../utils/errorReporting";
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE,
@@ -19,3 +20,14 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const method = error.config?.method?.toUpperCase() || "REQUEST";
+    const path = error.config?.url || "unknown URL";
+    const status = error.response?.status ? ` (${error.response.status})` : "";
+    reportClientError(new Error(`${method} ${path}${status}: ${error.message}`), "axios");
+    return Promise.reject(error);
+  },
+);
