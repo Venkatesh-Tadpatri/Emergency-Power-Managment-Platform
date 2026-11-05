@@ -5,6 +5,7 @@ import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useCompany } from "../../queries/companies";
 import { downloadReportPdf, useReport } from "../../queries/reports";
 import { useSystem } from "../../queries/systems";
+import { useReseller } from "../../queries/resellers";
 import { GeneratorRunReport } from "./GeneratorRunReport";
 import { AtsTransferReport } from "./AtsTransferReport";
 
@@ -14,6 +15,7 @@ export function ReportDetail() {
   const { data: company } = useCompany(companyId);
   const { data: report } = useReport(reportId);
   const { data: system } = useSystem(report?.system_id);
+  const { data: reseller } = useReseller(company?.reseller_id);
   const [downloading, setDownloading] = useState(false);
   usePageHeader("Report Detail", [
     { label: company?.name || "", onClick: () => navigate(`/companies/${companyId}`) },
@@ -40,9 +42,9 @@ export function ReportDetail() {
         </button>
       </div>
       {report.type === "gen-run" ? (
-        <GeneratorRunReport report={report} system={system} company={company} />
+        <GeneratorRunReport report={report} system={system} company={company} reseller={reseller} />
       ) : (
-        <AtsTransferReport report={report} system={system} company={company} />
+        <AtsTransferReport report={report} system={system} company={company} reseller={reseller} />
       )}
     </>
   );

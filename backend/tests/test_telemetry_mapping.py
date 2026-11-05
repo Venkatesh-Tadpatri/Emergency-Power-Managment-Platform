@@ -1,6 +1,6 @@
 import json
 
-from app.services.telemetry import map_payload, normalize_topic
+from app.services.telemetry import map_payload, normalize_topic, topic_matches_base
 
 
 def test_power_metrics_are_mapped_by_position():
@@ -28,8 +28,24 @@ def test_ats_status_metrics_are_mapped_by_position():
     }
 
 
+def test_tstp03_m4_power_maps_excel_phase_to_neutral_fields():
+    payload = json.dumps({"metrics": [479, 479, 480, 277, 276, 278, 54, 53, 55, 40]})
+
+    mapped = map_payload("TSTP03/M4/POWER", payload)
+
+    assert mapped["voltage_l1_n_v"] == 277
+    assert mapped["voltage_l2_n_v"] == 276
+    assert mapped["voltage_l3_n_v"] == 278
+    assert mapped["active_power_kw"] == 40
+
+
 def test_topic_normalization():
     assert normalize_topic(" /customer/panel/A1/ ") == "customer/panel/A1"
+
+
+def test_current_mapping_accepts_child_topic_and_rejects_old_topic():
+    assert topic_matches_base("TSTP01/M3/POWER", {"TSTP03/G1", "TSTP01/M3"})
+    assert not topic_matches_base("TSTP01/M1/POWER", {"TSTP03/G1", "TSTP01/M3"})
 
 
 def test_excel_style_csv_generator_status_payload():
@@ -48,4 +64,11 @@ def test_values_json_array_is_accepted():
         "status_word": 9,
         "time_to_bus_seconds": 12,
         "time_to_transfer_seconds": 4,
+    }
+
+
+def test_fuel_tank_payload_maps_level_and_gallons():
+    assert map_payload("SERIAL/CUST/P01/F1/FUEL", '{"metrics":[72.5,1450]}') == {
+        "fuel_level_percent": 72.5,
+        "fuel_volume_gallons": 1450,
     }

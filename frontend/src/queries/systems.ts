@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../api/client";
-import type { ATS, Generator, Panel, Site, System } from "../types/entities";
+import type { AlarmDisableStatus, ATS, Generator, Panel, Site, System, SystemEvent } from "../types/entities";
 
 export function useSystems(companyId?: string, siteId?: string) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ["systems", { companyId, siteId }],
     queryFn: async () =>
@@ -12,13 +13,24 @@ export function useSystems(companyId?: string, siteId?: string) {
           params: { ...(companyId ? { company_id: companyId } : {}), ...(siteId ? { site_id: siteId } : {}) },
         })
       ).data,
+    initialData: () => {
+      if (!companyId && !siteId) return undefined;
+      const allSystems = qc.getQueryData<System[]>(["systems", { companyId: undefined, siteId: undefined }]);
+      return allSystems?.filter((system) => (!companyId || system.company_id === companyId) && (!siteId || system.site_id === siteId));
+    },
   });
 }
 
 export function useSites(customerId?: string) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ["sites", { customerId }],
     queryFn: async () => (await api.get<Site[]>("/api/sites", { params: customerId ? { customer_id: customerId } : {} })).data,
+    initialData: () => {
+      if (!customerId) return undefined;
+      const allSites = qc.getQueryData<Site[]>(["sites", { customerId: undefined }]);
+      return allSites?.filter((site) => site.customer_id === customerId);
+    },
   });
 }
 
@@ -54,11 +66,71 @@ export function useArchiveSite() {
   });
 }
 
+export function useUnarchiveSite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.patch<Site>(`/api/sites/${id}`, { status: "active" })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sites"] }),
+  });
+}
+
+export function useDeleteSite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => api.delete(`/api/sites/${id}/permanent`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sites"] });
+      qc.invalidateQueries({ queryKey: ["systems"] });
+    },
+  });
+}
+
 export function useSystem(id: string | undefined) {
   return useQuery({
     queryKey: ["systems", id],
     queryFn: async () => (await api.get<System>(`/api/systems/${id}`)).data,
     enabled: !!id,
+  });
+}
+
+export function useAlarmDisableStatus(systemId?: string) {
+  return useQuery({
+    queryKey: ["systems", systemId, "alarm-disable"],
+    queryFn: async () => (await api.get<AlarmDisableStatus>(`/api/systems/${systemId}/alarm-disable`)).data,
+    enabled: !!systemId,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSystemEvents(systemId?: string) {
+  return useQuery({
+    queryKey: ["systems", systemId, "events"],
+    queryFn: async () => (await api.get<SystemEvent[]>(`/api/systems/${systemId}/events`)).data,
+    enabled: !!systemId,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useDisableSystemAlarms(systemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { duration: "1h" | "4h" | "8h" | "24h" | "indefinite"; reason: string }) =>
+      (await api.post<AlarmDisableStatus>(`/api/systems/${systemId}/alarm-disable`, data)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["systems", systemId, "alarm-disable"] });
+      qc.invalidateQueries({ queryKey: ["systems", systemId, "events"] });
+    },
+  });
+}
+
+export function useEnableSystemAlarms(systemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => (await api.delete<AlarmDisableStatus>(`/api/systems/${systemId}/alarm-disable`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["systems", systemId, "alarm-disable"] });
+      qc.invalidateQueries({ queryKey: ["systems", systemId, "events"] });
+    },
   });
 }
 
@@ -140,6 +212,14 @@ export function useAllAts(enabled = true) {
   });
 }
 
+export function useSystemAts(systemId: string | undefined) {
+  return useQuery({
+    queryKey: ["ats", { systemId }],
+    queryFn: async () => (await api.get<ATS[]>("/api/ats", { params: { system_id: systemId } })).data,
+    enabled: !!systemId,
+  });
+}
+
 export function useAtsDevice(id: string | undefined) {
   return useQuery({
     queryKey: ["ats", id],
@@ -191,6 +271,14 @@ export function useAllGenerators(enabled = true) {
   });
 }
 
+export function useSystemGenerators(systemId: string | undefined) {
+  return useQuery({
+    queryKey: ["generators", { systemId }],
+    queryFn: async () => (await api.get<Generator[]>("/api/generators", { params: { system_id: systemId } })).data,
+    enabled: !!systemId,
+  });
+}
+
 export function useGenerator(id: string | undefined) {
   return useQuery({
     queryKey: ["generators", id],
@@ -211,7 +299,7 @@ export function useUpdateGenerator() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Generator> }) =>
-      (await api.patch<Generator>(`/api/generators/${id}`, data)).data,
+      (await api.patch<Generator>(`/api/generators/${id}`, data, { timeout: 20_000 })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["generators"] }),
   });
 }

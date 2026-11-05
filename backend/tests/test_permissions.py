@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.auth.permissions import can_view_company, can_view_site, can_view_system, can_write_system, get_scope
+from app.auth.permissions import can_edit_one_line, can_view_company, can_view_site, can_view_system, can_write_system, get_scope
 from app.models.site import Site
 from app.models.base import Base
 from app.models.company import Company
@@ -111,6 +111,22 @@ def test_only_superadmin_can_change_systems_or_devices(db, fixtures):
 
     superadmin = User(zitadel_sub="write-superadmin", email="superadmin@x.com", role="superadmin")
     assert can_write_system(superadmin, db, company.id, company.reseller_id)
+
+
+def test_only_superadmin_and_own_reseller_admin_can_edit_one_line(fixtures):
+    reseller_a = fixtures["reseller_a"]
+    reseller_b = fixtures["reseller_b"]
+    superadmin = User(zitadel_sub="one-line-super", email="super@x.com", role="superadmin")
+    own_reseller_admin = User(zitadel_sub="one-line-own", email="own@x.com", role="reseller_admin", reseller_id=reseller_a.id)
+    other_reseller_admin = User(zitadel_sub="one-line-other", email="other@x.com", role="reseller_admin", reseller_id=reseller_b.id)
+
+    assert can_edit_one_line(superadmin, reseller_a.id)
+    assert can_edit_one_line(own_reseller_admin, reseller_a.id)
+    assert not can_edit_one_line(other_reseller_admin, reseller_a.id)
+
+    for role in ("company_admin", "system_operator", "system_viewer"):
+        user = User(zitadel_sub=f"one-line-{role}", email=f"{role}@x.com", role=role)
+        assert not can_edit_one_line(user, reseller_a.id)
 
 
 def test_assigned_scope_operator_sees_only_assigned_systems(db, fixtures):

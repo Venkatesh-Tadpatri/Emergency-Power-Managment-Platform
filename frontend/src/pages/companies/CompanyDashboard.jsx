@@ -7,13 +7,13 @@ import { StatsGrid } from "../../components/common/StatCard";
 import { StatusPill } from "../../components/common/StatusPill";
 import { IconAlert, IconBuilding, IconCheckCircle, IconPanel } from "../../components/common/Icons";
 import { Modal } from "../../components/common/Modal";
-import { PageHero } from "../../components/common/PageHero";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useAlarms } from "../../queries/alarms";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
 import { useReseller } from "../../queries/resellers";
 import { useArchiveSystem, useCreateSystem, useSystems, useUpdateSystem } from "../../queries/systems";
+import { activeAlarmOnly } from "../../utils/alarmClassification";
 export function CompanyDashboard() {
     const { companyId } = useParams();
     const navigate = useNavigate();
@@ -42,7 +42,7 @@ export function CompanyDashboard() {
     const canManage = me?.role === "superadmin";
     const normal = (systems || []).filter((s) => s.status === "normal").length;
     const events = (systems || []).length - normal;
-    const active = (alarms || []).filter((a) => a.status === "active");
+    const active = activeAlarmOnly(alarms);
     const unacked = active.filter((a) => !a.ack_by);
     const openNew = () => {
         setForm({ name: "", address: "", lat: "", lng: "" });
@@ -71,7 +71,7 @@ export function CompanyDashboard() {
         }
         setEditing(null);
     };
-    return (_jsxs(_Fragment, { children: [_jsx(PageHero, { title: company?.name || "Customer", subtitle: company?.address, icon: IconBuilding, color: events > 0 ? "#dc2626" : "#2563eb", bgImage: "/images/hero-bg.jpg" }), _jsx(StatsGrid, { stats: [
+    return (_jsxs(_Fragment, { children: [_jsx(StatsGrid, { stats: [
                     { label: "Systems", value: systems?.length ?? 0, color: "var(--cyan)", icon: IconPanel },
                     { label: "Normal", value: normal, color: "var(--green)", icon: IconCheckCircle },
                     { label: "Events", value: events, color: events ? "var(--red)" : "var(--green)", icon: IconAlert },

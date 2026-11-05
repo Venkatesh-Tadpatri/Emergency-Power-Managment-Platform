@@ -123,7 +123,7 @@ function SelectOrCustom({ label, unit, options, value, onChange, placeholder, re
 }
 
 const emptyAtsForm = { name: "", manufacturer: "", model: "", serial_number: "", branch: "equipment", source_type: "utility", rated_amps: "", rated_volts: "", mqtt_topic: "", power_mqtt_topic: "" };
-const emptyGenForm = { name: "", make: "", model: "", serial_number: "", rated_volts: "", rated_amps: "", rated_kw: "", mqtt_topic: "" };
+const emptyGenForm = { name: "", make: "", model: "", serial_number: "", rated_volts: "", rated_amps: "", rated_kw: "", mqtt_topic: "", power_mqtt_topic: "" };
 
 function MqttMappingHelp() {
   return (
@@ -141,14 +141,14 @@ function MqttMappingHelp() {
   );
 }
 
-export function DeviceManager({ systemId }: { systemId: string }) {
+export function DeviceManager({ systemId, embedded = false, panelId: panelIdOverride }: { systemId: string; embedded?: boolean; panelId?: string }) {
   const navigate = useNavigate();
   const auth = useAuth();
   const { data: me } = useMe(auth.isAuthenticated);
   const canManage = me?.role === "superadmin";
 
   const { data: panels } = usePanels(systemId);
-  const panelId = panels?.[0]?.id;
+  const panelId = panelIdOverride || panels?.[0]?.id;
   const { data: ats } = useAts(panelId);
   const { data: generators } = useGenerators(panelId);
 
@@ -237,6 +237,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       rated_amps: g.rated_amps?.toString() || "",
       rated_kw: g.rated_kw?.toString() || "",
       mqtt_topic: g.mqtt_topic || "",
+      power_mqtt_topic: g.power_mqtt_topic || "",
     });
     setGenEditing(g);
   };
@@ -252,6 +253,7 @@ export function DeviceManager({ systemId }: { systemId: string }) {
       rated_amps: genForm.rated_amps ? Number(genForm.rated_amps) : undefined,
       rated_kw: genForm.rated_kw ? Number(genForm.rated_kw) : undefined,
       mqtt_topic: genForm.mqtt_topic.trim() || undefined,
+      power_mqtt_topic: genForm.power_mqtt_topic.trim() || undefined,
     };
     if (genEditing === "new") {
       const pid = await ensurePanelId();
@@ -263,13 +265,13 @@ export function DeviceManager({ systemId }: { systemId: string }) {
   };
 
   return (
-    <div className="device-manager" style={{ marginTop: 24 }}>
-      <div className="section-header">
+    <div className={`device-manager${embedded ? " device-manager-embedded" : ""}`} style={{ marginTop: embedded ? 14 : 24 }}>
+      {!embedded && <div className="section-header">
         <div>
           <div className="section-title">Devices</div>
           <div className="section-sub">Register the ATS units and generators for this system</div>
         </div>
-      </div>
+      </div>}
 
       <div className="grid-2">
         <div className="card device-manager-panel" style={{ marginTop: 0 }}>
@@ -409,14 +411,23 @@ export function DeviceManager({ systemId }: { systemId: string }) {
               <SelectOrCustom label="Rated Amps" unit="A" options={GEN_RATED_AMPS} value={genForm.rated_amps} onChange={(v) => setGenForm({ ...genForm, rated_amps: v })} />
             </div>
             <div className="form-row">
-              <label>MQTT Topic Address</label>
+              <label>Generator Status Topic Base</label>
               <input
                 value={genForm.mqtt_topic}
                 onChange={(e) => setGenForm({ ...genForm, mqtt_topic: e.target.value })}
                 placeholder="00:E0:62:30:D3:5A/DEMO/P01/G1"
               />
-              <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Enter the base address; /POWER and /STATUS are mapped automatically.</span>
+              <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Enter the generator controller base; its /STATUS payload supplies engine and operating data.</span>
               <MqttMappingHelp />
+            </div>
+            <div className="form-row">
+              <label>Electrical Meter Topic Base</label>
+              <input
+                value={genForm.power_mqtt_topic}
+                onChange={(e) => setGenForm({ ...genForm, power_mqtt_topic: e.target.value })}
+                placeholder="00:E0:62:30:D3:5A/DEMO/P01/M4"
+              />
+              <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Optional meter base; its /POWER readings are merged into this generator dynamically.</span>
             </div>
             <div className="modal-actions">
               <button type="button" className="header-btn" onClick={() => setGenEditing(null)}>Cancel</button>

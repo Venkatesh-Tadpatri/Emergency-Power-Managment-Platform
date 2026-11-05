@@ -1,6 +1,7 @@
 """Fetches and caches Zitadel's JWKS so bearer tokens can be signature-verified
 without round-tripping to Zitadel on every request.
 """
+import threading
 import time
 from urllib.parse import urlparse
 
@@ -12,6 +13,7 @@ from app.config import settings
 
 _cache: dict = {"keys": {}, "fetched_at": 0.0}
 _CACHE_TTL_SECONDS = 3600
+_refresh_lock = threading.Lock()
 
 
 def _fetch_jwks() -> dict:
@@ -34,14 +36,28 @@ def _fetch_jwks() -> dict:
 def _get_key(kid: str) -> dict | None:
     now = time.time()
     if not _cache["keys"] or now - _cache["fetched_at"] > _CACHE_TTL_SECONDS:
-        _cache["keys"] = _fetch_jwks()
-        _cache["fetched_at"] = now
+        # Prevent simultaneous page-load requests from stampeding Zitadel.
+        with _refresh_lock:
+            refresh_now = time.time()
+            if not _cache["keys"] or refresh_now - _cache["fetched_at"] > _CACHE_TTL_SECONDS:
+                previous_keys = _cache["keys"]
+                try:
+                    _cache["keys"] = _fetch_jwks()
+                    _cache["fetched_at"] = refresh_now
+                except (httpx.HTTPError, KeyError, ValueError):
+                    if not previous_keys:
+                        raise
+                    _cache["keys"] = previous_keys
+                    _cache["fetched_at"] = refresh_now
     key = _cache["keys"].get(kid)
     if key is None:
         # kid rotated since our last fetch — refresh once and retry.
-        _cache["keys"] = _fetch_jwks()
-        _cache["fetched_at"] = time.time()
-        key = _cache["keys"].get(kid)
+        with _refresh_lock:
+            key = _cache["keys"].get(kid)
+            if key is None:
+                _cache["keys"] = _fetch_jwks()
+                _cache["fetched_at"] = time.time()
+                key = _cache["keys"].get(kid)
     return key
 
 

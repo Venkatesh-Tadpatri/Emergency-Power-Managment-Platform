@@ -1,5 +1,5 @@
 import { useAuth } from "react-oidc-context";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const features = [
   ["◉", "Live Monitoring", "See the real-time status of generators, ATS units, and power systems.", "View live status", "blue"],
@@ -25,7 +25,29 @@ features.forEach((feature) => {
 
 export function Landing() {
   const auth = useAuth();
-  const signIn = () => auth.signinRedirect().catch((err) => console.error("signinRedirect failed:", err));
+  const [signInError, setSignInError] = useState("");
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const signIn = async () => {
+    if (isSigningIn) return;
+
+    setIsSigningIn(true);
+    setSignInError("");
+
+    try {
+      await Promise.race([
+        auth.signinRedirect(),
+        new Promise((_, reject) => window.setTimeout(
+          () => reject(new Error("The sign-in service did not respond in time.")),
+          10_000,
+        )),
+      ]);
+    } catch (err) {
+      console.error("signinRedirect failed:", err);
+      setSignInError("The sign-in service is unavailable. Please check that the identity service is running and try again.");
+      setIsSigningIn(false);
+    }
+  };
 
   useEffect(() => {
     document.body.classList.add("marketing-mode");
@@ -36,10 +58,11 @@ export function Landing() {
     <main className="marketing-page">
       <section className="marketing-hero">
         <nav className="marketing-nav">
-          <a className="marketing-brand" href="#top" aria-label="CPC home"><img className="marketing-logo" src="/images/solution61-logo.svg" alt="Solution 61" /><span><strong>CPC</strong><small>Critical Power Command</small></span></a>
+          <a className="marketing-brand" href="#top" aria-label="CPC home"><img className="marketing-logo" src="/images/cpc-logo.png" alt="CPC" /><span><strong>CPC</strong><small>Critical Infrastructure. Managed.</small></span></a>
           <div className="marketing-links"><a href="#platform">Platform</a><a href="#solutions">Solutions</a><a href="#mobile">Mobile app</a><a href="#resources">Resources</a></div>
-          <div className="marketing-actions"><button className="marketing-signin" onClick={signIn}>Sign in</button></div>
+          <div className="marketing-actions"><button className="marketing-signin" onClick={signIn} disabled={isSigningIn}>{isSigningIn ? "Opening sign in..." : "Sign in"}</button></div>
         </nav>
+        {signInError && <div className="signin-error" role="alert">{signInError}</div>}
         <div className="marketing-hero-image" />
         <div className="marketing-hero-copy" id="top">
           <p className="marketing-kicker">Critical Power Command</p>
@@ -67,7 +90,7 @@ export function Landing() {
 
       <section className="quote-section"><p className="section-kicker">Trusted by facility managers worldwide</p><blockquote>“CPC has transformed the way we manage our critical power systems. The visibility, alerts, and reporting help us stay compliant and prepared — always.”</blockquote><p className="quote-name">Tadzi Radecki <span>Facilities Manager, Solution 61</span></p></section>
 
-      <footer className="marketing-footer" id="resources"><div className="footer-brand"><a className="marketing-brand" href="#top"><img className="marketing-logo" src="/images/solution61-logo.svg" alt="Solution 61" /><span><strong>CPC</strong><small>Critical Power Command</small></span></a><p>The most advanced platform for monitoring and managing generators, ATS, and critical power systems.</p></div><div><b>Solutions</b><a href="#platform">Generator monitoring</a><a href="#platform">ATS management</a><a href="#platform">Alert management</a></div><div><b>Products</b><a href="#platform">Platform overview</a><a href="#mobile">Mobile app</a><a href="#platform">Integrations</a></div><div><b>Company</b><a href="#top">About us</a><a href="#top">Careers</a><a href="#top">Contact us</a></div><div className="footer-newsletter"><b>Newsletter</b><p>Stay updated with the latest features and insights.</p><button onClick={signIn}>Sign in to get started →</button></div><small className="copyright">© 2026 CPC — Critical Power Command. All rights reserved.</small></footer>
+      <footer className="marketing-footer" id="resources"><div className="footer-brand"><a className="marketing-brand" href="#top"><img className="marketing-logo" src="/images/cpc-logo.png" alt="CPC" /><span><strong>CPC</strong><small>Critical Infrastructure. Managed.</small></span></a><p>The most advanced platform for monitoring and managing generators, ATS, and critical power systems.</p></div><div><b>Solutions</b><a href="#platform">Generator monitoring</a><a href="#platform">ATS management</a><a href="#platform">Alert management</a></div><div><b>Products</b><a href="#platform">Platform overview</a><a href="#mobile">Mobile app</a><a href="#platform">Integrations</a></div><div><b>Company</b><a href="#top">About us</a><a href="#top">Careers</a><a href="#top">Contact us</a></div><div className="footer-newsletter"><b>Newsletter</b><p>Stay updated with the latest features and insights.</p><button onClick={signIn}>Sign in to get started →</button></div><small className="copyright">© 2026 CPC — Critical Infrastructure. Managed. All rights reserved.</small></footer>
     </main>
   );
 }

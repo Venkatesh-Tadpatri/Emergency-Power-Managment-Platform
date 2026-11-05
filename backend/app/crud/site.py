@@ -36,3 +36,8 @@ def archive_site(db: Session, site: Site) -> Site:
     db.commit()
     db.refresh(site)
     return site
+
+
+def delete_site(db: Session, site: Site) -> None:
+    db.delete(site)
+    db.commit()

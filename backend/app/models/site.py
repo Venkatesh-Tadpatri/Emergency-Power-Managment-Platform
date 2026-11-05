@@ -17,4 +17,4 @@ class Site(Base, UUIDPKMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
 
     customer: Mapped["Customer"] = relationship(back_populates="sites")
-    systems: Mapped[list["System"]] = relationship(back_populates="site")
+    systems: Mapped[list["System"]] = relationship(back_populates="site", cascade="all, delete-orphan")

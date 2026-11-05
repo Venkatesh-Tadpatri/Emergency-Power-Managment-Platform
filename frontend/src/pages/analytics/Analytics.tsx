@@ -23,7 +23,7 @@ type EquipmentRow = {
   siteName: string;
   systemId: string;
   systemName: string;
-  live?: Record<string, unknown> & { equipment_id: string; equipment_name: string; status: string; fault_active: boolean; communication_healthy: boolean; active_power_kw: number; load_percentage: number };
+  live?: Record<string, unknown> & { equipment_id: string; equipment_name: string; status: string; fault_active: boolean; communication_healthy: boolean; active_power_kw?: number; load_percentage?: number };
 };
 
 export function Analytics() {
@@ -91,12 +91,14 @@ export function Analytics() {
   const data = useMemo(() => {
     const generators = equipment.filter((item) => item.kind === "generator");
     const withLive = equipment.filter((item) => item.live);
+    const powerReadings = withLive.flatMap((item) => typeof item.live!.active_power_kw === "number" ? [item.live!.active_power_kw] : []);
+    const loadReadings = withLive.flatMap((item) => typeof item.live!.load_percentage === "number" ? [item.live!.load_percentage] : []);
     const alarms = withLive.filter((item) => item.live!.fault_active || !item.live!.communication_healthy).length;
     return {
       generators, equipment, alarms,
       live: withLive.length,
-      power: withLive.reduce((total, item) => total + (item.live!.active_power_kw || 0), 0),
-      load: withLive.length ? withLive.reduce((total, item) => total + (item.live!.load_percentage || 0), 0) / withLive.length : 0,
+      power: powerReadings.length ? powerReadings.reduce((total, value) => total + value, 0) : undefined,
+      load: loadReadings.length ? loadReadings.reduce((total, value) => total + value, 0) / loadReadings.length : undefined,
     };
   }, [equipment]);
 

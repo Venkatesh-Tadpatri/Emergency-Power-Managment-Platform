@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import base64
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -11,7 +13,13 @@ from app.schemas.reseller import ResellerCreate, ResellerRead, ResellerUpdate
 router = APIRouter(prefix="/api/resellers", tags=["resellers"])
 
 
-@router.get("", response_model=list[ResellerRead])
+def _can_manage_branding(user: User, reseller_id: str) -> bool:
+    return can_manage_resellers(user) or (
+        user.role == "reseller_admin" and user.reseller_id == reseller_id
+    )
+
+
+@router.get("", response_model=list[ResellerRead], response_model_exclude={"__all__": {"logo_data"}})
 def list_resellers(
     db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ):
@@ -48,11 +56,53 @@ def update_reseller(
     user: User = Depends(get_current_user),
 ):
     if not can_manage_resellers(user):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "only superadmin can manage resellers")
+        if not _can_manage_branding(user, reseller_id):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to manage this reseller")
+        supplied = data.model_dump(exclude_unset=True)
+        if set(supplied) - {"show_logo_on_reports"}:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "reseller admins can only update branding preferences")
     reseller = crud.get_reseller(db, reseller_id)
     if not reseller:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
     return crud.update_reseller(db, reseller, data)
+
+
+@router.post("/{reseller_id}/logo", response_model=ResellerRead)
+async def upload_reseller_logo(
+    reseller_id: str,
+    logo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not _can_manage_branding(user, reseller_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to manage this reseller branding")
+    reseller = crud.get_reseller(db, reseller_id)
+    if not reseller:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
+    if logo.content_type not in {"image/png", "image/jpeg"}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "logo must be a PNG or JPEG image")
+    content = await logo.read()
+    if not content or len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "logo must be smaller than 2 MB")
+    reseller.logo_data = f"data:{logo.content_type};base64,{base64.b64encode(content).decode('ascii')}"
+    db.commit()
+    db.refresh(reseller)
+    return reseller
+
+
+@router.delete("/{reseller_id}/logo", response_model=ResellerRead)
+def remove_reseller_logo(
+    reseller_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    if not _can_manage_branding(user, reseller_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to manage this reseller branding")
+    reseller = crud.get_reseller(db, reseller_id)
+    if not reseller:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
+    reseller.logo_data = None
+    db.commit()
+    db.refresh(reseller)
+    return reseller
 
 
 @router.delete("/{reseller_id}", response_model=ResellerRead)

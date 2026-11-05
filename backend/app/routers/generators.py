@@ -15,10 +15,11 @@ router = APIRouter(prefix="/api/generators", tags=["generators"])
 @router.get("", response_model=list[GeneratorRead])
 def list_generators(
     panel_id: str | None = Query(default=None),
+    system_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    all_gens = crud.list_generators(db, panel_id)
+    all_gens = crud.list_generators(db, panel_id, system_id)
     return [g for g in all_gens if can_view_system(user, db, g.panel.system)]
 
 

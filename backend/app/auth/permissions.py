@@ -131,6 +131,13 @@ def can_write_system(user: User, db: Session, company_id: str, reseller_id: str)
     return user.role == "superadmin"
 
 
+def can_edit_one_line(user: User, reseller_id: str) -> bool:
+    """One-line design is limited to platform admins and the owning reseller's admins."""
+    if user.role == "superadmin":
+        return True
+    return user.role == "reseller_admin" and user.reseller_id == reseller_id
+
+
 def can_manage_company_users(user: User, company_id: str, reseller_id: str) -> bool:
     if user.role == "superadmin":
         return True

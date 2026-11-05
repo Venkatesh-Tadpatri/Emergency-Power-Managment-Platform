@@ -6,21 +6,25 @@ import { StatusPill } from "../../components/common/StatusPill";
 import { Modal } from "../../components/common/Modal";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
 import { IconBuilding, IconResellers } from "../../components/common/Icons";
-import { PageHero } from "../../components/common/PageHero";
+import { QueryState } from "../../components/common/QueryState";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useAlarms } from "../../queries/alarms";
 import { useArchiveCompany, useCompanies, useCreateCompany, useUpdateCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
 import { useReseller } from "../../queries/resellers";
 import { useAllGenerators, useAllPanels, useSites, useSystems } from "../../queries/systems";
+import { getCustomerCardStats, getCustomerLocationSummary, getCustomerWorstStatus } from "../../utils/customerCardStats";
+import { activeAlarmOnly } from "../../utils/alarmClassification";
 
 export function ResellerDashboard() {
   const { resellerId } = useParams();
   const navigate = useNavigate();
   const auth = useAuth();
   const { data: me } = useMe(auth.isAuthenticated);
-  const { data: reseller } = useReseller(resellerId);
-  const { data: companies } = useCompanies(resellerId);
+  const resellerQuery = useReseller(resellerId);
+  const companiesQuery = useCompanies(resellerId);
+  const { data: reseller } = resellerQuery;
+  const { data: companies } = companiesQuery;
   const { data: systems } = useSystems();
   const { data: sites } = useSites();
   const { data: panels } = useAllPanels();
@@ -33,6 +37,7 @@ export function ResellerDashboard() {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [customerForm, setCustomerForm] = useState({ name: "", address: "" });
   const [deletingCustomer, setDeletingCustomer] = useState(null);
+  const [customerStatusFilter, setCustomerStatusFilter] = useState("all");
 
   usePageHeader(
     reseller?.name || "Reseller",
@@ -43,7 +48,15 @@ export function ResellerDashboard() {
 
   const companySystems = (systems || []).filter((s) => (companies || []).some((c) => c.id === s.company_id));
   const companySites = (sites || []).filter((site) => site.status !== "archived" && (companies || []).some((company) => company.id === site.customer_id));
-  const activeAlarms = (alarms || []).filter((a) => a.status === "active");
+  const activeAlarms = activeAlarmOnly(alarms);
+  const activeCustomers = (companies || []).filter((company) => company.status !== "archived");
+  const filteredCustomers = activeCustomers.filter((company) => {
+    const customerSystems = companySystems.filter((system) => system.company_id === company.id);
+    if (customerStatusFilter === "alarms") return activeAlarms.some((alarm) => customerSystems.some((system) => system.id === alarm.system_id));
+    if (customerStatusFilter === "offline") return customerSystems.some((system) => system.status === "offline");
+    if (customerStatusFilter === "test") return customerSystems.some((system) => system.status === "test");
+    return true;
+  });
   const resellerTotals = [
     { label: "Total Customers", value: companies?.length ?? 0, tone: "blue" },
     { label: "Total Sites", value: companySites.length, tone: "amber" },
@@ -54,10 +67,14 @@ export function ResellerDashboard() {
   const formatAlarmDate = (value) => new Date(value).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
   const formatAlarmTime = (value) => new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
+  if (resellerQuery.isPending || companiesQuery.isPending) return <QueryState loading title="Loading reseller portfolio…" message="Customers and sites will appear as soon as they are ready." />;
+  if (resellerQuery.isError || companiesQuery.isError) return <QueryState title="Reseller portfolio unavailable" message="The server did not return the customer list. Your data has not been changed." onRetry={() => { void resellerQuery.refetch(); void companiesQuery.refetch(); }} />;
+
   const openNewCustomer = () => {
     setCustomerForm({ name: "", address: "" });
     setEditingCustomer("new");
   };
+
 
   const openEditCustomer = (c, e) => {
     e.stopPropagation();
@@ -101,6 +118,7 @@ export function ResellerDashboard() {
           />
         </div>
         <div className="modal-actions">
+          {editingCustomer !== "new" && <button type="button" className="header-btn danger reseller-edit-archive" onClick={() => { setDeletingCustomer(editingCustomer); setEditingCustomer(null); }}>Archive</button>}
           <button type="button" className="header-btn" onClick={() => setEditingCustomer(null)}>Cancel</button>
           <button type="submit" className="header-btn primary">Save</button>
         </div>
@@ -110,9 +128,9 @@ export function ResellerDashboard() {
 
   const deleteCustomerDialog = !deletingCustomer ? null : (
     <ConfirmDialog
-      title="Delete customer"
-      message={`Delete "${deletingCustomer.name}"? This hides the customer and its systems from active monitoring.`}
-      confirmLabel="Delete"
+      title="Archive customer"
+      message={`Archive "${deletingCustomer.name}"? It will be moved to Archived Customers.`}
+      confirmLabel="Archive"
       onCancel={() => setDeletingCustomer(null)}
       onConfirm={() => {
         archiveCompany.mutate(deletingCustomer.id);
@@ -123,16 +141,6 @@ export function ResellerDashboard() {
 
   return (
     <>
-      <PageHero
-        title={reseller?.name || "Reseller"}
-        subtitle={`${companies?.length ?? 0} customers - ${companySystems.length} systems`}
-        icon={IconResellers}
-        color={activeAlarms.length > 0 ? "#dc2626" : "#7c3aed"}
-        bgImage="/images/hero-bg.jpg"
-        showText={false}
-        showIcon={false}
-      />
-
       <div className="reseller-page-heading">
         <div className="reseller-page-heading-icon"><IconResellers size={19} /></div>
         <div className="reseller-page-heading-copy">
@@ -151,44 +159,41 @@ export function ResellerDashboard() {
 
       <div className="section-header">
         <div>
-          <div className="section-title">Customers</div>
+          <div className="section-title">Active Customers</div>
         </div>
-        {canManage && <button className="header-btn primary" onClick={openNewCustomer}>+ New Customer</button>}
+        <div className="customer-list-actions">
+          <select value={customerStatusFilter} onChange={(event) => setCustomerStatusFilter(event.target.value)} aria-label="Filter customers by status">
+            <option value="all">All Customers</option>
+            <option value="alarms">Has Alarms</option>
+            <option value="offline">Offline</option>
+            <option value="test">In Test</option>
+          </select>
+          {canManage && <button className="header-btn primary" onClick={openNewCustomer}>+ New Customer</button>}
+        </div>
       </div>
 
       <div className="card-grid reseller-customer-grid">
-        {(companies || []).map((c) => {
-          const cSystems = companySystems.filter((s) => s.company_id === c.id);
-          const cSites = companySites.filter((site) => site.customer_id === c.id);
-          const cOfflineDevices = cSystems.filter((system) => system.status === "offline").length;
-          const cActiveAlarms = activeAlarms.filter((alarm) => cSystems.some((system) => system.id === alarm.system_id)).length;
-          const cSystemIds = new Set(cSystems.map((system) => system.id));
-          const cPanelIds = new Set((panels || []).filter((panel) => cSystemIds.has(panel.system_id)).map((panel) => panel.id));
-          const cGenerators = (generators || []).filter((generator) => cPanelIds.has(generator.panel_id)).length;
+        {filteredCustomers.map((c) => {
+          const stats = getCustomerCardStats(c.id, { sites, systems, alarms, panels, generators });
           return (
             <div className="reseller-card-shell" key={c.id}>
               <InfoCard
                 title={c.name}
-                subtitle={c.address}
+                subtitle={getCustomerLocationSummary(c, sites || [])}
+                status={getCustomerWorstStatus(c.id, { systems, alarms })}
                 icon={IconBuilding}
-                stats={[
-                  { label: "Sites", value: cSites.length, color: "var(--cyan)" },
-                  { label: "Systems", value: cSystems.length, color: "var(--purple)" },
-                  { label: "Offline devices", value: cOfflineDevices, color: cOfflineDevices ? "var(--red)" : "var(--green)" },
-                  { label: "Active alarms", value: cActiveAlarms, color: cActiveAlarms ? "var(--red)" : "var(--green)" },
-                  { label: "Generators", value: cGenerators, color: "var(--amber)" },
-                ]}
+                stats={stats}
                 onClick={() => navigate(`/companies/${c.id}`)}
               />
               {canManage && (
                 <div className="reseller-card-actions">
                   <button className="header-btn" onClick={(e) => openEditCustomer(c, e)}>Edit</button>
-                  <button className="header-btn danger" onClick={(e) => { e.stopPropagation(); setDeletingCustomer(c); }}>Archive</button>
                 </div>
               )}
             </div>
           );
         })}
+        {filteredCustomers.length === 0 && <div className="reseller-customers-empty">No customers match this status filter.</div>}
       </div>
 
       <div className="section-header" style={{ marginTop: 18 }}>

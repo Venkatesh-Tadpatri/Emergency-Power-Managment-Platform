@@ -1,6 +1,10 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class AlarmAcknowledge(BaseModel):
+    comment: str | None = Field(default=None, max_length=1000)
 
 
 class AlarmRead(BaseModel):
@@ -14,3 +18,5 @@ class AlarmRead(BaseModel):
     occurred_at: datetime
     ack_by: str | None = None
     ack_at: datetime | None = None
+    ack_comment: str | None = None
+    cleared_at: datetime | None = None

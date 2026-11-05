@@ -27,6 +27,11 @@ export function DeviceAnalyticsModal({ kind, snapshot, history, onClose }: {
     series("vbc", "V B-C", "var(--chart-2)", history, "voltage_bc"),
     series("vca", "V C-A", "var(--chart-3)", history, "voltage_ca"),
   ];
+  const phaseNeutralVoltageSeries = [
+    series("van", "V A-N", "var(--chart-1)", history, "voltage_an"),
+    series("vbn", "V B-N", "var(--chart-2)", history, "voltage_bn"),
+    series("vcn", "V C-N", "var(--chart-3)", history, "voltage_cn"),
+  ];
   const currentSeries = [
     series("ia", "Amps A", "var(--chart-1)", history, "current_a"),
     series("ib", "Amps B", "var(--chart-2)", history, "current_b"),
@@ -62,6 +67,7 @@ export function DeviceAnalyticsModal({ kind, snapshot, history, onClose }: {
         <TrendChart title="Load" unit="%" series={[series("load", "Load", "var(--chart-1)", history, "load_percentage")]} times={times} />
         <TrendChart title="Active power" unit=" kW" series={[series("kw", "Power", "var(--chart-1)", history, "active_power_kw")]} times={times} />
         <TrendChart title="Line voltage" unit=" V" decimals={1} series={voltageSeries} times={times} />
+        <TrendChart title="Phase-to-neutral voltage" unit=" V" decimals={1} series={phaseNeutralVoltageSeries} times={times} />
         <TrendChart title="Line current" unit=" A" decimals={1} series={currentSeries} times={times} />
         <TrendChart title="Frequency" unit=" Hz" decimals={2} series={[series("hz", "Frequency", "var(--chart-1)", history, "frequency")]} times={times} />
         {isGenerator ? <>

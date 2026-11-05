@@ -16,7 +16,7 @@ export function ArchivedResellers() {
   const deleteReseller = useDeleteReseller();
   const [deleting, setDeleting] = useState(null);
 
-  usePageHeader("Archived Resellers", [{ label: "Resellers", onClick: () => navigate("/resellers") }]);
+  usePageHeader("Archived Resellers", [{ label: "Active Resellers", onClick: () => navigate("/resellers") }]);
 
   const canManage = !!me?.permissions.manage_resellers;
   if (!canManage) {

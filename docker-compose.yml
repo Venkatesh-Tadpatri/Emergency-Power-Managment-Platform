@@ -104,11 +104,23 @@ services:
       LOG_DIR: /app/logs
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-30}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-alerts@cpc.local}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
       - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
     depends_on:
       mysql:
         condition: service_healthy
@@ -145,12 +157,21 @@ services:
       VITE_GRAFANA_URL: ${VITE_GRAFANA_URL:-http://localhost:3000}
     command: npm run dev -- --host 0.0.0.0
     ports:
-      - "5173:5173"
+      # Docker Desktop's IPv6 WSL relay can accept localhost connections and then stall. Publish the
+      # development UI explicitly on IPv4 so browsers fall through to the working listener immediately.
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('net').connect(5173,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 60s
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   # Demo analytics workspace.  It uses Grafana's built-in TestData source, so
   # it runs without a telemetry pipeline and can be demonstrated immediately.

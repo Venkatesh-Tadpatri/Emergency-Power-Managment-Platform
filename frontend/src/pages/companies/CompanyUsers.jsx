@@ -9,7 +9,7 @@ import { useMe } from "../../queries/me";
 import { useSystems } from "../../queries/systems";
 import { lookupUnassignedUser, useAssignRole, useAssignSystems, useUsers } from "../../queries/users";
 const ROLES = ["company_admin", "system_operator", "system_viewer"];
-export function CompanyUsers() {
+export function CompanyUsers({ embedded = false }) {
     const { companyId } = useParams();
     const navigate = useNavigate();
     const auth = useAuth();
@@ -21,7 +21,7 @@ export function CompanyUsers() {
     const { data: systems } = useSystems(companyId);
     const [scopeTypeDraft, setScopeTypeDraft] = useState({});
     const [accessUser, setAccessUser] = useState(null);
-    usePageHeader("Users", [{ label: company?.name || "", onClick: () => navigate(`/companies/${companyId}`) }]);
+    usePageHeader(embedded ? "Customer Settings" : "Users", [{ label: company?.name || "", onClick: () => navigate(`/companies/${companyId}`) }]);
     const canManage = !!me?.permissions.manage_company_users;
     return (_jsxs(_Fragment, { children: [canManage && companyId && _jsx(AssignExistingUser, { companyId: companyId }), _jsxs("table", { className: "data-table", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { children: "Name" }), _jsx("th", { children: "Email" }), _jsx("th", { children: "Role" }), _jsx("th", { children: "Scope" }), canManage && _jsx("th", { children: "Actions" })] }) }), _jsx("tbody", { children: (users || []).map((u) => (_jsxs("tr", { children: [_jsx("td", { style: { fontWeight: 600 }, children: u.display_name || u.email }), _jsx("td", { className: "mono", children: u.email }), _jsx("td", { children: u.role || _jsx("span", { style: { color: "var(--text-dim)" }, children: "Unassigned" }) }), _jsx("td", { children: u.scope_type === "assigned" ? "Assigned systems only" : u.scope_type === "company_wide" ? "Company-wide" : "—" }), canManage && (u.id === me?.id ? _jsx("td", { style: { color: "var(--text-dim)" }, children: "—" }) : _jsxs("td", { style: { display: "flex", gap: 6, alignItems: "center" }, children: [_jsxs("select", { defaultValue: u.role || "", onChange: (e) => {
                                                 const role = e.target.value;

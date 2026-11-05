@@ -10,6 +10,9 @@ def normalize_topic(topic: str | None) -> str | None:
 
 def _sync_one(db: Session, device, mapping_type: str, raw_topic: str | None) -> None:
     """Keep the normalized, system-scoped topic registry in sync with a device form."""
+    # SessionLocal intentionally disables autoflush. Flush a preceding role update before checking
+    # topic ownership so a topic can move from a device's status role to its power role atomically.
+    db.flush()
     topic = normalize_topic(raw_topic)
     mapping = db.query(MqttTopicMapping).filter(
         MqttTopicMapping.device_type == mapping_type,
@@ -34,13 +37,13 @@ def _sync_one(db: Session, device, mapping_type: str, raw_topic: str | None) -> 
 def sync_device_topic(db: Session, device, device_type: str) -> None:
     device.mqtt_topic = normalize_topic(device.mqtt_topic)
     _sync_one(db, device, device_type, device.mqtt_topic)
-    if device_type == "ats":
+    if device_type in {"ats", "generator"}:
         device.power_mqtt_topic = normalize_topic(device.power_mqtt_topic)
-        _sync_one(db, device, "ats_power", device.power_mqtt_topic)
+        _sync_one(db, device, f"{device_type}_power", device.power_mqtt_topic)
 
 
 def delete_device_topic(db: Session, device_id: str, device_type: str) -> None:
-    mapping_types = [device_type, "ats_power"] if device_type == "ats" else [device_type]
+    mapping_types = [device_type, f"{device_type}_power"]
     db.query(MqttTopicMapping).filter(
         MqttTopicMapping.device_type.in_(mapping_types),
         MqttTopicMapping.device_id == device_id,

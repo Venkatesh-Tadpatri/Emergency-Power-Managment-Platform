@@ -1,7 +1,5 @@
-import { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
-import { FleetHero } from "../components/common/FleetHero";
 import { IconAlert, IconBuilding, IconPanel, IconResellers, IconSettings, IconUsers } from "../components/common/Icons";
 import { InfoCard, StatsGrid } from "../components/common/StatCard";
 import { usePageHeader } from "../components/layout/HeaderContext";
@@ -10,22 +8,15 @@ import { useMe } from "../queries/me";
 import { useResellers } from "../queries/resellers";
 import { useSites, useSystems } from "../queries/systems";
 
-const REFRESH_MS = 30_000;
-
 export function Dashboard() {
   const auth = useAuth();
   const navigate = useNavigate();
   const { data: me } = useMe(auth.isAuthenticated);
-  const { data: resellers, refetch: refetchResellers } = useResellers();
-  const { data: companies, refetch: refetchCompanies } = useCompanies();
-  const { data: sites, refetch: refetchSites } = useSites();
-  const { data: systems, refetch: refetchSystems } = useSystems();
+  const { data: resellers } = useResellers();
+  const { data: companies } = useCompanies();
+  const { data: sites } = useSites();
+  const { data: systems } = useSystems();
   usePageHeader("Dashboard");
-
-  useEffect(() => {
-    const timer = window.setInterval(() => [refetchResellers, refetchCompanies, refetchSites, refetchSystems].forEach((refetch) => void refetch()), REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [refetchCompanies, refetchResellers, refetchSites, refetchSystems]);
 
   if (me && me.role && !me.permissions.manage_resellers) {
     if (me.company_id) return <Navigate to={`/companies/${me.company_id}`} replace />;
@@ -35,7 +26,6 @@ export function Dashboard() {
 
   const activeSites = (sites || []).filter((site) => site.status !== "archived");
   return <>
-    <FleetHero />
     <StatsGrid stats={[{ label: "Total Resellers", value: resellers?.length ?? 0, color: "var(--purple)", icon: IconResellers, onClick: () => navigate("/resellers") }, { label: "Total Customers", value: companies?.length ?? 0, color: "var(--blue)", icon: IconBuilding, onClick: () => navigate("/companies") }, { label: "Total Sites", value: activeSites.length, color: "var(--amber)", icon: IconPanel }, { label: "Total Systems", value: systems?.length ?? 0, color: "var(--cyan)", icon: IconPanel }]} />
     <div className="section-header" style={{ marginTop: 22 }}><div><div className="section-title">Reseller Overview</div><div className="section-sub">Rollup status by reseller</div></div></div>
     <div className="card-grid dashboard-reseller-grid">{(resellers || []).map((reseller) => {

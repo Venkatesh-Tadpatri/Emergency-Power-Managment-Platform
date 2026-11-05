@@ -2,7 +2,7 @@ from app.models.base import Base
 from app.models.reseller import Reseller
 from app.models.company import Customer
 from app.models.site import Site
-from app.models.system import System
+from app.models.system import System, SystemEvent
 from app.models.panel import Panel
 from app.models.ats import ATS
 from app.models.generator import Generator
@@ -22,6 +22,7 @@ __all__ = [
     "Customer",
     "Site",
     "System",
+    "SystemEvent",
     "Panel",
     "ATS",
     "Generator",

@@ -9,8 +9,8 @@ type Scenario = "normal" | "emergency" | "test";
 const BRANCH_TAG: Record<string, string> = { "life-safety": "LS", critical: "CR", equipment: "EQ" };
 const SCENARIO_LABEL: Record<Scenario, string> = { normal: "NORMAL", emergency: "EMERGENCY", test: "TEST" };
 
-function Reading({ label, unit = "V" }: { label: string; unit?: string }) {
-  return <div className="telemetry-reading"><span>{label}</span><b>000</b><em>{unit}</em></div>;
+function Reading({ label }: { label: string; unit?: string }) {
+  return <div className="telemetry-reading"><span>{label}</span><b>—</b></div>;
 }
 
 export function OneLineDiagram({ ats, generators, utilityName, systemId }: { ats: ATS[]; generators: Generator[]; utilityName?: string; systemId?: string }) {
@@ -72,8 +72,8 @@ export function OneLineDiagram({ ats, generators, utilityName, systemId }: { ats
           <p>{shownGenerators[0]?.make || "Generator set"} — Standby Source</p>
           <div className="telemetry-readings"><Reading label="V A-B" /><Reading label="V B-C" /><Reading label="Eng Temp" unit="°F" /><Reading label="Hours" unit="hr" /></div>
           {scenario !== "normal" && <div className="generator-emergency-metrics">
-            <div className="generator-load"><span>Load</span><b>000 kW</b><em>00%</em><i><u /></i></div>
-            <div className="fuel-forecast"><span>Fuel Forecast</span><b>000h 00m</b><em>@ 000 kW · 00% tank</em><i><u /></i></div>
+            <div className="generator-load"><span>Load</span><b>—</b><em>—</em><i><u /></i></div>
+            <div className="fuel-forecast"><span>Fuel Forecast</span><b>—</b><em>—</em><i><u /></i></div>
           </div>}
           <strong className={`source-state ${scenario === "normal" ? "standby" : "running"}`}>{generatorStatus}</strong>
         </button>
@@ -85,15 +85,15 @@ export function OneLineDiagram({ ats, generators, utilityName, systemId }: { ats
           return <button className={`telemetry-ats detail-link ${viewMode === "simple" ? "compact" : "detailed"}`} key={item.id} onClick={() => systemId && navigate(`/systems/${systemId}/ats`)} style={{ "--ats-accent": branch === "life-safety" ? "#ef4444" : branch === "critical" ? "#f59e0b" : "#3b82f6" } as CSSProperties}>
             <div><span className={`branch-tag ${branch}`}>{BRANCH_TAG[branch] || "EQ"}</span><b>{item.name}</b></div>
             <em>{SCENARIO_LABEL[scenario]}</em>
-            {viewMode === "simple" ? <span className="ats-simple-reading">000 kW · 000 A · 000 V</span> : <><div className="ats-metric-grid"><span><small>Load</small><b>000 kW</b></span><span><small>Current</small><b>000 A</b></span><span><small>Voltage</small><b>000 V</b></span><span><small>Power Factor</small><b>0.00</b></span></div><div className="ats-load-strip"><i><u /></i><span>Load</span><b>000%</b></div></>}
+            {viewMode === "simple" ? <span className="ats-simple-reading">—</span> : <><div className="ats-metric-grid"><span><small>Load</small><b>—</b></span><span><small>Current</small><b>—</b></span><span><small>Voltage</small><b>—</b></span><span><small>Power Factor</small><b>—</b></span></div><div className="ats-load-strip"><i><u /></i><span>Load</span><b>—</b></div></>}
           </button>;
         })}
       </div>
 
       <div className="telemetry-loads">
-        {shownAts.map((item, index) => <div className="telemetry-load" key={item.id}><b>{item.branch === "life-safety" ? "Life Safety" : item.branch === "critical" ? "Critical" : `Equipment ${index + 1}`}</b><span>{item.name}</span><strong>000 kW</strong></div>)}
+        {shownAts.map((item, index) => <div className="telemetry-load" key={item.id}><b>{item.branch === "life-safety" ? "Life Safety" : item.branch === "critical" ? "Critical" : `Equipment ${index + 1}`}</b><span>{item.name}</span><strong>—</strong></div>)}
       </div>
-      <div className="telemetry-summary"><span>Total Load <b>000 kW</b></span><span>Capacity <b>000 kW</b></span><span>Headroom <b>000 kW</b></span></div>
+      <div className="telemetry-summary"><span>Total Load <b>—</b></span><span>Capacity <b>—</b></span><span>Headroom <b>—</b></span></div>
     </div>
   );
 }

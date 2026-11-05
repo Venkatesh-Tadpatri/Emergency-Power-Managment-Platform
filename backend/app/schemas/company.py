@@ -4,6 +4,9 @@ from pydantic import BaseModel, ConfigDict
 class CompanyBase(BaseModel):
     name: str
     address: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
     lat: float | None = None
     lng: float | None = None
     reseller_id: str
@@ -17,6 +20,9 @@ class CompanyCreate(CompanyBase):
 class CompanyUpdate(BaseModel):
     name: str | None = None
     address: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
     lat: float | None = None
     lng: float | None = None
     reseller_id: str | None = None

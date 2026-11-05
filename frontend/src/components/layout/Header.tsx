@@ -7,6 +7,7 @@ import { useAlarms } from "../../queries/alarms";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
 import { useReseller } from "../../queries/resellers";
+import { activeAlarmOnly } from "../../utils/alarmClassification";
 import { useHeader } from "./HeaderContext";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -32,7 +33,12 @@ export function Header() {
     },
     { enabled: me?.role === "superadmin" || !!me?.reseller_id || !!me?.company_id }
   );
-  const unackedCount = (alarms || []).filter((a) => a.status === "active" && !a.ack_by).length;
+  const activeAlarms = activeAlarmOnly(alarms);
+  const activeCount = activeAlarms.length;
+  const unackedCount = activeAlarms.filter((alarm) => !alarm.ack_by).length;
+  const previewAlarms = [...activeAlarms]
+    .sort((a, b) => Number(!!a.ack_by) - Number(!!b.ack_by) || new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
+    .slice(0, 5);
   // Zitadel's ID token here doesn't carry name/email claims — `me` (from our own
   // /api/me, backed by the UserInfo-endpoint fetch) is the reliable source.
   const displayName = me?.display_name || me?.email || auth.user?.profile.name || auth.user?.profile.email;
@@ -41,8 +47,10 @@ export function Header() {
   const firstName = (displayName || "there").split(/[\s@]/)[0];
   const headingDetails = {
     Dashboard: { icon: IconDashboard, subtitle: `Welcome back, ${firstName}!` },
-    Resellers: { icon: IconResellers, subtitle: "View and manage reseller partners across your organization" },
-    Customers: { icon: IconBuilding, subtitle: "View and manage all customers across your organization" },
+    "Active Resellers": { icon: IconResellers, subtitle: "View and manage active reseller partners across your organization" },
+    "Active Customers": { icon: IconBuilding, subtitle: "View and manage active customers across your organization" },
+    "Archived Customers": { icon: IconBuilding, subtitle: "Review and restore archived customers" },
+    "Archived Sites": { icon: IconMap, subtitle: "Review, restore, or permanently delete archived sites" },
     "Platform Users": { icon: IconUsers, subtitle: "Manage access, roles, and organization scope" },
     "Map View": { icon: IconMap, subtitle: "Monitor facilities and systems across the network" },
     Alarms: { icon: IconAlert, subtitle: "Review active events and power-system alerts" },
@@ -52,11 +60,13 @@ export function Header() {
   const HeadingIcon = headingDetails.icon;
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [alarmOpen, setAlarmOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   // Dark is the application default. Once a user explicitly selects light mode,
   // preserve that preference instead of resetting it on every page load/login.
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("cpc-theme") !== "light");
   const menuRef = useRef<HTMLDivElement>(null);
+  const alarmRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.body.classList.toggle("dark-dashboard", darkMode);
@@ -78,12 +88,13 @@ export function Header() {
   };
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !alarmOpen) return;
     const onClickAway = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (alarmRef.current && !alarmRef.current.contains(e.target as Node)) setAlarmOpen(false);
     };
     const onEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") { setMenuOpen(false); setAlarmOpen(false); }
     };
     document.addEventListener("mousedown", onClickAway);
     document.addEventListener("keydown", onEscape);
@@ -91,7 +102,7 @@ export function Header() {
       document.removeEventListener("mousedown", onClickAway);
       document.removeEventListener("keydown", onEscape);
     };
-  }, [menuOpen]);
+  }, [menuOpen, alarmOpen]);
 
   const orgLabel = reseller?.name
     ? "Reseller"
@@ -154,17 +165,21 @@ export function Header() {
             placeholder="Search resellers by name..."
           />
         </div>
-        <button
-          type="button"
-          className="header-icon-btn"
-          onClick={() => navigate("/alarms")}
-          aria-label={unackedCount > 0 ? `View alarms — ${unackedCount} unacknowledged` : "View alarms"}
-          title="View alarms"
-        >
-          <IconBell size={16} />
-          {unackedCount > 0 && <span className="header-icon-dot">{unackedCount > 9 ? "9+" : unackedCount}</span>}
-        </button>
-        <div className="header-user" ref={menuRef} onClick={() => setMenuOpen((v) => !v)}>
+        <div className="alarm-preview-wrap" ref={alarmRef}>
+          <button type="button" className="header-icon-btn" onClick={() => { setAlarmOpen((open) => !open); setMenuOpen(false); }} aria-label={activeCount > 0 ? `Open alarm preview — ${activeCount} active alarms` : "Open alarm preview"} aria-expanded={alarmOpen} title="Active alarms">
+            <IconBell size={16} />
+            {activeCount > 0 && <span className="header-icon-dot">{activeCount > 9 ? "9+" : activeCount}</span>}
+          </button>
+          {alarmOpen && <div className="alarm-preview" role="dialog" aria-label="Active alarm preview">
+            <div className="alarm-preview-head"><div><strong>Active alarms</strong><span>{activeCount} in your scope</span></div>{unackedCount > 0 && <span className="alarm-preview-unacked">{unackedCount} unacknowledged</span>}</div>
+            <div className="alarm-preview-list">
+              {previewAlarms.map((alarm) => <div className="alarm-preview-item" key={alarm.id}><span className={`alarm-preview-severity ${alarm.severity}`} aria-hidden="true" /><div className="alarm-preview-copy"><strong>{alarm.message}</strong><span>{alarm.device_label || alarm.system_id} · {new Date(alarm.occurred_at).toLocaleString()}</span></div>{!alarm.ack_by && <span className="alarm-preview-new">Unacked</span>}</div>)}
+              {!previewAlarms.length && <div className="alarm-preview-empty">No active alarms in your scope.</div>}
+            </div>
+            <button className="alarm-preview-all" type="button" onClick={() => { setAlarmOpen(false); navigate("/alarms"); }}>View all alarms</button>
+          </div>}
+        </div>
+        <div className="header-user" ref={menuRef} onClick={() => { setMenuOpen((v) => !v); setAlarmOpen(false); }}>
           <div className="header-user-avatar">{(displayEmail || "?").slice(0, 1).toUpperCase()}</div>
           <div>
             <div className="header-user-name">{displayName || "Signed in"}</div>

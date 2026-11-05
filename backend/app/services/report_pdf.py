@@ -80,24 +80,32 @@ class _ReportLogo(Flowable):
             draw_width, draw_height = self.width, self.width / aspect
         else:
             draw_height, draw_width = self.height, self.height * aspect
-        draw_width *= 2.4
-        draw_height *= 2.4
         canvas.drawImage(self.reader, (self.width - draw_width) / 2, (self.height - draw_height) / 2,
                          width=draw_width, height=draw_height, preserveAspectRatio=True, mask="auto")
         canvas.restoreState()
 
 
-def _header(title: str, subtitle: str, date_label_top: str, date_value: date | None, logo_data: str | None = None, show_command_name: bool = False):
+def _data_logo(logo_data: str | None):
+    if logo_data and "," in logo_data:
+        try:
+            return _ReportLogo(base64.b64decode(logo_data.split(",", 1)[1]))
+        except Exception:
+            pass
+    return None
+
+
+def _header(title: str, subtitle: str, date_label_top: str, date_value: date | None,
+            logo_data: str | None = None, reseller_logo_data: str | None = None,
+            show_command_name: bool = False):
     # leading (the line-box height) defaults to a fixed 12pt in reportlab regardless of font size —
     # left at that default, the 15pt title's own glyphs are taller than the box reportlab reserves for
     # them, so the very next line (the subtitle) starts overlapping into it. Every style here gets an
     # explicit leading sized to its own font, plus a little spaceAfter on the title for a clean gap.
-    logo = Paragraph("<b>CPC</b>", ParagraphStyle("logo", fontName="Helvetica-Bold", fontSize=13, leading=15, textColor=colors.white))
-    if logo_data and "," in logo_data:
-        try:
-            logo = _ReportLogo(base64.b64decode(logo_data.split(",", 1)[1]))
-        except Exception:
-            pass
+    cpc_logo = Paragraph("<b>CPC</b>", ParagraphStyle("logo", fontName="Helvetica-Bold", fontSize=13, leading=15, textColor=colors.white))
+    logos = [item for item in (_data_logo(logo_data), _data_logo(reseller_logo_data)) if item]
+    logos.append(cpc_logo)
+    logo = Table([logos], colWidths=[1.15 * inch] * len(logos))
+    logo.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 5)]))
     title_block = ([
         Paragraph("CPC · CRITICAL POWER COMMAND", ParagraphStyle("commandTitle", fontName="Helvetica-Bold", fontSize=10, leading=12, spaceAfter=3, textColor=colors.white, alignment=TA_CENTER)),
     ] if show_command_name else []) + [
@@ -108,7 +116,8 @@ def _header(title: str, subtitle: str, date_label_top: str, date_value: date | N
         Paragraph(date_label_top, ParagraphStyle("dateLabel", fontName="Helvetica", fontSize=6.5, leading=9, spaceAfter=2, textColor=colors.HexColor("#94a3b8"), alignment=TA_RIGHT)),
         Paragraph(date_value.isoformat() if date_value else "—", ParagraphStyle("dateVal", fontName="Helvetica-Bold", fontSize=10, leading=13, textColor=colors.white, alignment=TA_RIGHT)),
     ]
-    table = Table([[logo, title_block, date_block]], colWidths=[1.25 * inch, 4.45 * inch, 1.3 * inch])
+    logo_width = min(3.45, 1.15 * len(logos)) * inch
+    table = Table([[logo, title_block, date_block]], colWidths=[logo_width, 5.7 * inch - logo_width, 1.3 * inch])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), NAVY),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -209,11 +218,11 @@ def _footer(company_system: str, code: str):
     return row
 
 
-def build_generator_run_pdf(report, system_name: str, company_name: str, logo_data: str | None = None) -> bytes:
+def build_generator_run_pdf(report, system_name: str, company_name: str, logo_data: str | None = None, reseller_logo_data: str | None = None) -> bytes:
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=0, bottomMargin=0.4 * inch, leftMargin=0.6 * inch, rightMargin=0.6 * inch)
     story = [
-        _header("Generator Run Report", f"{system_name} — {report.initiating_ats or 'GEN'}", "RUN DATE", report.report_date, logo_data),
+        _header("Generator Run Report", f"{system_name} — {report.initiating_ats or 'GEN'}", "RUN DATE", report.report_date, logo_data, reseller_logo_data),
         Spacer(1, 12),
         _info_strip([
             ("MAKE", report.make), ("MODEL", report.model), ("SERIAL NUMBER", report.serial_number),
@@ -268,12 +277,12 @@ def build_generator_run_pdf(report, system_name: str, company_name: str, logo_da
     return buf.getvalue()
 
 
-def build_ats_transfer_pdf(report, system_name: str, company_name: str, logo_data: str | None = None) -> bytes:
+def build_ats_transfer_pdf(report, system_name: str, company_name: str, logo_data: str | None = None, reseller_logo_data: str | None = None) -> bytes:
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=0, bottomMargin=0.4 * inch, leftMargin=0.6 * inch, rightMargin=0.6 * inch)
     details = report.ats_details or []
     story = [
-        _header("ATS Transfer Report", f"{system_name} — {report.event_type or ''} Event", "EVENT DATE", report.report_date, logo_data, True),
+        _header("ATS Transfer Report", f"{system_name} — {report.event_type or ''} Event", "EVENT DATE", report.report_date, logo_data, reseller_logo_data, True),
         Spacer(1, 12),
         _stat_tiles([
             ("ATS AFFECTED", str(len(details)), NAVY),
@@ -337,7 +346,7 @@ def build_ats_transfer_pdf(report, system_name: str, company_name: str, logo_dat
     return buf.getvalue()
 
 
-def build_report_pdf(report, system_name: str, company_name: str, logo_data: str | None = None) -> bytes:
+def build_report_pdf(report, system_name: str, company_name: str, logo_data: str | None = None, reseller_logo_data: str | None = None) -> bytes:
     if report.type == "gen-run":
-        return build_generator_run_pdf(report, system_name, company_name, logo_data)
-    return build_ats_transfer_pdf(report, system_name, company_name, logo_data)
+        return build_generator_run_pdf(report, system_name, company_name, logo_data, reseller_logo_data)
+    return build_ats_transfer_pdf(report, system_name, company_name, logo_data, reseller_logo_data)

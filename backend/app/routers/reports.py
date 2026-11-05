@@ -56,7 +56,11 @@ def download_report_pdf(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
     if not can_view_system(user, db, report.system):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "report not found")
-    pdf_bytes = build_report_pdf(report, report.system.name, report.company.name, report.company.logo_data)
+    reseller = report.company.reseller
+    pdf_bytes = build_report_pdf(
+        report, report.system.name, report.company.name, report.company.logo_data,
+        reseller.logo_data if reseller.show_logo_on_reports else None,
+    )
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

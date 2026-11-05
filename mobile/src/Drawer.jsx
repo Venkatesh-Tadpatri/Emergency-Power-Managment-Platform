@@ -1,5 +1,5 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SolutionLogo } from "./SolutionLogo";
+import { CpcLogo } from "./CpcLogo";
 import { useTheme } from "./theme";
 
 const sections = (isSuperAdmin) => [
@@ -18,10 +18,9 @@ export function Drawer({ visible, screen, isSuperAdmin, onSelect, onClose }) {
       <View style={styles.panel}>
         <ScrollView contentContainerStyle={styles.panelContent}>
           <View style={styles.brand}>
-            <SolutionLogo width={56} />
+            <CpcLogo width={82} showTagline />
             <View>
               <Text style={styles.brandTitle}>CPC</Text>
-              <Text style={styles.brandSubtitle}>Critical Power Command</Text>
             </View>
           </View>
           {sections(isSuperAdmin).map((section) => (

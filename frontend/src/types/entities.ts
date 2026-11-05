@@ -5,12 +5,17 @@ export interface Reseller {
   contact_email?: string | null;
   contact_phone?: string | null;
   status: string;
+  logo_data?: string | null;
+  show_logo_on_reports: boolean;
 }
 
 export interface Company {
   id: string;
   name: string;
   address?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
   lat?: number | null;
   lng?: number | null;
   reseller_id: string;
@@ -92,7 +97,28 @@ export interface Generator {
   rated_amps?: number | null;
   rated_kw?: number | null;
   mqtt_topic?: string | null;
+  power_mqtt_topic?: string | null;
   panel_id: string;
+}
+
+export interface AlarmDisableStatus {
+  disabled: boolean;
+  disabled_at?: string | null;
+  disabled_until?: string | null;
+  indefinite: boolean;
+  reason?: string | null;
+  disabled_by_name?: string | null;
+  disabled_by_email?: string | null;
+  can_control: boolean;
+}
+
+export interface SystemEvent {
+  id: string;
+  event_type: string;
+  message: string;
+  occurred_at: string;
+  actor_name?: string | null;
+  reason?: string | null;
 }
 
 export interface Alarm {
@@ -105,6 +131,8 @@ export interface Alarm {
   occurred_at: string;
   ack_by?: string | null;
   ack_at?: string | null;
+  ack_comment?: string | null;
+  cleared_at?: string | null;
 }
 
 export interface AtsTransferDetail {

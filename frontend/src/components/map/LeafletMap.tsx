@@ -10,35 +10,53 @@ export interface MapMarker {
   status: string;
   label: string;
   sublabel?: string;
-}
-
-function tooltipHtml(m: MapMarker, weather?: WeatherInfo | null): string {
-  const weatherRow = weather
-    ? `<div style="margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:2px;color:#334155;font-size:10px">
-        <span>🌡️ ${weather.tempC}°C</span>
-        <span>${weather.emoji} Rain: ${weather.rainChancePct}%</span>
-        <span>💨 Wind: ${weather.windKmh} km/h</span>
-        <span>${weather.emoji} ${weather.description}</span>
-      </div>`
-    : "";
-  return `<div style="font-family:Inter,sans-serif;font-size:12px"><div style="font-weight:700;margin-bottom:4px">${m.label}</div>${
-    m.sublabel ? `<div style="color:#94a3b8;font-size:10px">${m.sublabel}</div>` : ""
-  }${weatherRow}</div>`;
+  customerName?: string;
+  activeStates?: string[];
+  unacknowledged?: boolean;
 }
 
 const STATUS_COLOR: Record<string, string> = {
   normal: "#22c55e",
   emergency: "#ef4444",
   alarm: "#f59e0b",
-  test: "#a855f7",
   offline: "#64748b",
+  test: "#a855f7",
 };
+const STATUS_PRIORITY: Record<string, number> = { normal: 0, test: 1, offline: 2, alarm: 3, emergency: 4 };
+const STATUS_ORDER = ["emergency", "alarm", "offline", "test", "normal"];
 
-export function LeafletMap({
-  markers,
-  onMarkerClick,
-  singleMarkerZoom = 14,
-}: {
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char] || char);
+}
+
+function tooltipHtml(marker: MapMarker, weather?: WeatherInfo | null) {
+  const title = [marker.customerName, marker.label].filter(Boolean).map((part) => escapeHtml(part || "")).join(" — ");
+  const states = (marker.activeStates || []).map(escapeHtml).join(" · ");
+  const address = marker.sublabel ? `<div class="map-tooltip-address">${escapeHtml(marker.sublabel)}</div>` : "";
+  const stateRow = states ? `<div class="map-tooltip-states">${states}</div>` : "";
+  const weatherRow = weather ? `<div class="map-tooltip-weather"><span>Temperature: ${weather.tempC}°C</span><span>Rain: ${weather.rainChancePct}%</span><span>Wind: ${weather.windKmh} km/h</span></div>` : "";
+  return `<div class="map-site-tooltip"><strong>${title}</strong>${address}${stateRow}${weatherRow}</div>`;
+}
+
+function worstStatus(markers: MapMarker[]) {
+  return markers.reduce((worst, marker) =>
+    (STATUS_PRIORITY[marker.status] ?? 0) > (STATUS_PRIORITY[worst] ?? 0) ? marker.status : worst, "normal");
+}
+
+function mixGradient(markers: MapMarker[]) {
+  let offset = 0;
+  const stops: string[] = [];
+  for (const status of STATUS_ORDER) {
+    const count = markers.filter((marker) => marker.status === status).length;
+    if (!count) continue;
+    const end = offset + (count / markers.length) * 100;
+    stops.push(`${STATUS_COLOR[status]} ${offset}% ${end}%`);
+    offset = end;
+  }
+  return `conic-gradient(${stops.join(",")})`;
+}
+
+export function LeafletMap({ markers, onMarkerClick, singleMarkerZoom = 14 }: {
   markers: MapMarker[];
   onMarkerClick?: (id: string) => void;
   singleMarkerZoom?: number;
@@ -48,84 +66,70 @@ export function LeafletMap({
 
   useEffect(() => {
     if (!elRef.current) return;
-    const map = L.map(elRef.current, {
-      center: [37.5, -77.5],
-      zoom: 6,
-      zoomControl: false,
-      attributionControl: false,
-    });
+    const map = L.map(elRef.current, { center: [37.5, -77.5], zoom: 6, zoomControl: false, attributionControl: false });
     L.control.zoom({ position: "topright" }).addTo(map);
-    // Esri's free, key-less light-grey canvas basemap + its matching label/road reference overlay —
-    // keeps the minimal light background the markers were designed for, with legible place names.
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
-      maxZoom: 16,
-    }).addTo(map);
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
-      maxZoom: 16,
-    }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16 }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16 }).addTo(map);
     mapRef.current = map;
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
+    return () => { map.remove(); mapRef.current = null; };
   }, []);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    let layer = L.layerGroup().addTo(map);
+    const clusterSize = 72;
 
-    const layer = L.layerGroup().addTo(map);
-    const bounds: L.LatLngExpression[] = [];
-
-    markers.forEach((m) => {
-      const col = STATUS_COLOR[m.status] || STATUS_COLOR.normal;
-      const pulse = ["emergency", "alarm", "test"].includes(m.status);
-      bounds.push([m.lat, m.lng]);
-      if (pulse) {
-        L.circleMarker([m.lat, m.lng], {
-          radius: 18,
-          color: col,
-          fillColor: col,
-          fillOpacity: 0.12,
-          weight: 1,
-          opacity: 0.3,
-          className: "map-pulse-ring",
-        }).addTo(layer);
-      }
-      const mk = L.circleMarker([m.lat, m.lng], {
-        radius: pulse ? 8 : 7,
-        color: "#1a1a2e",
-        weight: 2,
-        fillColor: col,
-        fillOpacity: 1,
-      }).addTo(layer);
-      mk.bindTooltip(tooltipHtml(m), { direction: "top", offset: [0, -10], className: "cpc-map-tooltip" });
-      // Prefetched (not fetched per-hover) so weather is already in place by the time anyone
-      // hovers — fetchWeather's own cache collapses nearby facilities into one request.
-      fetchWeather(m.lat, m.lng).then((weather) => {
-        if (weather) mk.setTooltipContent(tooltipHtml(m, weather));
-      });
-      L.marker([m.lat, m.lng], {
-        icon: L.divIcon({
-          className: "cpc-map-label",
-          html: `<span style="font-family:Inter;font-size:10px;font-weight:700;color:#0f172a;text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 7px #fff;white-space:nowrap">${m.label}</span>`,
-          iconSize: [0, 0],
-          iconAnchor: [-12, 4],
-        }),
-        interactive: false,
-      }).addTo(layer);
-      if (onMarkerClick) mk.on("click", () => onMarkerClick(m.id));
-    });
-
-    if (bounds.length > 1) {
-      map.fitBounds(bounds as L.LatLngBoundsExpression, { padding: [50, 50] });
-    } else if (bounds.length === 1) {
-      map.setView(bounds[0] as L.LatLngExpression, singleMarkerZoom);
-    }
-
-    return () => {
+    const render = () => {
       layer.remove();
+      layer = L.layerGroup().addTo(map);
+      const groups = new Map<string, MapMarker[]>();
+      for (const marker of markers) {
+        const point = map.project([marker.lat, marker.lng], map.getZoom());
+        const key = `${Math.floor(point.x / clusterSize)}:${Math.floor(point.y / clusterSize)}`;
+        groups.set(key, [...(groups.get(key) || []), marker]);
+      }
+
+      for (const group of groups.values()) {
+        if (group.length > 1) {
+          const lat = group.reduce((sum, marker) => sum + marker.lat, 0) / group.length;
+          const lng = group.reduce((sum, marker) => sum + marker.lng, 0) / group.length;
+          const status = worstStatus(group);
+          const pulseClass = group.some((marker) => marker.unacknowledged) ? " unacknowledged" : "";
+          const icon = L.divIcon({
+            className: "cpc-map-cluster",
+            html: `<div class="map-cluster-ring${pulseClass}" style="background:${mixGradient(group)}"><div style="background:${STATUS_COLOR[status]}">${group.length}</div></div>`,
+            iconSize: [42, 42], iconAnchor: [21, 21],
+          });
+          const cluster = L.marker([lat, lng], { icon }).addTo(layer);
+          const mix = STATUS_ORDER.map((item) => ({ item, count: group.filter((marker) => marker.status === item).length })).filter(({ count }) => count);
+          cluster.bindTooltip(`<div class="map-site-tooltip"><strong>${group.length} sites</strong><div class="map-tooltip-states">${mix.map(({ item, count }) => `${count} ${item}`).join(" · ")}</div><div class="map-tooltip-address">Click to zoom and split</div></div>`, { direction: "top" });
+          cluster.on("click", () => map.fitBounds(group.map((marker) => [marker.lat, marker.lng] as L.LatLngTuple), { padding: [70, 70], maxZoom: Math.min(map.getZoom() + 3, 16) }));
+          continue;
+        }
+
+        const marker = group[0];
+        const color = STATUS_COLOR[marker.status] || STATUS_COLOR.normal;
+        if (marker.unacknowledged) {
+          L.circleMarker([marker.lat, marker.lng], { radius: 18, color, fillColor: color, fillOpacity: 0.14, weight: 2, opacity: 0.55, className: "map-pulse-ring" }).addTo(layer);
+        }
+        const pin = L.circleMarker([marker.lat, marker.lng], { radius: 8, color: "#1a1a2e", weight: 2, fillColor: color, fillOpacity: 1 }).addTo(layer);
+        pin.bindTooltip(tooltipHtml(marker), { direction: "top", offset: [0, -10], className: "cpc-map-tooltip" });
+        fetchWeather(marker.lat, marker.lng).then((weather) => { if (weather) pin.setTooltipContent(tooltipHtml(marker, weather)); });
+        L.marker([marker.lat, marker.lng], {
+          icon: L.divIcon({ className: "cpc-map-label", html: `<span>${escapeHtml(marker.label)}</span>`, iconSize: [0, 0], iconAnchor: [-12, 4] }),
+          interactive: false,
+        }).addTo(layer);
+        if (onMarkerClick) pin.on("click", () => onMarkerClick(marker.id));
+      }
     };
+
+    render();
+    map.on("zoomend moveend", render);
+    const bounds = markers.map((marker) => [marker.lat, marker.lng] as L.LatLngTuple);
+    if (bounds.length > 1) map.fitBounds(bounds, { padding: [50, 50] });
+    else if (bounds.length === 1) map.setView(bounds[0], singleMarkerZoom);
+    return () => { map.off("zoomend moveend", render); layer.remove(); };
   }, [markers, onMarkerClick, singleMarkerZoom]);
 
   return <div ref={elRef} style={{ height: "100%", width: "100%", background: "#080c16" }} />;

@@ -48,6 +48,7 @@ ID_PREFIXES = {
     "monitored_assets": "AST",
     "panel_pushes": "PSH",
     "mqtt_topic_mappings": "MQT",
+    "system_events": "EVT",
 }
 
 

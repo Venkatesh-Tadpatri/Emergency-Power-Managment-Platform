@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 import { SystemOperationsOverview } from "../../components/systems/SystemOperationsOverview";
-import { DeviceManager } from "../../components/systems/DeviceManager";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
@@ -20,7 +19,7 @@ export function SystemDetail() {
   const { data: ats } = useAts(panelId);
   const { data: generators } = useGenerators(panelId);
   const [view, setView] = useState("details");
-  const canEditOneLine = me?.role === "superadmin";
+  const canEditOneLine = ["superadmin", "reseller_admin"].includes(me?.role);
 
   useEffect(() => {
     if (!canEditOneLine && view === "wizard") setView("details");
@@ -37,13 +36,14 @@ export function SystemDetail() {
       <SystemOperationsOverview
         systemId={system.id}
         systemName={system.name}
+        customerLogo={company?.logo_data}
+        customerName={company?.name}
         ats={ats || []}
         generators={generators || []}
         view={view}
         onViewChange={setView}
         canEditOneLine={canEditOneLine}
       />
-      {view === "details" && <DeviceManager systemId={system.id} />}
     </>
   );
 }

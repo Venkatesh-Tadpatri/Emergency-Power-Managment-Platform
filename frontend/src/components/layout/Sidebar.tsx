@@ -1,6 +1,8 @@
 import type { ComponentType } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
+import { resolveAtsTelemetry } from "../systems/SystemOperationsOverview";
+import { useTelemetrySnapshot } from "../../hooks/useTelemetry";
 
 import {
   IconAlert,
@@ -14,17 +16,19 @@ import {
   IconUsers,
 } from "../common/Icons";
 import { useMe } from "../../queries/me";
-import { useCompany } from "../../queries/companies";
+import { useCompanies, useCompany } from "../../queries/companies";
 import { useAlarms } from "../../queries/alarms";
 import { useReseller, useResellers } from "../../queries/resellers";
-import { useSites, useSystem, useSystems } from "../../queries/systems";
+import { useAllAts, useAllPanels, useSites, useSystem, useSystems } from "../../queries/systems";
+import { activeAlarmOnly } from "../../utils/alarmClassification";
 
 const DOT: Record<string, string> = {
   normal: "dot-green",
+  online: "dot-green",
   emergency: "dot-red",
   alarm: "dot-amber",
   test: "dot-purple",
-  offline: "dot-green",
+  offline: "dot-gray",
 };
 
 function NavItem({
@@ -65,7 +69,7 @@ export function Sidebar() {
 
   const resellerMatch = useMatch("/resellers/:resellerId/*");
   const companyMatch = useMatch("/companies/:companyId/*");
-  const siteMatch = useMatch("/companies/:companyId/sites/:siteId");
+  const siteMatch = useMatch("/companies/:companyId/sites/:siteId/*");
   const systemMatch = useMatch("/systems/:systemId/*");
 
   const resellerId =
@@ -76,20 +80,36 @@ export function Sidebar() {
 
   const { data: systemForNav } = useSystem(systemId);
   const companyId = companyIdFromRoute || systemForNav?.company_id;
-  const activeSiteId = siteId || systemForNav?.site_id;
+  const activeSiteId = (siteId === "archived" ? undefined : siteId) || systemForNav?.site_id;
 
   const { data: reseller } = useReseller(resellerId);
   const { data: resellers } = useResellers();
+  const { data: companiesForNav } = useCompanies(resellerId);
   const { data: company } = useCompany(companyId);
   const { data: sites } = useSites(companyId);
   const { data: systems } = useSystems(companyId, activeSiteId);
+  const { data: panelsForNav } = useAllPanels(!!activeSiteId);
+  const { data: atsForNav } = useAllAts(!!activeSiteId);
+  const telemetryForNav = useTelemetrySnapshot();
   const { data: companyAlarms } = useAlarms({ companyId: companyId });
   const { data: resellerAlarms } = useAlarms({ resellerId });
 
   const path = window.location.pathname;
 
+  const sidebarSystemStatus = (system: { id: string; status: string }) => {
+    const panelIds = new Set((panelsForNav || []).filter((panel) => panel.system_id === system.id).map((panel) => panel.id));
+    const systemAts = (atsForNav || []).filter((item) => panelIds.has(item.panel_id));
+    if (!systemAts.length) return system.status;
+    const atsTelemetry = systemAts.map((item) => resolveAtsTelemetry(telemetryForNav?.ats, item.id, item.name));
+    if (atsTelemetry.some((data) => data?.connected_source === "GENERATOR")) return "emergency";
+    if (!atsTelemetry.some((data) => data?.utility_available)) return "offline";
+    return system.status;
+  };
+
   if (companyId && company) {
-    const activeAlarms = (companyAlarms || []).filter((a) => a.status === "active");
+    const visibleSystemIds = new Set((systems || []).map((system) => system.id));
+    const activeAlarms = activeAlarmOnly(companyAlarms).filter((alarm) =>
+      !activeSiteId || visibleSystemIds.has(alarm.system_id));
     // Only superadmin/reseller_admin can actually view a reseller dashboard — for
     // company-scoped roles, don't link back to a page the backend will 403/404 on.
     const canViewReseller = me?.role === "superadmin" || me?.role === "reseller_admin";
@@ -115,6 +135,7 @@ export function Sidebar() {
               <span className="sys-nav-name">{site.name}</span>
             </div>
           ))}
+          {!activeSiteId && <NavItem icon={IconMap} color="#64748b" label="Archived Sites" active={path === `/companies/${companyId}/sites/archived`} badge={(sites || []).filter((site) => site.status === "archived").length} onClick={() => navigate(`/companies/${companyId}/sites/archived`)} />}
           {activeSiteId && (systems || []).map((s) => (
             <div
               key={s.id}
@@ -122,39 +143,34 @@ export function Sidebar() {
               onClick={() => navigate(`/systems/${s.id}`)}
               title={s.name}
             >
-              <span className={`sys-dot ${DOT[s.status] || "dot-green"}`} />
+              <span className={`sys-dot ${DOT[sidebarSystemStatus(s)] || "dot-gray"}`} />
               <span className="sys-nav-name">{s.name}</span>
             </div>
           ))}
         </div>
         <div className="nav-section">
           <div className="nav-section-label">Monitoring</div>
-          <NavItem icon={IconAlert} color="#dc2626" label="Alarms" active={path.endsWith("/alarms")} badge={activeAlarms.length} onClick={() => navigate(`/companies/${companyId}/alarms`)} />
+          <NavItem icon={IconAlert} color="#dc2626" label="Alarms" active={path.endsWith("/alarms")} badge={activeAlarms.length} onClick={() => navigate(activeSiteId ? `/companies/${companyId}/sites/${activeSiteId}/alarms` : `/companies/${companyId}/alarms`)} />
           <NavItem icon={IconPhone} color="#0e7490" label="On-Call" active={path.endsWith("/oncall")} onClick={() => navigate(`/companies/${companyId}/oncall`)} />
           <NavItem icon={IconReport} color="#2563eb" label="Analytics" active={path === "/analytics"} onClick={() => navigate(`/analytics?companyId=${companyId}${activeSiteId ? `&siteId=${activeSiteId}` : ""}`)} />
         </div>
         <div className="nav-section">
           <div className="nav-section-label">Administration</div>
-          {me?.permissions.manage_company_users && (
-            <>
-              <NavItem icon={IconUsers} color="#7c3aed" label="Users" active={path.endsWith("/users")} onClick={() => navigate(`/companies/${companyId}/users`)} />
-              <NavItem icon={IconBuilding} color="#16a34a" label="Company Details" active={path.endsWith("/details")} onClick={() => navigate(`/companies/${companyId}/details`)} />
-            </>
-          )}
+          {me?.permissions.manage_company_users && <NavItem icon={IconSettings} color="#7c3aed" label="Customer Settings" active={path.endsWith("/settings") || path.endsWith("/users") || path.endsWith("/details")} onClick={() => navigate(`/companies/${companyId}/settings`)} />}
           <NavItem icon={IconReport} color="#2563eb" label="Reports" active={path.includes("/reports")} onClick={() => navigate(`/companies/${companyId}/reports`)} />
-          {systemId && <NavItem icon={IconSettings} color="#0891b2" label="Monitored Assets" active={path.endsWith("/monitored-assets")} onClick={() => navigate(`/systems/${systemId}/monitored-assets`)} />}
+          {systemId && <NavItem icon={IconSettings} color="#0891b2" label="Device Administration" active={path.endsWith("/device-administration")} onClick={() => navigate(`/systems/${systemId}/device-administration`)} />}
         </div>
       </div>
     );
   }
 
   if (resellerId && reseller) {
-    const activeAlarms = (resellerAlarms || []).filter((a) => a.status === "active");
+    const activeAlarms = activeAlarmOnly(resellerAlarms);
     return (
       <div className="sidebar-nav">
         {me?.role === "superadmin" && (
           <div className="scope-header" onClick={() => navigate("/resellers")}>
-            <span className="scope-back-label">&larr; All Resellers</span>
+            <span className="scope-back-label">&larr; Back</span>
           </div>
         )}
         <div className="scope-title">{reseller.name}</div>
@@ -166,13 +182,18 @@ export function Sidebar() {
         </div>
         <div className="nav-section">
           <div className="nav-section-label">Portfolio</div>
-          <NavItem icon={IconBuilding} color="#16a34a" label="Customers" active={path.endsWith("/companies")} onClick={() => navigate(`/resellers/${resellerId}/companies`)} />
+          <NavItem icon={IconBuilding} color="#16a34a" label="Active Customers" active={path === `/resellers/${resellerId}/companies`} onClick={() => navigate(`/resellers/${resellerId}/companies`)} />
+          <NavItem icon={IconBuilding} color="#64748b" label="Archived Customers" active={path === `/resellers/${resellerId}/companies/archived`} badge={(companiesForNav || []).filter((company) => company.status === "archived").length} onClick={() => navigate(`/resellers/${resellerId}/companies/archived`)} />
           <NavItem icon={IconUsers} color="#7c3aed" label="Users" active={path.endsWith("/users")} onClick={() => navigate(`/resellers/${resellerId}/users`)} />
         </div>
         <div className="nav-section">
           <div className="nav-section-label">Monitoring</div>
           <NavItem icon={IconAlert} color="#dc2626" label="Alarms" active={path.endsWith("/alarms")} badge={activeAlarms.length} onClick={() => navigate(`/resellers/${resellerId}/alarms`)} />
         </div>
+        {me?.role === "reseller_admin" && me.reseller_id === resellerId && <div className="nav-section">
+          <div className="nav-section-label">Administration</div>
+          <NavItem icon={IconSettings} color="#0891b2" label="Branding" active={path.endsWith("/branding")} onClick={() => navigate(`/resellers/${resellerId}/branding`)} />
+        </div>}
       </div>
     );
   }
@@ -187,8 +208,9 @@ export function Sidebar() {
       {canManageHierarchy && (
         <div className="nav-section">
           <div className="nav-section-label">Hierarchy</div>
-          <NavItem icon={IconResellers} color="#7c3aed" label="Resellers" active={path === "/resellers"} onClick={() => navigate("/resellers")} />
-          <NavItem icon={IconBuilding} color="#2563eb" label="Customers" active={path === "/companies"} onClick={() => navigate("/companies")} />
+          <NavItem icon={IconResellers} color="#7c3aed" label="Active Resellers" active={path === "/resellers"} onClick={() => navigate("/resellers")} />
+          <NavItem icon={IconBuilding} color="#2563eb" label="Active Customers" active={path === "/companies"} onClick={() => navigate("/companies")} />
+          <NavItem icon={IconBuilding} color="#64748b" label="Archived Customers" active={path === "/companies/archived"} badge={(companiesForNav || []).filter((company) => company.status === "archived").length} onClick={() => navigate("/companies/archived")} />
           <NavItem
             icon={IconResellers}
             color="#64748b"

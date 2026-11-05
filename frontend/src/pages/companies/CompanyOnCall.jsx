@@ -8,6 +8,7 @@ import { useAlarms } from "../../queries/alarms";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
 import { useCreateOnCallShift, useDeleteOnCallShift, useOnCallShifts, useUpdateOnCallShift, } from "../../queries/oncall";
+import { activeAlarmOnly } from "../../utils/alarmClassification";
 const SHIFT_LABELS = ["24h", "Day (8a-8p)", "Night (8p-8a)"];
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const emptyForm = { shift_date: "", day_label: "", primary_name: "", secondary_name: "", shift_label: "24h" };
@@ -30,7 +31,7 @@ export function CompanyOnCall() {
     const canManage = !!me?.permissions.manage_oncall;
     const todayIso = new Date().toISOString().slice(0, 10);
     const today = (shifts || []).find((s) => s.shift_date === todayIso) || (shifts || [])[0];
-    const active = (alarms || []).filter((a) => a.status === "active");
+    const active = activeAlarmOnly(alarms);
     const activeUnacked = active.filter((a) => !a.ack_by);
     const dayLabelFor = (isoDate) => {
         if (!isoDate)

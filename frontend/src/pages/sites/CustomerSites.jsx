@@ -3,21 +3,25 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
 import { IconBuilding, IconMap } from "../../components/common/Icons";
-import { LeafletMap } from "../../components/map/LeafletMap";
 import { Modal } from "../../components/common/Modal";
-import { PageHero } from "../../components/common/PageHero";
 import { StatusPill } from "../../components/common/StatusPill";
+import { QueryState } from "../../components/common/QueryState";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
+import { useReseller } from "../../queries/resellers";
 import { useArchiveSite, useCreateSite, useSites, useSystems, useUpdateSite } from "../../queries/systems";
 
 export function CustomerSites() {
   const { companyId } = useParams();
   const navigate = useNavigate();
-  const { data: customer } = useCompany(companyId);
-  const { data: sites } = useSites(companyId);
-  const { data: systems } = useSystems(companyId);
+  const customerQuery = useCompany(companyId);
+  const { data: customer } = customerQuery;
+  const { data: reseller } = useReseller(customer?.reseller_id);
+  const sitesQuery = useSites(companyId);
+  const systemsQuery = useSystems(companyId);
+  const { data: sites } = sitesQuery;
+  const { data: systems } = systemsQuery;
   const { data: me } = useMe(true);
   const createSite = useCreateSite();
   const updateSite = useUpdateSite();
@@ -41,7 +45,10 @@ export function CustomerSites() {
     return "online";
   };
 
-  usePageHeader(customer?.name || "Customer", canViewReseller ? [{ label: "Resellers", onClick: () => navigate("/resellers") }] : []);
+  usePageHeader(customer?.name || "Customer", canViewReseller ? [
+    { label: "Active Resellers", onClick: () => navigate("/resellers") },
+    { label: reseller?.name || "", onClick: () => navigate(`/resellers/${customer?.reseller_id}`) },
+  ] : []);
 
   useEffect(() => {
     const query = form.address.trim();
@@ -115,8 +122,10 @@ export function CustomerSites() {
     setEditing(null);
   }
 
+  if (customerQuery.isPending) return <QueryState loading title="Loading customer…" message="Preparing customer details." />;
+  if (customerQuery.isError) return <QueryState title="Customer unavailable" message="We couldn't retrieve this customer." onRetry={() => { void customerQuery.refetch(); }} />;
+
   return <>
-    <PageHero title={customer?.name || "Customer"} subtitle={customer?.address} icon={IconBuilding} color="#2563eb" bgImage="/images/hero-bg.jpg" showText={false} showIcon={false} />
     <div className="reseller-page-heading">
       <div className="reseller-page-heading-icon"><IconBuilding size={19} /></div>
       <div className="reseller-page-heading-copy">
@@ -133,7 +142,7 @@ export function CustomerSites() {
     <div className="section-header"><div><div className="section-title">Sites</div><div className="section-sub">Select a site to view its systems</div></div>{canManage && <button className="header-btn primary" onClick={openNew}>+ New Site</button>}</div>
     <table className="data-table">
       <thead><tr><th>Sl.</th><th>Site</th><th>Location</th><th>Systems</th><th>Online</th><th>Events</th><th>Status</th><th /></tr></thead>
-      <tbody>{activeSites.map((site, index) => {
+      <tbody>{sitesQuery.isPending && <tr><td colSpan={8} className="table-loading-row">Loading sites...</td></tr>}{sitesQuery.isError && <tr><td colSpan={8} className="table-loading-row error">Sites could not be loaded. <button className="header-btn" onClick={() => sitesQuery.refetch()}>Retry</button></td></tr>}{activeSites.map((site, index) => {
         const siteSystems = (systems || []).filter((system) => system.site_id === site.id);
         const siteOnline = siteSystems.filter((system) => system.status === "normal").length;
         const siteStatus = statusFromSystems(siteSystems);
@@ -142,23 +151,10 @@ export function CustomerSites() {
           <td>{site.address || "—"}</td><td>{siteSystems.length}</td><td style={{ color: "var(--green)", fontWeight: 600 }}>{siteOnline}</td><td style={{ color: siteSystems.length - siteOnline ? "var(--red)" : "var(--text-dim)", fontWeight: 600 }}>{siteSystems.length - siteOnline}</td><td><StatusPill status={siteStatus} /></td>
           <td onClick={(event) => event.stopPropagation()}>{canManage && <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
             <button className="header-btn" onClick={(event) => openEdit(site, event)}>Edit</button>
-            <button className="header-btn" onClick={() => navigate(`/companies/${companyId}/sites/${site.id}`)}>View Details</button>
-            <button className="header-btn danger" onClick={() => setDeleting(site)}>Delete</button>
           </span>}</td>
         </tr>;
       })}</tbody>
     </table>
-    <div className="section-header"><div><div className="section-title">Site Locations</div><div className="section-sub">{activeSites.filter((site) => site.lat != null && site.lng != null).length} of {activeSites.length} sites plotted on the map</div></div></div>
-    <div style={{ position: "relative", height: 420, borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
-      <LeafletMap
-        markers={activeSites.filter((site) => site.lat != null && site.lng != null).map((site) => {
-          const siteSystems = (systems || []).filter((system) => system.site_id === site.id);
-          return { id: site.id, lat: site.lat, lng: site.lng, status: statusFromSystems(siteSystems), label: site.name };
-        })}
-        onMarkerClick={(id) => navigate(`/companies/${companyId}/sites/${id}`)}
-        singleMarkerZoom={12}
-      />
-    </div>
     {editing && <Modal title={editing === "new" ? "New Site" : "Edit Site"} onClose={() => setEditing(null)}>
       <form onSubmit={submit}>
         <div className="form-row">
@@ -198,15 +194,16 @@ export function CustomerSites() {
           </div>
         </div>
         <div className="modal-actions">
+          {editing !== "new" && <button type="button" className="header-btn danger reseller-edit-archive" onClick={() => { setDeleting(editing); setEditing(null); }}>Archive</button>}
           <button type="button" className="header-btn" onClick={() => setEditing(null)}>Cancel</button>
           <button type="submit" className="header-btn primary">Save</button>
         </div>
       </form>
     </Modal>}
     {deleting && <ConfirmDialog
-      title="Delete site"
-      message={`Delete "${deleting.name}"? This hides the site and its systems from active monitoring.`}
-      confirmLabel="Delete"
+      title="Archive site"
+      message={`Archive "${deleting.name}"? It will be moved to Archived Sites.`}
+      confirmLabel="Archive"
       onCancel={() => setDeleting(null)}
       onConfirm={() => { archiveSite.mutate(deleting.id); setDeleting(null); }}
     />}

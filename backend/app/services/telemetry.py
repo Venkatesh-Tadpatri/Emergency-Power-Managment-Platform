@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import queue
 import re
 import threading
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from app.config import settings
 from app.database import SessionLocal
 from app.models.ats import ATS
 from app.models.generator import Generator
+from app.models.monitored_asset import MonitoredAsset
 from app.models.mqtt_topic_mapping import MqttTopicMapping
 from app.services.mqtt_topics import normalize_topic
 
@@ -42,7 +44,21 @@ METRIC_MAPPINGS: dict[tuple[str, str], tuple[str, ...]] = {
     ("M", "STATUS"): (
         "plc_error", "plc_warning", "battery_low",
     ),
+    ("F", "FUEL"): (
+        "fuel_level_percent", "fuel_volume_gallons",
+    ),
 }
+
+POWER_FIELD_NAMES = frozenset(
+    name for (device_kind, message_kind), names in METRIC_MAPPINGS.items()
+    if message_kind == "POWER" for name in names
+)
+
+
+def topic_matches_base(topic: str | None, bases: set[str]) -> bool:
+    """Return whether a stored/published topic belongs to a current device mapping."""
+    normalized = normalize_topic(topic)
+    return bool(normalized and any(normalized == base or normalized.startswith(f"{base}/") for base in bases))
 
 
 def map_payload(topic: str, payload: bytes | str) -> dict[str, float | int]:
@@ -107,6 +123,15 @@ def find_device(topic: str) -> DeviceMatch | None:
         # field devices that accidentally publish JSON in the customer/panel segments while refusing
         # to route anything when that pair is ambiguous in MySQL.
         published_route = (topic_parts[0].upper(), topic_parts[-2].upper()) if len(topic_parts) >= 3 else None
+        fuel_tanks = db.query(MonitoredAsset).filter(MonitoredAsset.asset_type == "fuel_tank", MonitoredAsset.mqtt_topic.isnot(None)).all()
+        fuel_matches = []
+        for tank in fuel_tanks:
+            base = normalize_topic(tank.mqtt_topic)
+            if base and (topic == base or topic.startswith(f"{base}/") or base == topic.rsplit("/", 1)[0]):
+                system = tank.system
+                fuel_matches.append(DeviceMatch("fuel_tank", tank.id, tank.asset_tag, base, system.id, system.company_id, system.site_id, tank.panel_id or ""))
+        if fuel_matches:
+            return max(fuel_matches, key=lambda match: len(match.base_topic))
         mappings = db.query(MqttTopicMapping).filter(MqttTopicMapping.enabled.is_(True)).all()
         for mapping in mappings:
             base = normalize_topic(mapping.base_topic)
@@ -118,13 +143,14 @@ def find_device(topic: str) -> DeviceMatch | None:
                             (base_parts[0].upper(), base_parts[-1].upper()) == published_route)
             if not is_exact and not is_route:
                 continue
-            item = db.get(Generator if mapping.device_type == "generator" else ATS, mapping.device_id)
+            is_generator = mapping.device_type in {"generator", "generator_power"}
+            item = db.get(Generator if is_generator else ATS, mapping.device_id)
             if not item or item.panel.system_id != mapping.system_id:
                 logger.error("Rejected stale/cross-system MQTT mapping %s", mapping.id)
                 continue
             system = item.panel.system
             match = DeviceMatch(
-                "generator" if mapping.device_type == "generator" else "ats", item.id, item.name, base, system.id,
+                "generator" if is_generator else "ats", item.id, item.name, base, system.id,
                 system.company_id, system.site_id, item.panel_id,
             )
             (exact_matches if is_exact else route_matches).append(match)
@@ -151,7 +177,12 @@ class TelemetryBridge:
         self.last_message_topic: str | None = None
         self.last_error: str | None = None
         self._latest: dict[tuple[str, str], tuple[DeviceMatch, str, dict[str, float | int]]] = {}
+        self._latest_received_at: dict[tuple[str, str], datetime] = {}
+        # Keep the latest decodable packet even when its topic has not been assigned yet. This lets
+        # a configuration save activate a packet which arrived moments before the mapping existed.
+        self._topic_cache: dict[str, tuple[dict[str, float | int], datetime]] = {}
         self._latest_lock = threading.Lock()
+        self._write_queue: queue.Queue[tuple[DeviceMatch, str, dict[str, float | int]]] = queue.Queue()
         self._sampler_stop = threading.Event()
         self._sampler: threading.Thread | None = None
 
@@ -165,6 +196,7 @@ class TelemetryBridge:
         try:
             import paho.mqtt.client as mqtt
             from influxdb_client import InfluxDBClient, Point, WritePrecision
+            from influxdb_client.client.write_api import SYNCHRONOUS
         except ImportError:
             logger.exception(
                 "MQTT telemetry packages are unavailable; rebuild/install backend requirements"
@@ -173,7 +205,9 @@ class TelemetryBridge:
         self._influx = InfluxDBClient(
             url=settings.influxdb_url, token=settings.influxdb_token, org=settings.influxdb_org
         )
-        self._writer = self._influx.write_api()
+        # Synchronous writes run only in the dedicated persistence worker. This lets failures be
+        # retried deterministically instead of being reported later by an async callback.
+        self._writer = self._influx.write_api(write_options=SYNCHRONOUS)
         self._point_factory = Point
         self._write_precision = WritePrecision.NS
         self._bootstrap_latest_samples()
@@ -186,6 +220,7 @@ class TelemetryBridge:
         client.on_connect_fail = self._on_connect_fail
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_message
+        client.reconnect_delay_set(min_delay=1, max_delay=30)
         client.connect_async(settings.mqtt_host, settings.mqtt_port, keepalive=60)
         client.loop_start()
         self._mqtt = client
@@ -230,10 +265,13 @@ class TelemetryBridge:
         try:
             self.last_message_topic = message.topic
             fields = map_payload(message.topic, message.payload)
-            device = find_device(message.topic)
             if not fields:
                 logger.warning("Ignored MQTT topic with no metric mapping: %s", message.topic)
                 return
+            received_at = datetime.now(timezone.utc)
+            with self._latest_lock:
+                self._topic_cache[normalize_topic(message.topic) or message.topic] = (fields, received_at)
+            device = find_device(message.topic)
             if not device:
                 logger.warning("Ignored MQTT topic with no matching device: %s", message.topic)
                 return
@@ -241,26 +279,42 @@ class TelemetryBridge:
                 key = (device.device_type, device.device_id)
                 previous = self._latest.get(key)
                 merged_fields = {**(previous[2] if previous else {}), **fields}
-                self._latest[key] = (device, message.topic, merged_fields)
+                # A status packet updates engine/state fields but must not relabel the merged
+                # electrical snapshot as G1/STATUS. Keep the power topic as snapshot provenance.
+                is_power_message = message.topic.rstrip("/").upper().endswith("/POWER")
+                snapshot_topic = message.topic if is_power_message or not previous else previous[1]
+                self._latest[key] = (device, snapshot_topic, merged_fields)
+                self._latest_received_at[key] = received_at
+                sample = (device, snapshot_topic, dict(merged_fields))
+            self._write_queue.put(sample)
             logger.info(
-                "Cached %d MQTT fields for %s (%s) from %s",
-                len(fields), device.device_name, device.device_id, message.topic,
+                "Cached MQTT fields for %s (%s) from %s: %s",
+                device.device_name, device.device_id, message.topic, fields,
             )
         except Exception as exc:
             self.last_error = str(exc)
             logger.exception("Unable to ingest MQTT message from %s", message.topic)
 
     def _sample_loop(self) -> None:
-        interval = max(1, settings.telemetry_sample_interval_seconds)
-        while not self._sampler_stop.wait(interval):
-            with self._latest_lock:
-                samples = list(self._latest.values())
-            for device, topic, fields in samples:
+        """Persist every actual MQTT update once, retrying without blocking MQTT ingestion."""
+        while not self._sampler_stop.is_set():
+            try:
+                sample = self._write_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+            device, topic, fields = sample
+            while not self._sampler_stop.is_set():
                 try:
                     self._write_sample(device, topic, fields)
+                    self._write_queue.task_done()
+                    break
                 except Exception as exc:
-                    self.last_error = str(exc)
-                    logger.exception("Unable to store sampled telemetry for %s", device.device_id)
+                    self.last_error = f"InfluxDB write failed: {exc}"
+                    logger.exception(
+                        "Unable to store MQTT telemetry for %s; queued sample will retry in 5 seconds",
+                        device.device_id,
+                    )
+                    self._sampler_stop.wait(5)
 
     def _bootstrap_latest_samples(self) -> None:
         """Resume fixed-interval history from the last stored values after a restart.
@@ -269,8 +323,20 @@ class TelemetryBridge:
         timestamp creates the requested five-second rows without overwriting prior history.
         """
         try:
+            with SessionLocal() as db:
+                allowed_topics: dict[tuple[str, str], set[str]] = {}
+                mappings = db.query(MqttTopicMapping).filter(MqttTopicMapping.enabled.is_(True)).all()
+                for mapping in mappings:
+                    device_type = "generator" if mapping.device_type.startswith("generator") else "ats"
+                    base = normalize_topic(mapping.base_topic)
+                    if base:
+                        allowed_topics.setdefault((device_type, mapping.device_id), set()).add(base)
+                for tank in db.query(MonitoredAsset).filter(MonitoredAsset.asset_type == "fuel_tank", MonitoredAsset.mqtt_topic.isnot(None)).all():
+                    base = normalize_topic(tank.mqtt_topic)
+                    if base:
+                        allowed_topics.setdefault(("fuel_tank", tank.id), set()).add(base)
             flux = f'''from(bucket: {json.dumps(settings.influxdb_bucket)})
-  |> range(start: -30d)
+  |> range(start: -24h)
   |> filter(fn: (r) => r._measurement == "device_telemetry")
   |> last()'''
             accumulated: dict[tuple[str, str], tuple[DeviceMatch, str, dict[str, float | int]]] = {}
@@ -283,6 +349,8 @@ class TelemetryBridge:
                     if not device_id or not device_type or not isinstance(field_value, (int, float)):
                         continue
                     key = (device_type, device_id)
+                    if not topic_matches_base(values.get("mqtt_topic"), allowed_topics.get(key, set())):
+                        continue
                     if key not in accumulated:
                         accumulated[key] = (
                             DeviceMatch(
@@ -301,8 +369,11 @@ class TelemetryBridge:
                     accumulated[key][2][record.get_field()] = field_value
             with self._latest_lock:
                 self._latest.update(accumulated)
+                for key, (_, _, fields) in accumulated.items():
+                    # Bootstrapped values are a fallback until a fresh MQTT message replaces them.
+                    self._latest_received_at.setdefault(key, datetime.now(timezone.utc))
             if accumulated:
-                logger.info("Resumed 5-second sampling for %d devices from InfluxDB", len(accumulated))
+                logger.info("Restored latest telemetry cache for %d devices from InfluxDB", len(accumulated))
         except Exception:
             logger.exception("Unable to resume latest telemetry samples from InfluxDB")
 
@@ -323,25 +394,91 @@ class TelemetryBridge:
             point.field(name, value)
         self._writer.write(bucket=settings.influxdb_bucket, org=settings.influxdb_org, record=point)
         logger.info(
-            "Stored 5-second snapshot with %d fields for %s (%s)",
+            "Stored MQTT snapshot with %d fields for %s (%s); queue_depth=%d",
             len(fields), device.device_name, device.device_id,
+            self._write_queue.qsize(),
         )
+
+    def latest_fields(self, device_ids: set[str]) -> dict[str, dict[str, Any]]:
+        """Return an in-process snapshot without blocking the live API on an Influx query."""
+        with self._latest_lock:
+            return {
+                device_id: {
+                    "timestamp": self._latest_received_at.get((device_type, device_id), datetime.now(timezone.utc)).isoformat(),
+                    **fields,
+                }
+                for (device_type, device_id), (_, _, fields) in self._latest.items()
+                if device_id in device_ids
+            }
+
+    def invalidate_fields(self, device_type: str, device_id: str, fields: set[str] | frozenset[str]) -> None:
+        """Stop sampling values that came from a mapping which has just changed."""
+        key = (device_type, device_id)
+        with self._latest_lock:
+            cached = self._latest.get(key)
+            if not cached:
+                return
+            device, topic, values = cached
+            remaining = {name: value for name, value in values.items() if name not in fields}
+            if remaining:
+                self._latest[key] = (device, topic, remaining)
+            else:
+                self._latest.pop(key, None)
+                self._latest_received_at.pop(key, None)
+
+    def activate_cached_power_topic(self, device_type: str, device_id: str, base_topic: str | None) -> bool:
+        """Replace stale power fields and apply the last packet already seen for a new mapping."""
+        base = normalize_topic(base_topic)
+        full_topic = f"{base}/POWER" if base else None
+        with self._latest_lock:
+            cached_packet = self._topic_cache.get(full_topic) if full_topic else None
+        device = find_device(full_topic) if full_topic and cached_packet else None
+        key = (device_type, device_id)
+        with self._latest_lock:
+            existing = self._latest.get(key)
+            remaining = {
+                name: value for name, value in (existing[2] if existing else {}).items()
+                if name not in POWER_FIELD_NAMES
+            }
+            if not device or device.device_type != device_type or device.device_id != device_id or not cached_packet:
+                if existing and remaining:
+                    self._latest[key] = (existing[0], existing[1], remaining)
+                elif existing:
+                    self._latest.pop(key, None)
+                    self._latest_received_at.pop(key, None)
+                return False
+            fields, received_at = cached_packet
+            merged = {**remaining, **fields}
+            self._latest[key] = (device, full_topic, merged)
+            self._latest_received_at[key] = received_at
+            sample = (device, full_topic, dict(merged))
+        self._write_queue.put(sample)
+        logger.info("Activated cached MQTT packet %s for %s", full_topic, device_id)
+        return True
 
 
 telemetry_bridge = TelemetryBridge()
 
 
-def latest_system_snapshot(system, generators, ats_devices) -> dict[str, Any]:
+def latest_system_snapshot(system, generators, ats_devices, fuel_tanks=None) -> dict[str, Any]:
     """Return the most recent Influx fields for one system's registered devices."""
-    device_ids = [item.id for item in generators if item.mqtt_topic] + [
+    fuel_tanks = fuel_tanks or []
+    device_ids = [item.id for item in generators if item.mqtt_topic or item.power_mqtt_topic] + [
         item.id for item in ats_devices if item.mqtt_topic or item.power_mqtt_topic
-    ]
-    result: dict[str, dict[str, Any]] = {}
-    if device_ids and settings.influxdb_token:
+    ] + [item.id for item in fuel_tanks if item.mqtt_topic]
+    result = telemetry_bridge.latest_fields(set(device_ids))
+    allowed_topics = {
+        item.id: {
+            topic for topic in (normalize_topic(item.mqtt_topic), normalize_topic(item.power_mqtt_topic)) if topic
+        }
+        for item in [*generators, *ats_devices, *fuel_tanks]
+    }
+    missing_device_ids = [device_id for device_id in device_ids if device_id not in result]
+    if missing_device_ids and settings.influxdb_token:
         try:
             from influxdb_client import InfluxDBClient
 
-            ids = ", ".join(json.dumps(device_id) for device_id in device_ids)
+            ids = ", ".join(json.dumps(device_id) for device_id in missing_device_ids)
             flux = f'''from(bucket: {json.dumps(settings.influxdb_bucket)})
   |> range(start: -24h)
   |> filter(fn: (r) => r._measurement == "device_telemetry")
@@ -354,7 +491,7 @@ def latest_system_snapshot(system, generators, ats_devices) -> dict[str, Any]:
                 for table in client.query_api().query(flux, org=settings.influxdb_org):
                     for record in table.records:
                         device_id = record.values.get("device_id")
-                        if device_id:
+                        if device_id and topic_matches_base(record.values.get("mqtt_topic"), allowed_topics.get(device_id, set())):
                             target = result.setdefault(device_id, {"timestamp": record.get_time().isoformat()})
                             target[record.get_field()] = record.get_value()
         except Exception:
@@ -386,22 +523,22 @@ def latest_system_snapshot(system, generators, ats_devices) -> dict[str, Any]:
         if device_type == "generator":
             running = bool(status_word & 1)
             alarm = bool(status_word & (1 << 1))
-            active_kw = fields.get("active_power_kw", 0)
-            load_percent = (float(active_kw) / item.rated_kw * 100) if item.rated_kw and active_kw is not None else 0
+            active_kw = fields.get("active_power_kw")
+            load_percent = (float(active_kw) / item.rated_kw * 100) if item.rated_kw and active_kw is not None else None
             data.update({
                 "status": "FAULT" if alarm else "RUNNING" if running else "READY" if fields else "WAITING",
                 "running": running,
                 "auto_mode": not bool(status_word & (1 << 2)),
                 "fault_active": alarm,
-                "frequency": fields.get("frequency_hz", 0),
+                "frequency": fields.get("frequency_hz"),
                 "active_power_kw": active_kw,
-                "apparent_power_kva": fields.get("apparent_power_kva", 0),
-                "load_percentage": round(load_percent, 2),
-                "fuel_level_percent": fields.get("fuel_level_percent", 0),
-                "engine_hours": fields.get("engine_hours", 0),
-                "oil_pressure_psi": fields.get("oil_pressure_psi", 0),
-                "coolant_temperature_c": fields.get("coolant_temperature_c", 0),
-                "battery_voltage": fields.get("battery_voltage", 0),
+                "apparent_power_kva": fields.get("apparent_power_kva"),
+                "load_percentage": round(load_percent, 2) if load_percent is not None else None,
+                "fuel_level_percent": fields.get("fuel_level_percent"),
+                "engine_hours": fields.get("engine_hours"),
+                "oil_pressure_psi": fields.get("oil_pressure_psi"),
+                "coolant_temperature_c": fields.get("coolant_temperature_c"),
+                "battery_voltage": fields.get("battery_voltage"),
             })
         else:
             utility = bool(status_word & 1)
@@ -413,8 +550,8 @@ def latest_system_snapshot(system, generators, ats_devices) -> dict[str, Any]:
                 "utility_available": utility,
                 "generator_available": generator,
                 "connected_source": "GENERATOR" if generator_connected else "UTILITY" if utility_connected else "OFF",
-                "transfer_time_seconds": fields.get("time_to_transfer_seconds", 0),
-                "time_on_emergency_seconds": fields.get("time_to_bus_seconds", 0),
+                "transfer_time_seconds": fields.get("time_to_transfer_seconds"),
+                "time_on_emergency_seconds": fields.get("time_to_bus_seconds"),
                 "fault_active": False,
             })
         return {key: value for key, value in data.items() if value is not None}
@@ -437,6 +574,15 @@ def latest_system_snapshot(system, generators, ats_devices) -> dict[str, Any]:
             "last_mqtt_topic": telemetry_bridge.last_message_topic,
             "mqtt_error": telemetry_bridge.last_error,
         },
-        "generators": [electrical(item, "generator") for item in generators if item.mqtt_topic],
+        "generators": [electrical(item, "generator") for item in generators if item.mqtt_topic or item.power_mqtt_topic],
         "ats": [electrical(item, "ats") for item in ats_devices if item.mqtt_topic or item.power_mqtt_topic],
+        "fuel_tanks": [{
+            "equipment_id": item.id,
+            "equipment_name": item.asset_tag,
+            "mqtt_topic": item.mqtt_topic,
+            "timestamp": result.get(item.id, {}).get("timestamp"),
+            "communication_healthy": bool(result.get(item.id)),
+            "level_percent": result.get(item.id, {}).get("fuel_level_percent"),
+            "volume_gallons": result.get(item.id, {}).get("fuel_volume_gallons"),
+        } for item in fuel_tanks if item.mqtt_topic],
     }

@@ -1,6 +1,6 @@
 import { ImageBackground, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { SolutionLogo } from "./SolutionLogo";
+import { CpcLogo } from "./CpcLogo";
 
 const FEATURES = [
   ["◉", "Live Monitoring", "See generator, ATS, fuel, and utility status in real time across every location.", "#2563eb", "#dbeafe"],
@@ -23,10 +23,10 @@ export function Landing({ disabled, onSignIn }) {
     <View style={styles.page}>
       <SafeAreaView style={styles.navSafe}>
         <View style={styles.nav}>
-          <SolutionLogo width={60} ink="#000" />
+          <CpcLogo width={76} showTagline />
           <View>
             <Text style={styles.navTitle}>CPC</Text>
-            <Text style={styles.navSubtitle}>Critical Power Command</Text>
+            <Text style={styles.navSubtitle}>Critical Infrastructure. Managed.</Text>
           </View>
         </View>
       </SafeAreaView>
@@ -91,7 +91,7 @@ export function Landing({ disabled, onSignIn }) {
         </View>
 
         <View style={styles.footer}>
-          <SolutionLogo width={110} ink="#fff" />
+          <CpcLogo width={110} showTagline light />
           <Text style={styles.footerBrand}>CPC</Text>
           <Text style={styles.footerTagline}>The most advanced platform for monitoring and managing generators, ATS, and critical power systems.</Text>
           <View style={styles.footerDivider} />

@@ -1,11 +1,11 @@
 const BRANCH_LABELS = { "life-safety": "LIFE SAFETY", critical: "CRITICAL", equipment: "EQUIPMENT" };
 
-export function AtsTransferReport({ report, system, company }) {
+export function AtsTransferReport({ report, system, company, reseller }) {
   const details = report.ats_details || [];
   return (
     <div className="report-doc">
       <div className="report-doc-header">
-        <div className="report-doc-brand">{company?.logo_data ? <img src={company.logo_data} alt={`${company.name} logo`} /> : "CPC"}</div>
+        <div className="report-doc-brand report-brand-logos">{company?.logo_data && <span className="report-logo-box" data-label="Customer"><img src={company.logo_data} alt={`${company.name} logo`} /></span>}{reseller?.show_logo_on_reports && reseller.logo_data && <span className="report-logo-box" data-label="Reseller"><img src={reseller.logo_data} alt={`${reseller.name} logo`} /></span>}<span className="report-logo-box cpc" data-label="CPC"><img src="/images/cpc-logo.png" alt="CPC" /></span></div>
         <div className="report-doc-title-block">
           <div className="report-doc-command-title">CPC · Critical Power Command</div>
           <div className="report-doc-title">ATS Transfer Report</div>

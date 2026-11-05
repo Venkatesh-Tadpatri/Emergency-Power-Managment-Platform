@@ -59,3 +59,16 @@ def archive_site(site_id: str, db: Session = Depends(get_db), user: User = Depen
     if not can_write_system(user, db, customer.id, customer.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to archive this site")
     return crud.archive_site(db, site)
+
+
+@router.delete("/{site_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+def delete_site_permanently(site_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    site = crud.get_site(db, site_id)
+    customer = company_crud.get_company(db, site.customer_id) if site else None
+    if not site or not customer:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "site not found")
+    if site.status != "archived":
+        raise HTTPException(status.HTTP_409_CONFLICT, "site must be archived before it can be deleted")
+    if not can_write_system(user, db, customer.id, customer.reseller_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to delete this site")
+    crud.delete_site(db, site)

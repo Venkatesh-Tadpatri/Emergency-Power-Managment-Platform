@@ -15,10 +15,11 @@ router = APIRouter(prefix="/api/ats", tags=["ats"])
 @router.get("", response_model=list[ATSRead])
 def list_ats(
     panel_id: str | None = Query(default=None),
+    system_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    all_ats = crud.list_ats(db, panel_id)
+    all_ats = crud.list_ats(db, panel_id, system_id)
     return [a for a in all_ats if can_view_system(user, db, a.panel.system)]
 
 

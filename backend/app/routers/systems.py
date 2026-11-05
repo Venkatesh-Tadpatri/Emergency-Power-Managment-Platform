@@ -8,9 +8,19 @@ from app.crud import site as site_crud
 from app.crud import system as crud
 from app.database import get_db
 from app.models.user import User
-from app.schemas.system import SystemCreate, SystemRead, SystemUpdate
+from app.models.system import SystemEvent
+from app.schemas.system import AlarmDisableRequest, AlarmDisableStatus, SystemCreate, SystemEventRead, SystemRead, SystemUpdate
+from app.services.alarm_disable import can_control_alarms, disable_alarms, enable_alarms, ensure_utc, status_payload
+from app.models.base import utcnow
 
 router = APIRouter(prefix="/api/systems", tags=["systems"])
+
+
+def _visible_system(db: Session, user: User, system_id: str):
+    system = crud.get_system(db, system_id)
+    if not system or not can_view_system(user, db, system):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "system not found")
+    return system
 
 
 @router.get("", response_model=list[SystemRead])
@@ -50,6 +60,37 @@ def get_system(
     if not system or not can_view_system(user, db, system):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "system not found")
     return system
+
+
+@router.get("/{system_id}/alarm-disable", response_model=AlarmDisableStatus)
+def get_alarm_disable_status(system_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    system = _visible_system(db, user, system_id)
+    until = ensure_utc(system.alarms_disabled_until)
+    if system.alarms_disabled and until and until <= utcnow():
+        enable_alarms(db, system, automatic=True)
+    return status_payload(system, can_control_alarms(user, db, system))
+
+
+@router.post("/{system_id}/alarm-disable", response_model=AlarmDisableStatus)
+def set_alarm_disable(system_id: str, data: AlarmDisableRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    system = _visible_system(db, user, system_id)
+    if not can_control_alarms(user, db, system):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "this role cannot disable alarms")
+    return disable_alarms(db, system, user, data.duration, data.reason)
+
+
+@router.delete("/{system_id}/alarm-disable", response_model=AlarmDisableStatus)
+def clear_alarm_disable(system_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    system = _visible_system(db, user, system_id)
+    if not can_control_alarms(user, db, system):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "this role cannot re-enable alarms")
+    return enable_alarms(db, system, user=user)
+
+
+@router.get("/{system_id}/events", response_model=list[SystemEventRead])
+def list_system_events(system_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _visible_system(db, user, system_id)
+    return db.query(SystemEvent).filter(SystemEvent.system_id == system_id).order_by(SystemEvent.occurred_at.desc()).limit(100).all()
 
 
 @router.patch("/{system_id}", response_model=SystemRead)

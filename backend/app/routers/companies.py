@@ -18,7 +18,7 @@ from app.schemas.company import CompanyCreate, CompanyRead, CompanyUpdate
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 
 
-@router.get("", response_model=list[CompanyRead])
+@router.get("", response_model=list[CompanyRead], response_model_exclude={"__all__": {"logo_data"}})
 def list_companies(
     reseller_id: str | None = Query(default=None),
     db: Session = Depends(get_db),

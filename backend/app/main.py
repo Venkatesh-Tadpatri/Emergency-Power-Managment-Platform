@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.logging_config import configure_logging
 from app.services.telemetry import telemetry_bridge
+from app.services.alarm_disable import alarm_disable_worker
 from app.routers import (
     alarms,
     ats,
@@ -40,12 +41,14 @@ async def lifespan(_app: FastAPI):
     logger.info("Application starting; logs=%s", log_dir)
     try:
         telemetry_bridge.start()
+        alarm_disable_worker.start()
         yield
     except Exception:
         logger.exception("Application lifespan failed")
         raise
     finally:
         telemetry_bridge.stop()
+        alarm_disable_worker.stop()
         logger.info("Application stopped")
 
 

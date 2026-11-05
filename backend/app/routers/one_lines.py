@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import can_view_system, can_write_system
+from app.auth.permissions import can_edit_one_line, can_view_system
 from app.crud import one_line as crud
 from app.crud import system as system_crud
 from app.database import get_db
@@ -32,6 +32,6 @@ def save_one_line(
     system = system_crud.get_system(db, system_id)
     if not system:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "system not found")
-    if not can_write_system(user, db, system.company_id, system.company.reseller_id):
+    if not can_edit_one_line(user, system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this system's one-line")
     return crud.upsert_one_line(db, system_id, payload.data)

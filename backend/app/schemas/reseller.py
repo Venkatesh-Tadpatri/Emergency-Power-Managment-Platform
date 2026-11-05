@@ -7,6 +7,7 @@ class ResellerBase(BaseModel):
     contact_email: str | None = None
     contact_phone: str | None = None
     status: str = "active"
+    show_logo_on_reports: bool = False
 
 
 class ResellerCreate(ResellerBase):
@@ -19,8 +20,10 @@ class ResellerUpdate(BaseModel):
     contact_email: str | None = None
     contact_phone: str | None = None
     status: str | None = None
+    show_logo_on_reports: bool | None = None
 
 
 class ResellerRead(ResellerBase):
     model_config = ConfigDict(from_attributes=True)
     id: str
+    logo_data: str | None = None

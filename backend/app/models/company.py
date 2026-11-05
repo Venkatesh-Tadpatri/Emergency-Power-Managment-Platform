@@ -9,6 +9,9 @@ class Customer(Base, UUIDPKMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     address: Mapped[str | None] = mapped_column(String(500))
+    contact_name: Mapped[str | None] = mapped_column(String(255))
+    contact_email: Mapped[str | None] = mapped_column(String(255))
+    contact_phone: Mapped[str | None] = mapped_column(String(50))
     lat: Mapped[float | None] = mapped_column(Float)
     lng: Mapped[float | None] = mapped_column(Float)
     reseller_id: Mapped[str] = mapped_column(ForeignKey("resellers.id"), nullable=False)

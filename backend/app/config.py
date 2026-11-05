@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     log_dir: str = "logs"
     log_level: str = "INFO"
     log_retention_days: int = 30
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "alerts@cpc.local"
+    smtp_starttls: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

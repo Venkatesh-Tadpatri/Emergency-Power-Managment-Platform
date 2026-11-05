@@ -7,6 +7,7 @@ from app.crud.system import get_system
 from app.database import get_db
 from app.models.user import User
 from app.models.mqtt_topic_mapping import MqttTopicMapping
+from app.models.monitored_asset import MonitoredAsset
 from app.services.telemetry import latest_system_snapshot, telemetry_bridge
 
 router = APIRouter(prefix="/api/telemetry", tags=["telemetry"])
@@ -32,7 +33,8 @@ def latest_system_telemetry(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "system not found")
     generators = [device for panel in system.panels for device in panel.generators]
     ats_devices = [device for panel in system.panels for device in panel.ats_devices]
-    return latest_system_snapshot(system, generators, ats_devices)
+    fuel_tanks = db.query(MonitoredAsset).filter(MonitoredAsset.system_id == system_id, MonitoredAsset.asset_type == "fuel_tank").all()
+    return latest_system_snapshot(system, generators, ats_devices, fuel_tanks)
 
 
 @router.get("/systems/{system_id}/topics")

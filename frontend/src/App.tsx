@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 
 import { AuthTokenBridge } from "./auth/AuthTokenBridge";
@@ -10,29 +10,33 @@ import { Landing } from "./pages/Landing";
 import { MapView } from "./pages/MapView";
 import { Profile } from "./pages/Profile";
 import { AlarmsList } from "./pages/alarms/AlarmsList";
+import { SiteAlarms } from "./pages/alarms/SiteAlarms";
 import { Analytics } from "./pages/analytics/Analytics";
 import { CompanyAlarms } from "./pages/companies/CompanyAlarms";
+import { ArchivedCompanies } from "./pages/companies/ArchivedCompanies";
 import { CompanyDashboard } from "./pages/companies/CompanyDashboard";
-import { CompanyDetails } from "./pages/companies/CompanyDetails";
 import { CompaniesList } from "./pages/companies/CompaniesList";
 import { CompanyMap } from "./pages/companies/CompanyMap";
 import { CompanyOnCall } from "./pages/companies/CompanyOnCall";
 import { CompanyReports } from "./pages/companies/CompanyReports";
-import { CompanyUsers } from "./pages/companies/CompanyUsers";
+import { CustomerSettings } from "./pages/companies/CustomerSettings";
 import { ReportDetail } from "./pages/reports/ReportDetail";
 import { ArchivedResellers } from "./pages/resellers/ArchivedResellers";
 import { ResellerAlarms } from "./pages/resellers/ResellerAlarms";
 import { ResellerCompanies } from "./pages/resellers/ResellerCompanies";
 import { ResellerDashboard } from "./pages/resellers/ResellerDashboard";
+import { ResellerBranding } from "./pages/resellers/ResellerBranding";
 import { ResellerMap } from "./pages/resellers/ResellerMap";
 import { ResellerUsers } from "./pages/resellers/ResellerUsers";
 import { ResellersList } from "./pages/resellers/ResellersList";
 import { Settings } from "./pages/settings/Settings";
 import { CustomerSites } from "./pages/sites/CustomerSites";
+import { ArchivedSites } from "./pages/sites/ArchivedSites";
 import { SiteSystems } from "./pages/sites/SiteSystems";
 import { SystemDetail } from "./pages/systems/SystemDetail";
 import { AtsDetail, GeneratorDetail } from "./pages/systems/DeviceDetail";
 import { MonitoredAssetsPage } from "./pages/systems/MonitoredAssets";
+import { useMe } from "./queries/me";
 
 export function App() {
   return (
@@ -57,6 +61,26 @@ function Gate() {
     return <Landing />;
   }
 
+  return <PortalBootstrap />;
+}
+
+function PortalBootstrap() {
+  const auth = useAuth();
+  const meQuery = useMe(auth.isAuthenticated);
+
+  if (meQuery.isPending) {
+    const identity = auth.user?.profile.email || auth.user?.profile.preferred_username || "your account";
+    return <div className="portal-bootstrap">
+      <img src="/images/cpc-logo.png" alt="CPC" />
+      <strong>Signing in as {identity}</strong>
+      <span>Loading your portal access...</span>
+      <div className="portal-bootstrap-bar"><i /></div>
+    </div>;
+  }
+  if (meQuery.isError) {
+    return <div className="portal-bootstrap"><img src="/images/cpc-logo.png" alt="CPC" /><strong>Unable to load your portal</strong><span>Your session is signed in, but the user profile could not be loaded.</span><button className="header-btn primary" onClick={() => meQuery.refetch()}>Retry</button></div>;
+  }
+
   return (
     <Routes>
       <Route element={<AppShell />}>
@@ -72,23 +96,30 @@ function Gate() {
         <Route path="resellers/archived" element={<ArchivedResellers />} />
         <Route path="resellers/:resellerId" element={<ResellerDashboard />} />
         <Route path="resellers/:resellerId/companies" element={<ResellerCompanies />} />
+        <Route path="resellers/:resellerId/companies/archived" element={<ArchivedCompanies />} />
         <Route path="resellers/:resellerId/users" element={<ResellerUsers />} />
         <Route path="resellers/:resellerId/alarms" element={<ResellerAlarms />} />
         <Route path="resellers/:resellerId/map" element={<ResellerMap />} />
+        <Route path="resellers/:resellerId/branding" element={<ResellerBranding />} />
 
         <Route path="companies" element={<CompaniesList />} />
+        <Route path="companies/archived" element={<ArchivedCompanies />} />
         <Route path="companies/:companyId" element={<CustomerSites />} />
-        <Route path="companies/:companyId/details" element={<CompanyDetails />} />
+        <Route path="companies/:companyId/sites/archived" element={<ArchivedSites />} />
+        <Route path="companies/:companyId/details" element={<Navigate to="../settings?tab=branding" replace />} />
+        <Route path="companies/:companyId/settings" element={<CustomerSettings />} />
         <Route path="companies/:companyId/sites/:siteId" element={<SiteSystems />} />
+        <Route path="companies/:companyId/sites/:siteId/alarms" element={<SiteAlarms />} />
         <Route path="companies/:companyId/map" element={<CompanyMap />} />
         <Route path="companies/:companyId/alarms" element={<CompanyAlarms />} />
-        <Route path="companies/:companyId/users" element={<CompanyUsers />} />
+        <Route path="companies/:companyId/users" element={<Navigate to="../settings?tab=users" replace />} />
         <Route path="companies/:companyId/reports" element={<CompanyReports />} />
         <Route path="companies/:companyId/reports/:reportId" element={<ReportDetail />} />
         <Route path="companies/:companyId/oncall" element={<CompanyOnCall />} />
 
         <Route path="systems/:systemId" element={<SystemDetail />} />
-        <Route path="systems/:systemId/monitored-assets" element={<MonitoredAssetsPage />} />
+        <Route path="systems/:systemId/device-administration" element={<MonitoredAssetsPage />} />
+        <Route path="systems/:systemId/monitored-assets" element={<Navigate to="../device-administration" relative="path" replace />} />
         <Route path="systems/:systemId/ats" element={<AtsDetail />} />
         <Route path="systems/:systemId/ats/:atsId" element={<AtsDetail />} />
         <Route path="systems/:systemId/generators" element={<GeneratorDetail />} />

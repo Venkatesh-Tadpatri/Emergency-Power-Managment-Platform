@@ -4,6 +4,10 @@ from app.models.alarm import Alarm
 from app.models.system import System
 
 
+def get_alarm(db: Session, alarm_id: str) -> Alarm | None:
+    return db.query(Alarm).filter(Alarm.id == alarm_id).first()
+
+
 def list_alarms(
     db: Session,
     system_id: str | None = None,

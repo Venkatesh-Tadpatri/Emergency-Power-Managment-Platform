@@ -4,7 +4,7 @@ import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import { createAts, createGenerator, getAlarms, getAllAts, getAllGenerators, getAllPanels, getAts, getCompanies, getGenerators, getMe, getOnCall, getPanels, getReports, getResellers, getSites, getSystems } from "./src/api";
 import { clearToken, exchangeAuthorizationCode, readToken, redirectUri } from "./src/auth";
-import { SolutionLogo } from "./src/SolutionLogo";
+import { CpcLogo } from "./src/CpcLogo";
 import { Landing } from "./src/Landing";
 import { Customers, CustomerDetail, PlatformUsers, Resellers, ResellerDetail, SiteDetail, UserDetail } from "./src/AdminLists";
 import { Analytics } from "./src/Analytics";
@@ -63,7 +63,7 @@ function AppInner() {
       <StatusBar barStyle={theme.statusBar} />
       <View style={styles.header}>
         <Pressable style={styles.menuButton} onPress={() => setDrawerOpen(true)}><Text style={styles.menuIcon}>☰</Text></Pressable>
-        <SolutionLogo width={40} />
+        <CpcLogo width={48} />
         <Text style={styles.headerTitle}>{SCREEN_TITLES[screen]}</Text>
       </View>
       <View style={styles.body}>

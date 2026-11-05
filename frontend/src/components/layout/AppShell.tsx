@@ -4,6 +4,7 @@ import { useAuth } from "react-oidc-context";
 
 import { IconChevronsLeft } from "../common/Icons";
 import { useMe } from "../../queries/me";
+import { useReseller } from "../../queries/resellers";
 import { HeaderProvider } from "./HeaderContext";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
@@ -22,6 +23,7 @@ export function AppShell() {
   const auth = useAuth();
   const navigate = useNavigate();
   const { data: me } = useMe(auth.isAuthenticated);
+  const { data: reseller } = useReseller(me?.role !== "superadmin" ? me?.reseller_id || undefined : undefined);
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
@@ -60,9 +62,9 @@ export function AppShell() {
           >
             <IconChevronsLeft size={16} />
           </button>
-          <img className="sidebar-logo" src="/images/solution61-logo.svg" alt="Solution 61" />
+          <img className="sidebar-logo" src={reseller?.logo_data || "/images/cpc-logo.png"} alt={reseller?.logo_data ? `${reseller.name} logo` : "CPC"} />
           <div className="sidebar-brand-copy">
-            <div className="sidebar-brand"><span>CPC</span><span className="sidebar-brand-name">Critical Power Command</span></div>
+            <div className="sidebar-brand">{reseller?.logo_data ? "Powered by CPC" : "Critical Infrastructure. Managed."}</div>
           </div>
         </div>
         <Sidebar />

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 
 export type GeneratorTelemetry = {
@@ -9,25 +10,28 @@ export type GeneratorTelemetry = {
   auto_mode: boolean;
   test_mode: boolean;
   fault_active: boolean;
-  voltage_ab: number;
-  voltage_bc: number;
-  voltage_ca: number;
-  current_a: number;
-  current_b: number;
-  current_c: number;
-  frequency: number;
-  active_power_kw: number;
-  apparent_power_kva: number;
-  power_factor: number;
-  load_percentage: number;
-  oil_pressure_psi: number;
-  coolant_temperature_c: number;
-  engine_hours: number;
-  fuel_level_percent: number;
-  fuel_volume_litres: number;
-  fuel_consumption_lph: number;
-  estimated_runtime_hours: number;
-  battery_voltage: number;
+  voltage_ab?: number;
+  voltage_bc?: number;
+  voltage_ca?: number;
+  voltage_an?: number;
+  voltage_bn?: number;
+  voltage_cn?: number;
+  current_a?: number;
+  current_b?: number;
+  current_c?: number;
+  frequency?: number;
+  active_power_kw?: number;
+  apparent_power_kva?: number;
+  power_factor?: number;
+  load_percentage?: number;
+  oil_pressure_psi?: number;
+  coolant_temperature_c?: number;
+  engine_hours?: number;
+  fuel_level_percent?: number;
+  fuel_volume_litres?: number;
+  fuel_consumption_lph?: number;
+  estimated_runtime_hours?: number;
+  battery_voltage?: number;
   low_fuel_alarm: boolean;
   low_oil_pressure_alarm: boolean;
   high_temperature_alarm: boolean;
@@ -45,61 +49,81 @@ export type AtsTelemetry = {
   generator_available: boolean;
   connected_source: "UTILITY" | "GENERATOR" | "OFF";
   transfer_in_progress: boolean;
-  transfer_time_seconds: number;
-  time_on_emergency_seconds: number;
-  voltage_ab: number;
-  voltage_bc: number;
-  voltage_ca: number;
-  current_a: number;
-  current_b: number;
-  current_c: number;
-  frequency: number;
-  active_power_kw: number;
-  apparent_power_kva: number;
-  power_factor: number;
-  load_percentage: number;
+  transfer_time_seconds?: number;
+  time_on_emergency_seconds?: number;
+  voltage_ab?: number;
+  voltage_bc?: number;
+  voltage_ca?: number;
+  voltage_an?: number;
+  voltage_bn?: number;
+  voltage_cn?: number;
+  current_a?: number;
+  current_b?: number;
+  current_c?: number;
+  frequency?: number;
+  active_power_kw?: number;
+  apparent_power_kva?: number;
+  power_factor?: number;
+  load_percentage?: number;
   fault_active: boolean;
   communication_healthy: boolean;
   timestamp: string;
 };
 
+export type FuelTankTelemetry = {
+  equipment_id: string;
+  equipment_name: string;
+  mqtt_topic?: string;
+  timestamp?: string;
+  communication_healthy: boolean;
+  level_percent?: number;
+  volume_gallons?: number;
+};
+
 export type TelemetrySnapshot = {
   customer: { id: string; name: string };
   site: { id: string; name: string };
+  fuel_tanks?: FuelTankTelemetry[];
   system: { id: string; name: string };
   refresh_interval_ms: number;
   generators: GeneratorTelemetry[];
   ats: AtsTelemetry[];
-  storage?: { engine: string; url: string; org: string; bucket: string; measurement: string; has_data: boolean };
+  storage?: {
+    engine: string;
+    url: string;
+    org: string;
+    bucket: string;
+    measurement: string;
+    has_data: boolean;
+    mqtt_connected: boolean;
+    last_mqtt_topic: string | null;
+    mqtt_error: string | null;
+  };
 };
 
 /** Poll the system-scoped API; the backend enforces hierarchy and queries Influx by system_id. */
 export function useTelemetry(systemId?: string) {
-  const [telemetry, setTelemetry] = useState<TelemetrySnapshot | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ["telemetry", systemId],
+    queryFn: async () =>
+      (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`, { timeout: 15_000 })).data,
+    enabled: !!systemId,
+    // Preserve the last successful snapshot across navigation and refresh it in the background.
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 24 * 60 * 60_000,
+    refetchInterval: (state) => state.state.data?.refresh_interval_ms || 5000,
+    refetchIntervalInBackground: true,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    retry: 5,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
+  });
 
-  useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    const load = async () => {
-      if (!systemId) return;
-      try {
-        const snapshot = (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`)).data;
-        if (!active) return;
-        setTelemetry(snapshot);
-        setError(null);
-        timer = window.setTimeout(load, snapshot.refresh_interval_ms || 5000);
-      } catch (error) {
-        console.warn("Live telemetry could not be loaded", error);
-        if (active) setError("Live MQTT telemetry is unavailable.");
-        if (active) timer = window.setTimeout(load, 5000);
-      }
-    };
-    void load();
-    return () => { active = false; if (timer) window.clearTimeout(timer); };
-  }, [systemId]);
-
-  return { telemetry, error };
+  return {
+    telemetry: query.data ?? null,
+    error: query.error ? "Live telemetry refresh failed; showing the last received values." : null,
+    isRefreshing: query.isFetching,
+  };
 }
 
 /** Convenience hook for screens that only need the latest snapshot. */
@@ -114,6 +138,7 @@ export function telemetryFor<T extends { equipment_id: string; equipment_name: s
 
 const HISTORY_FIELDS = [
   "load_percentage", "active_power_kw", "voltage_ab", "voltage_bc", "voltage_ca",
+  "voltage_an", "voltage_bn", "voltage_cn",
   "current_a", "current_b", "current_c", "frequency", "power_factor",
   "fuel_level_percent", "coolant_temperature_c", "oil_pressure_psi",
 ] as const;

@@ -8,12 +8,48 @@ from app.crud import system as system_crud
 from app.database import get_db
 from app.models.user import User
 from app.models.panel import Panel
+from app.models.system import System
+from app.models.id_sequence import IDSequence
 from app.models.monitored_asset import PanelPush
 from app.schemas.monitored_asset import PanelPushRead
 from app.models.base import utcnow
 from app.schemas.panel import PanelCreate, PanelRead, PanelUpdate
 
 router = APIRouter(prefix="/api/panels", tags=["panels"])
+
+
+def _next_panel_number(db: Session, company_id: str) -> str:
+    """Allocate the next customer-wide PNUMBER without reusing gaps."""
+    from app.models.company import Customer
+    company = db.get(Customer, company_id)
+    customer_code = "".join(character for character in (company.name if company else company_id) if character.isalnum()).upper()[:4]
+    prefix = f"{customer_code}P"
+    sequence_key = f"P{company_id.replace('-', '')}"[:10]
+    sequence = db.query(IDSequence).filter(IDSequence.prefix == sequence_key).with_for_update().first()
+    if sequence:
+        number = sequence.next_value
+        sequence.next_value += 1
+        db.flush()
+        return f"{prefix}{number:02d}"
+
+    values = (
+        db.query(Panel.panel_mqtt_id)
+        .join(System, Panel.system_id == System.id)
+        .filter(System.company_id == company_id, Panel.panel_mqtt_id.isnot(None))
+        .all()
+    )
+    numbers = []
+    for (value,) in values:
+        if not value:
+            continue
+        normalized = value.upper()
+        suffix = normalized[len(prefix):] if normalized.startswith(prefix) else normalized[1:] if normalized.startswith("P") else ""
+        if suffix.isdigit():
+            numbers.append(int(suffix))
+    number = max(numbers, default=0) + 1
+    db.add(IDSequence(prefix=sequence_key, next_value=number + 1))
+    db.flush()
+    return f"{prefix}{number:02d}"
 
 
 @router.get("", response_model=list[PanelRead])
@@ -23,7 +59,16 @@ def list_panels(
     user: User = Depends(get_current_user),
 ):
     all_panels = crud.list_panels(db, system_id)
-    return [p for p in all_panels if can_view_system(user, db, p.system)]
+    visible_panels = [p for p in all_panels if can_view_system(user, db, p.system)]
+    # Backfill PNUMBERs for panels created before automatic allocation existed.
+    backfilled = False
+    for panel in visible_panels:
+        if not panel.panel_mqtt_id:
+            panel.panel_mqtt_id = _next_panel_number(db, panel.system.company_id)
+            backfilled = True
+    if backfilled:
+        db.commit()
+    return visible_panels
 
 
 @router.post("", response_model=PanelRead, status_code=status.HTTP_201_CREATED)
@@ -37,9 +82,8 @@ def create_panel(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "system not found")
     if not can_write_system(user, db, system.company_id, system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to add panels here")
-    duplicate = db.query(Panel).filter(Panel.system_id == data.system_id, Panel.panel_mqtt_id == data.panel_mqtt_id).first()
-    if duplicate:
-        raise HTTPException(status.HTTP_409_CONFLICT, "panel number already exists in this system")
+    # PNUMBER is owned by CPC, scoped to the customer, and never entered by a user.
+    data.panel_mqtt_id = _next_panel_number(db, system.company_id)
     return crud.create_panel(db, data)
 
 
@@ -65,10 +109,8 @@ def update_panel(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "panel not found")
     if not can_write_system(user, db, panel.system.company_id, panel.system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this panel")
-    if data.panel_mqtt_id:
-        duplicate = db.query(Panel).filter(Panel.system_id == panel.system_id, Panel.panel_mqtt_id == data.panel_mqtt_id, Panel.id != panel.id).first()
-        if duplicate:
-            raise HTTPException(status.HTTP_409_CONFLICT, "panel number already exists in this system")
+    if data.panel_mqtt_id is not None and data.panel_mqtt_id != panel.panel_mqtt_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "PNUMBER is permanent and cannot be changed")
     return crud.update_panel(db, panel, data)
 
 

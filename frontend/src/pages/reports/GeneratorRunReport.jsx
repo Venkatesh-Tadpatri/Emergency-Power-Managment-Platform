@@ -2,12 +2,12 @@ import { LoadProfileChart } from "../../components/chart/LoadProfileChart";
 
 const fmt = (value, digits = 1) => (value == null ? "—" : Number(value).toFixed(digits));
 
-export function GeneratorRunReport({ report, system, company }) {
+export function GeneratorRunReport({ report, system, company, reseller }) {
   const log = report.telemetry_log || [];
   return (
     <div className="report-doc">
       <div className="report-doc-header">
-        <div className="report-doc-brand">{company?.logo_data ? <img src={company.logo_data} alt={`${company.name} logo`} /> : "CPC"}</div>
+        <div className="report-doc-brand report-brand-logos">{company?.logo_data && <span className="report-logo-box" data-label="Customer"><img src={company.logo_data} alt={`${company.name} logo`} /></span>}{reseller?.show_logo_on_reports && reseller.logo_data && <span className="report-logo-box" data-label="Reseller"><img src={reseller.logo_data} alt={`${reseller.name} logo`} /></span>}<span className="report-logo-box cpc" data-label="CPC"><img src="/images/cpc-logo.png" alt="CPC" /></span></div>
         <div className="report-doc-title-block">
           <div className="report-doc-title">Generator Run Report</div>
           <div className="report-doc-subtitle">{system?.name || "—"} — {report.initiating_ats || "GEN"}</div>

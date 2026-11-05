@@ -6,9 +6,10 @@ import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useAts, useGenerators, usePanels, useSystem } from "../../queries/systems";
 import { telemetryFor, useTelemetrySnapshot } from "../../hooks/useTelemetry";
 
-const LiveReading = ({ label, value = "000", unit }: { label: string; value?: string | number; unit?: string }) => (
-  <div className="device-reading"><span>{label}</span><b>{value}</b>{unit && <em>{unit}</em>}</div>
-);
+const LiveReading = ({ label, value, unit }: { label: string; value?: string | number; unit?: string }) => {
+  const available = value !== undefined && value !== null && value !== "";
+  return <div className="device-reading"><span>{label}</span><b>{available ? value : "—"}</b>{available && unit && <em>{unit}</em>}</div>;
+};
 
 function DetailShell({ title, type, children }: { title: string; type: "ats" | "generator"; children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -32,17 +33,18 @@ export function GeneratorDetail() {
   const telemetry = useTelemetrySnapshot(systemId);
   return <DetailShell title="Generator Detail View" type="generator">
     <h2 className="legacy-device-section-heading">Generator Detail</h2>
-    <section className="generator-detail-grid">{(generators || []).filter((generator) => !generatorId || generator.id === generatorId).map((generator) => { const capacity = generator.rated_kw ?? 0; const data = telemetryFor(telemetry?.generators, generator.id, generator.name); return <article className="generator-monitor-card" key={generator.id}>
+    <section className="generator-detail-grid">{(generators || []).filter((generator) => !generatorId || generator.id === generatorId).map((generator) => { const capacity = generator.rated_kw; const data = telemetryFor(telemetry?.generators, generator.id, generator.name); return <article className="generator-monitor-card" key={generator.id}>
       <h3 className="generator-card-name">{generator.name}</h3>
       <div className="device-card-title"><span>Generator control panel</span><b>{[generator.make, generator.model].filter(Boolean).join(" · ") || "Generator set"}</b></div>
-      <div className="generator-status-row"><strong>{data?.status || "WAITING"}</strong><span>{generator.serial_number ? `S/N ${generator.serial_number}` : "Telemetry pending"}</span></div>
+      <div className="generator-status-row"><strong>{!(generator.mqtt_topic || generator.power_mqtt_topic) ? "NO DATA" : !data || data.communication_healthy === false || data.status === "OFFLINE" ? "OFFLINE" : data.status}</strong><span>{generator.serial_number ? `S/N ${generator.serial_number}` : "Telemetry pending"}</span></div>
       <div className="generator-reading-grid">
         <LiveReading label="VAB" value={data?.voltage_ab?.toFixed(1)} unit="V" /><LiveReading label="VBC" value={data?.voltage_bc?.toFixed(1)} unit="V" /><LiveReading label="VCA" value={data?.voltage_ca?.toFixed(1)} unit="V" />
+        <LiveReading label="VAN" value={data?.voltage_an?.toFixed(1)} unit="V" /><LiveReading label="VBN" value={data?.voltage_bn?.toFixed(1)} unit="V" /><LiveReading label="VCN" value={data?.voltage_cn?.toFixed(1)} unit="V" />
         <LiveReading label="AMPS A" value={data?.current_a?.toFixed(1)} unit="A" /><LiveReading label="AMPS B" value={data?.current_b?.toFixed(1)} unit="A" /><LiveReading label="AMPS C" value={data?.current_c?.toFixed(1)} unit="A" />
         <LiveReading label="Oil pressure" value={data?.oil_pressure_psi?.toFixed(1)} unit="psi" /><LiveReading label="Engine temp" value={data?.coolant_temperature_c?.toFixed(1)} unit="°C" /><LiveReading label="Engine hours" value={data?.engine_hours?.toFixed(1)} unit="hr" />
       </div>
-      <div className="generator-load-panel"><div><span>Power factor</span><b>{data?.power_factor?.toFixed(2) || "0.00"}</b></div><div><span>Current load</span><b>{data ? `${data.active_power_kw.toFixed(1)} kW · ${data.load_percentage.toFixed(1)}%` : "000 kW · 00%"}</b></div><div className="device-load-track"><i style={{ width: `${data?.load_percentage || 0}%` }} /></div></div>
-      <footer><span>Rated capacity <b>{capacity} kW</b></span><span>Rated current <b>{generator.rated_amps ?? "—"} A</b></span><span>Rated voltage <b>{generator.rated_volts ?? "—"} V</b></span></footer>
+      <div className="generator-load-panel"><div><span>Power factor</span><b>{data?.power_factor?.toFixed(2) ?? "—"}</b></div><div><span>Current load</span><b>{data?.active_power_kw != null && data?.load_percentage != null ? `${data.active_power_kw.toFixed(1)} kW · ${data.load_percentage.toFixed(1)}%` : "—"}</b></div><div className="device-load-track"><i style={{ width: `${data?.load_percentage ?? 0}%` }} /></div></div>
+      <footer><span>Rated capacity <b>{capacity != null ? `${capacity} kW` : "—"}</b></span><span>Rated current <b>{generator.rated_amps != null ? `${generator.rated_amps} A` : "—"}</b></span><span>Rated voltage <b>{generator.rated_volts != null ? `${generator.rated_volts} V` : "—"}</b></span></footer>
     </article>; })}</section>
     {!generators?.length && <p className="operations-empty">No generators are registered for this system.</p>}
   </DetailShell>;

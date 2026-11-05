@@ -5,11 +5,22 @@ from app.auth.dependencies import get_current_user
 from app.auth.permissions import can_view_system, can_write_system
 from app.database import get_db
 from app.models.monitored_asset import MonitoredAsset
+from app.models.generator import Generator
 from app.models.system import System
 from app.models.user import User
 from app.schemas.monitored_asset import MonitoredAssetCreate, MonitoredAssetRead, MonitoredAssetUpdate
 
 router = APIRouter(prefix="/api/monitored-assets", tags=["monitored-assets"])
+
+
+def validate_served_generators(db: Session, system_id: str, generator_ids: list[str] | None) -> None:
+    for generator_id in generator_ids or []:
+        legacy = db.get(Generator, generator_id)
+        asset = db.get(MonitoredAsset, generator_id)
+        valid_legacy = legacy and legacy.panel.system_id == system_id
+        valid_asset = asset and asset.system_id == system_id and asset.asset_type == "generator"
+        if not valid_legacy and not valid_asset:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"generator {generator_id} does not belong to this system")
 
 
 def allowed(db: Session, user: User, system_id: str, write: bool = False) -> System:
@@ -37,6 +48,8 @@ def create_asset(data: MonitoredAssetCreate, db: Session = Depends(get_db), user
         occupied = db.query(MonitoredAsset).filter(MonitoredAsset.panel_id == data.panel_id, MonitoredAsset.slot == data.slot).first()
         if occupied:
             raise HTTPException(status.HTTP_409_CONFLICT, "PLC slot is already occupied")
+    if data.asset_type == "fuel_tank":
+        validate_served_generators(db, data.system_id, data.served_generator_ids)
     row = MonitoredAsset(**data.model_dump())
     if row.panel_id:
         from app.models.panel import Panel
@@ -54,6 +67,20 @@ def update_asset(asset_id: str, data: MonitoredAssetUpdate, db: Session = Depend
     if not row: raise HTTPException(status.HTTP_404_NOT_FOUND, "asset not found")
     allowed(db, user, row.system_id, True)
     values = data.model_dump(exclude_unset=True)
+    if row.asset_type == "fuel_tank" or values.get("asset_type") == "fuel_tank":
+        validate_served_generators(db, row.system_id, values.get("served_generator_ids", row.served_generator_ids))
+    next_tag = values.get("asset_tag")
+    if next_tag and db.query(MonitoredAsset).filter(MonitoredAsset.system_id == row.system_id, MonitoredAsset.asset_tag == next_tag, MonitoredAsset.id != row.id).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, "asset tag already exists in this system")
+    next_panel = values.get("panel_id", row.panel_id)
+    next_slot = values.get("slot", row.slot)
+    if next_panel and next_slot and db.query(MonitoredAsset).filter(MonitoredAsset.panel_id == next_panel, MonitoredAsset.slot == next_slot, MonitoredAsset.id != row.id).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, "PLC slot is already occupied")
+    if next_panel:
+        from app.models.panel import Panel
+        panel = db.get(Panel, next_panel)
+        if not panel or panel.system_id != row.system_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "panel does not belong to this system")
     for key, value in values.items(): setattr(row, key, value)
     row.status = "pending"
     if row.panel: row.panel.sync_status = "pending"

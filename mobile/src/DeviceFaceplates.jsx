@@ -4,7 +4,7 @@ import { TestWizard } from "./TestWizard";
 import { useTheme } from "./theme";
 import { resolveAtsTelemetry, resolveGeneratorTelemetry } from "./telemetry";
 
-const fmt = (value, digits = 1) => (typeof value === "number" ? value.toFixed(digits) : "000");
+const fmt = (value, digits = 1, unit = "") => (typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(digits)}${unit}` : "—");
 
 function formatDuration(seconds) {
   if (seconds == null) return "—";
@@ -99,7 +99,7 @@ function GeneratorFaceplate({ item, onTest }) {
   const data = resolveGeneratorTelemetry(item.id, item.name);
   const bannerText = data?.status === "RUNNING" ? "RUNNING" : data?.status === "FAULT" ? "FAULT" : data?.status === "TEST" ? "TEST MODE" : data?.status === "OFFLINE" ? "OFFLINE" : "READY";
   const bannerTone = bannerText === "FAULT" ? "emergency" : bannerText === "OFFLINE" ? "offline" : "ready";
-  const loadPct = item.rated_kw && data?.active_power_kw ? Math.min(100, Math.round((data.active_power_kw / item.rated_kw) * 100)) : Math.round(data?.load_percentage ?? 0);
+  const loadPct = item.rated_kw && data?.active_power_kw != null ? Math.min(100, Math.round((data.active_power_kw / item.rated_kw) * 100)) : data?.load_percentage != null ? Math.round(data.load_percentage) : undefined;
   const kva = data?.apparent_power_kva;
   const kw = data?.active_power_kw;
   const kvar = kva != null && kw != null ? Math.sqrt(Math.max(0, kva * kva - kw * kw)) : undefined;
@@ -111,23 +111,23 @@ function GeneratorFaceplate({ item, onTest }) {
 
       <Text style={styles.sectionTitle}>Engine Data</Text>
       <View style={styles.grid}>
-        <Reading label="Fuel" value={`${fmt(data?.fuel_level_percent, 0)}%`} />
+        <Reading label="Fuel" value={fmt(data?.fuel_level_percent, 0, "%")} />
         <Reading label="Hours" value={fmt(data?.engine_hours, 1)} />
         <Reading label="Oil PSI" value={fmt(data?.oil_pressure_psi, 0)} />
-        <Reading label="H₂O Temp" value={`${fmt(data?.coolant_temperature_c, 0)}°`} />
+        <Reading label="H₂O Temp" value={fmt(data?.coolant_temperature_c, 0, "°")} />
         <Reading label="Battery" value={fmt(data?.battery_voltage, 1)} />
       </View>
       <View style={styles.barTrack}><View style={[styles.barFill, { width: `${Math.max(0, Math.min(100, data?.fuel_level_percent ?? 0))}%` }]} /></View>
-      <Text style={styles.barCaption}>Fuel Level {fmt(data?.fuel_level_percent, 0)}%</Text>
+      <Text style={styles.barCaption}>Fuel Level {fmt(data?.fuel_level_percent, 0, "%")}</Text>
 
       <Text style={styles.sectionTitle}>Electrical Data</Text>
       <View style={styles.elecGrid}>
-        <ElecColumn title="Voltage" rows={[["VAB", `${fmt(data?.voltage_ab, 0)} V`], ["VBC", `${fmt(data?.voltage_bc, 0)} V`], ["VCA", `${fmt(data?.voltage_ca, 0)} V`]]} />
+        <ElecColumn title="Voltage" rows={[["VAB", fmt(data?.voltage_ab, 0, " V")], ["VBC", fmt(data?.voltage_bc, 0, " V")], ["VCA", fmt(data?.voltage_ca, 0, " V")]]} />
         <ElecColumn title="Current" rows={[["Amps A", fmt(data?.current_a, 0)], ["Amps B", fmt(data?.current_b, 0)], ["Amps C", fmt(data?.current_c, 0)], ["Hz", fmt(data?.frequency, 0)]]} />
         <ElecColumn title="Power" rows={[["kW", fmt(kw, 0)], ["kVA", fmt(kva, 0)], ["kVAR", fmt(kvar, 0)], ["PF", fmt(data?.power_factor, 2)]]} />
       </View>
-      <View style={styles.barTrack}><View style={[styles.barFill, styles.barFillBlue, { width: `${loadPct}%` }]} /></View>
-      <Text style={styles.barCaption}>{fmt(data?.active_power_kw, 0)} kW ({loadPct}%)</Text>
+      <View style={styles.barTrack}><View style={[styles.barFill, styles.barFillBlue, { width: `${loadPct ?? 0}%` }]} /></View>
+      <Text style={styles.barCaption}>{data?.active_power_kw != null && loadPct != null ? `${fmt(data.active_power_kw, 0, " kW")} (${loadPct}%)` : "—"}</Text>
 
       <View style={styles.footerRow}>
         <Footer label="Rated capacity" value={item.rated_kw ? `${item.rated_kw} kW` : "—"} />
@@ -170,7 +170,7 @@ function AtsFaceplate({ item, onTest }) {
 
       <Text style={styles.sectionTitle}>Electrical Data</Text>
       <View style={styles.elecGrid}>
-        <ElecColumn title="Voltage" rows={[["VAB", `${fmt(data?.voltage_ab, 0)} V`], ["VBC", `${fmt(data?.voltage_bc, 0)} V`], ["VCA", `${fmt(data?.voltage_ca, 0)} V`], ["VAN", `${fmt(voltAn, 0)} V`], ["VBN", `${fmt(voltBn, 0)} V`], ["VCN", `${fmt(voltCn, 0)} V`]]} />
+        <ElecColumn title="Voltage" rows={[["VAB", fmt(data?.voltage_ab, 0, " V")], ["VBC", fmt(data?.voltage_bc, 0, " V")], ["VCA", fmt(data?.voltage_ca, 0, " V")], ["VAN", fmt(voltAn, 0, " V")], ["VBN", fmt(voltBn, 0, " V")], ["VCN", fmt(voltCn, 0, " V")]]} />
         <ElecColumn title="Current" rows={[["Amps A", fmt(data?.current_a, 0)], ["Amps B", fmt(data?.current_b, 0)], ["Amps C", fmt(data?.current_c, 0)], ["Hz", fmt(data?.frequency, 0)]]} />
         <ElecColumn title="Power" rows={[["kW", fmt(data?.active_power_kw, 0)]]} />
       </View>

@@ -10,7 +10,18 @@ import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { installGlobalErrorHandlers } from "./utils/errorReporting";
 import "./styles/global.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Keep recently viewed portfolio data on screen while it refreshes. This avoids
+      // flashing false zero/empty states when navigating back through the hierarchy.
+      staleTime: 60_000,
+      gcTime: 30 * 60_000,
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 installGlobalErrorHandlers();
 
 createRoot(document.getElementById("root")!).render(

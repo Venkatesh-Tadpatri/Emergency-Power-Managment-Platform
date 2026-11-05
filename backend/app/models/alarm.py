@@ -19,5 +19,7 @@ class Alarm(Base, UUIDPKMixin, TimestampMixin):
     occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     ack_by: Mapped[str | None] = mapped_column(String(255))
     ack_at: Mapped[datetime | None] = mapped_column(DateTime)
+    ack_comment: Mapped[str | None] = mapped_column(String(1000))
+    cleared_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     system: Mapped["System"] = relationship()
