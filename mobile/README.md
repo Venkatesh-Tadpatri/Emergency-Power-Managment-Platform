@@ -13,7 +13,7 @@ Expo React Native client for Android and iOS. It uses the existing CPC API and Z
 
 ## Local development (Expo Go)
 
-1. Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE`, `EXPO_PUBLIC_ZITADEL_AUTHORITY`, `EXPO_PUBLIC_ZITADEL_CLIENT_ID` (the native app's client ID from above), and `EXPO_PUBLIC_GRAFANA_URL`.
+1. Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE`, `EXPO_PUBLIC_ZITADEL_AUTHORITY`, and `EXPO_PUBLIC_ZITADEL_CLIENT_ID` (the native app's client ID from above).
 2. `localhost` in these values means *the phone itself*, not your computer — for a physical device, use your computer's LAN IP (e.g. `192.168.1.28`) for all of them, and make sure the backend/Zitadel/frontend containers are using that same host too (see the root README's "Testing from another device" section).
 3. Run:
    ```powershell

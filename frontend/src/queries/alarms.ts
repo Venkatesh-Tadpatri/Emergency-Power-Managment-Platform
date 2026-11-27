@@ -27,6 +27,7 @@ export function useAlarms(
 export function useAcknowledgeAlarm() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { success: "Alarm acknowledged.", error: "Could not acknowledge the alarm." },
     mutationFn: async ({ id, comment }: { id: string; comment?: string }) =>
       (await api.patch<Alarm>(`/api/alarms/${id}/acknowledge`, { comment: comment?.trim() || null })).data,
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["alarms"] }); },

@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../../auth/LocalAuth";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
 import { StatsGrid } from "../../components/common/StatCard";
 import { StatusPill } from "../../components/common/StatusPill";

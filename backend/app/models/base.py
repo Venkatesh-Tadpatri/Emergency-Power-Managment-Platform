@@ -37,6 +37,7 @@ ID_PREFIXES = {
     "generators": "GEN",
     "meters": "MTR",
     "users": "USR",
+    "auth_otps": "OTP",
     "user_assigned_systems": "UAS",
     "user_assigned_sites": "UAT",
     "alarms": "ALM",
@@ -49,6 +50,8 @@ ID_PREFIXES = {
     "panel_pushes": "PSH",
     "mqtt_topic_mappings": "MQT",
     "system_events": "EVT",
+    "equipment_notes": "NTE",
+    "asset_alarm_disables": "AAD",
 }
 
 

@@ -28,6 +28,8 @@ def create_site(data: SiteCreate, db: Session = Depends(get_db), user: User = De
         raise HTTPException(status.HTTP_404_NOT_FOUND, "customer not found")
     if not can_write_system(user, db, customer.id, customer.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to create sites here")
+    if crud.get_site_by_name(db, data.customer_id, data.name):
+        raise HTTPException(status.HTTP_409_CONFLICT, "a site with the same name already exists for this customer")
     return crud.create_site(db, data)
 
 
@@ -47,6 +49,8 @@ def update_site(site_id: str, data: SiteUpdate, db: Session = Depends(get_db), u
         raise HTTPException(status.HTTP_404_NOT_FOUND, "site not found")
     if not can_write_system(user, db, customer.id, customer.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this site")
+    if data.name is not None and crud.get_site_by_name(db, site.customer_id, data.name, exclude_id=site.id):
+        raise HTTPException(status.HTTP_409_CONFLICT, "a site with the same name already exists for this customer")
     return crud.update_site(db, site, data)
 
 

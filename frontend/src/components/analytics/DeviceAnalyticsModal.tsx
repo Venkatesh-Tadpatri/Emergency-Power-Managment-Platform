@@ -1,42 +1,48 @@
+import { useMemo, useState } from "react";
+
 import { Modal } from "../common/Modal";
 import { TrendChart, type TrendSeries } from "./TrendChart";
-import type { AtsTelemetry, GeneratorTelemetry, TelemetryHistoryPoint } from "../../hooks/useTelemetry";
-import { deviceGrafanaUrl, type DeviceKind } from "../../utils/grafanaLinks";
+import { HISTORY_RANGES, useDeviceHistory, type AtsTelemetry, type GeneratorTelemetry, type HistoryPoint, type HistoryRange } from "../../hooks/useTelemetry";
+import { devicePerformance, fieldStats, formatAgo, formatHours, formatNumber, seriesColor, voltageUnbalance, type NumericField } from "./analyticsData";
+import { RangePicker } from "./RangePicker";
 
-const metric = (value: number | undefined, decimals = 1, unit = "") => (value == null || Number.isNaN(value) ? "—" : `${value.toFixed(decimals)}${unit}`);
-const series = (key: string, label: string, color: string, history: TelemetryHistoryPoint[], field: keyof TelemetryHistoryPoint): TrendSeries => ({
-  key, label, color, points: history.map((point) => (point[field] as number | undefined) ?? NaN),
-});
+export type DeviceKind = "generator" | "ats";
 
-export function DeviceAnalyticsModal({ kind, snapshot, history, onClose }: {
+const single = (key: string, label: string, points: HistoryPoint[], field: NumericField): TrendSeries[] => [{
+  key, label, color: seriesColor(0), points: points.map((point) => (typeof point[field] === "number" ? point[field] as number : NaN)),
+}];
+const phases = (points: HistoryPoint[], fields: [NumericField, string][]): TrendSeries[] => fields.map(([field, label], index) => ({
+  key: field, label, color: seriesColor(index), points: points.map((point) => (typeof point[field] === "number" ? point[field] as number : NaN)),
+}));
+
+export function DeviceAnalyticsModal({ kind, deviceId, deviceName, systemId, snapshot, initialRange = "24h", onClose }: {
   kind: DeviceKind;
-  snapshot: (GeneratorTelemetry | AtsTelemetry) & { equipment_id: string; equipment_name: string };
-  history: TelemetryHistoryPoint[];
+  deviceId: string;
+  deviceName: string;
+  systemId: string;
+  /** Latest live reading, when the device is currently reporting. */
+  snapshot?: (GeneratorTelemetry | AtsTelemetry) | null;
+  initialRange?: HistoryRange;
   onClose: () => void;
 }) {
+  const [range, setRange] = useState<HistoryRange>(initialRange);
+  const historyQuery = useDeviceHistory([systemId], range, deviceId);
+  const device = historyQuery.data?.devices.find((item) => item.equipment_id === deviceId);
+  const points = useMemo(() => device?.points ?? [], [device]);
+  const times = points.map((point) => point.t);
+  const rangeMs = HISTORY_RANGES.find((item) => item.key === range)!.ms;
+  const domain: [number, number] = [Date.now() - rangeMs, Date.now()];
+  const perf = device && historyQuery.data ? devicePerformance(device, historyQuery.data.window_seconds, rangeMs) : undefined;
   const isGenerator = kind === "generator";
-  const generator = isGenerator ? (snapshot as GeneratorTelemetry) : undefined;
-  const ats = !isGenerator ? (snapshot as AtsTelemetry) : undefined;
-  const unhealthy = snapshot.fault_active || !snapshot.communication_healthy;
-  const grafanaHref = deviceGrafanaUrl(kind, snapshot.equipment_id, snapshot.equipment_name);
+  const generator = isGenerator ? (snapshot as GeneratorTelemetry | undefined) : undefined;
+  const ats = !isGenerator ? (snapshot as AtsTelemetry | undefined) : undefined;
+  const unhealthy = snapshot ? snapshot.fault_active || !snapshot.communication_healthy : false;
+  const unbalance = points.map((point) => voltageUnbalance(point) ?? NaN);
+  const freq = fieldStats(points, "frequency");
+  const pf = fieldStats(points, "power_factor");
 
-  const times = history.map((point) => point.t);
-
-  const voltageSeries = [
-    series("vab", "V A-B", "var(--chart-1)", history, "voltage_ab"),
-    series("vbc", "V B-C", "var(--chart-2)", history, "voltage_bc"),
-    series("vca", "V C-A", "var(--chart-3)", history, "voltage_ca"),
-  ];
-  const phaseNeutralVoltageSeries = [
-    series("van", "V A-N", "var(--chart-1)", history, "voltage_an"),
-    series("vbn", "V B-N", "var(--chart-2)", history, "voltage_bn"),
-    series("vcn", "V C-N", "var(--chart-3)", history, "voltage_cn"),
-  ];
-  const currentSeries = [
-    series("ia", "Amps A", "var(--chart-1)", history, "current_a"),
-    series("ib", "Amps B", "var(--chart-2)", history, "current_b"),
-    series("ic", "Amps C", "var(--chart-3)", history, "current_c"),
-  ];
+  const chart = (title: string, series: TrendSeries[], unit: string, decimals = 1, step = false) =>
+    <TrendChart title={title} series={series} unit={unit} decimals={decimals} times={times} domain={domain} step={step} />;
 
   return (
     <Modal title="" onClose={onClose} className="device-analytics-modal">
@@ -44,45 +50,57 @@ export function DeviceAnalyticsModal({ kind, snapshot, history, onClose }: {
       <header className="device-analytics-header">
         <div>
           <span>{isGenerator ? "Generator" : "Automatic Transfer Switch"} analytics</span>
-          <h3>{snapshot.equipment_name}</h3>
+          <h3>{deviceName}</h3>
         </div>
-        <span className={`analytics-status ${unhealthy ? "fault" : "healthy"}`}>{snapshot.status}</span>
+        <div className="device-analytics-header-actions">
+          <RangePicker value={range} onChange={setRange} />
+          <span className={`analytics-status ${snapshot ? (unhealthy ? "fault" : "healthy") : "unknown"}`}>{snapshot?.status ?? "No live data"}</span>
+        </div>
       </header>
 
       <div className="device-analytics-stats">
-        <div><span>Load</span><b>{metric(snapshot.load_percentage, 1, "%")}</b></div>
-        <div><span>Active power</span><b>{metric(snapshot.active_power_kw, 1, " kW")}</b></div>
-        <div><span>Frequency</span><b>{metric(snapshot.frequency, 1, " Hz")}</b></div>
-        <div><span>Power factor</span><b>{metric(snapshot.power_factor, 2)}</b></div>
         {isGenerator ? <>
-          <div><span>Fuel level</span><b>{metric(generator?.fuel_level_percent, 0, "%")}</b></div>
-          <div><span>Engine hours</span><b>{metric(generator?.engine_hours, 1, " h")}</b></div>
+          <div><span>Load now</span><b>{formatNumber(snapshot?.load_percentage, 1, "%")}</b></div>
+          <div><span>Avg load</span><b>{formatNumber(perf?.avgLoad, 1, "%")}</b></div>
+          <div><span>Peak power</span><b>{formatNumber(perf?.peakKw, 1, " kW")}</b></div>
+          <div><span>Run time</span><b>{formatHours(perf?.runHours)}</b></div>
+          <div><span>Fuel used</span><b>{formatNumber(perf?.fuelUsed, 1, "%")}</b></div>
+          <div><span>Fuel level</span><b>{formatNumber(generator?.fuel_level_percent, 0, "%")}</b></div>
         </> : <>
-          <div><span>Connected source</span><b>{ats?.connected_source ?? "—"}</b></div>
-          <div><span>Time on emergency</span><b>{ats ? `${ats.time_on_emergency_seconds}s` : "—"}</b></div>
+          <div><span>Source now</span><b>{ats?.connected_source ?? "—"}</b></div>
+          <div><span>Transfers</span><b>{perf?.transfers ?? "—"}</b></div>
+          <div><span>On emergency</span><b>{formatHours(perf?.emergencyHours)}</b></div>
+          <div><span>Avg frequency</span><b>{formatNumber(freq.avg, 2, " Hz")}</b></div>
+          <div><span>Avg power factor</span><b>{formatNumber(pf.avg, 2)}</b></div>
+          <div><span>Peak power</span><b>{formatNumber(perf?.peakKw, 1, " kW")}</b></div>
         </>}
       </div>
-
-      <div className="device-analytics-trends">
-        <TrendChart title="Load" unit="%" series={[series("load", "Load", "var(--chart-1)", history, "load_percentage")]} times={times} />
-        <TrendChart title="Active power" unit=" kW" series={[series("kw", "Power", "var(--chart-1)", history, "active_power_kw")]} times={times} />
-        <TrendChart title="Line voltage" unit=" V" decimals={1} series={voltageSeries} times={times} />
-        <TrendChart title="Phase-to-neutral voltage" unit=" V" decimals={1} series={phaseNeutralVoltageSeries} times={times} />
-        <TrendChart title="Line current" unit=" A" decimals={1} series={currentSeries} times={times} />
-        <TrendChart title="Frequency" unit=" Hz" decimals={2} series={[series("hz", "Frequency", "var(--chart-1)", history, "frequency")]} times={times} />
-        {isGenerator ? <>
-          <TrendChart title="Coolant temperature" unit="°C" series={[series("temp", "Coolant", "var(--chart-1)", history, "coolant_temperature_c")]} times={times} />
-          <TrendChart title="Fuel level" unit="%" decimals={0} series={[series("fuel", "Fuel", "var(--chart-1)", history, "fuel_level_percent")]} times={times} />
-          <TrendChart title="Oil pressure" unit=" psi" series={[series("oil", "Oil pressure", "var(--chart-1)", history, "oil_pressure_psi")]} times={times} />
-        </> : (
-          <TrendChart title="Power factor" unit="" decimals={2} series={[series("pf", "Power factor", "var(--chart-1)", history, "power_factor")]} times={times} />
-        )}
+      <div className="device-analytics-availability">
+        <span>Data availability <b>{formatNumber(perf?.availability, 0, "%")}</b></span>
+        <span>Last reading <b>{formatAgo(perf?.lastSeen)}</b></span>
+        <span>{historyQuery.data ? `Averaged per ${Math.round(historyQuery.data.window_seconds / 60)} min` : ""}</span>
       </div>
 
-      <footer className="device-analytics-footer">
-        <p>Charts trend live readings sampled since this page was opened. Open Grafana for this device's complete historical trend and analytics.</p>
-        <a className="analytics-open-btn" href={grafanaHref} target="_blank" rel="noopener noreferrer">Open full trend in Grafana ↗</a>
-      </footer>
+      {historyQuery.isPending ? <div className="analytics-empty">Loading history…</div>
+        : historyQuery.isError ? <div className="analytics-empty error">Could not load stored history for this device. Try again shortly.</div>
+        : <div className="device-analytics-trends">
+          {isGenerator ? <>
+            {chart("Load", single("load", "Load", points, "load_percentage"), "%")}
+            {chart("Active power", single("kw", "Active power", points, "active_power_kw"), " kW")}
+          </> : chart("Running on emergency (1 = yes)", single("emg", "On emergency", points, "on_emergency"), "", 0, true)}
+          {chart("Line voltage", phases(points, [["voltage_ab", "V A-B"], ["voltage_bc", "V B-C"], ["voltage_ca", "V C-A"]]), " V")}
+          {chart("Phase-to-neutral voltage", phases(points, [["voltage_an", "V A-N"], ["voltage_bn", "V B-N"], ["voltage_cn", "V C-N"]]), " V")}
+          {chart("Line current", phases(points, [["current_a", "Amps A"], ["current_b", "Amps B"], ["current_c", "Amps C"]]), " A")}
+          {chart("Voltage unbalance", [{ key: "unb", label: "Unbalance", color: seriesColor(0), points: unbalance }], "%", 2)}
+          {chart("Frequency", single("hz", "Frequency", points, "frequency"), " Hz", 2)}
+          {chart("Power factor", single("pf", "Power factor", points, "power_factor"), "", 2)}
+          {isGenerator ? <>
+            {chart("Fuel level", single("fuel", "Fuel", points, "fuel_level_percent"), "%", 0)}
+            {chart("Coolant temperature", single("temp", "Coolant", points, "coolant_temperature_c"), "°C")}
+            {chart("Oil pressure", single("oil", "Oil pressure", points, "oil_pressure_psi"), " psi")}
+            {chart("Battery voltage", single("batt", "Battery", points, "battery_voltage"), " V", 2)}
+          </> : chart("Active power", single("kw", "Active power", points, "active_power_kw"), " kW")}
+        </div>}
     </Modal>
   );
 }

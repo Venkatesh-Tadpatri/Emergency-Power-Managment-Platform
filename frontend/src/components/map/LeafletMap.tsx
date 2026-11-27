@@ -66,34 +66,77 @@ export function LeafletMap({ markers, onMarkerClick, singleMarkerZoom = 14 }: {
 
   useEffect(() => {
     if (!elRef.current) return;
-    const map = L.map(elRef.current, { center: [37.5, -77.5], zoom: 6, zoomControl: false, attributionControl: false });
+    // Show a single copy of the world: no horizontal wrapping, hard edges, and a
+    // minimum zoom that keeps the world at least as wide as the map container.
+    const worldBounds = L.latLngBounds([-85, -180], [85, 180]);
+    const map = L.map(elRef.current, {
+      center: [37.5, -77.5], zoom: 6, zoomControl: false, attributionControl: false,
+      maxBounds: worldBounds, maxBoundsViscosity: 1.0, worldCopyJump: false,
+    });
     L.control.zoom({ position: "topright" }).addTo(map);
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16 }).addTo(map);
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16 }).addTo(map);
+    const tileOptions = { maxZoom: 16, noWrap: true, bounds: worldBounds };
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", tileOptions).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", tileOptions).addTo(map);
+    const updateMinZoom = () => {
+      const width = map.getSize().x;
+      if (!width) return;
+      map.setMinZoom(Math.max(1, Math.ceil(Math.log2(width / 256))));
+    };
+    updateMinZoom();
+    map.on("resize", updateMinZoom);
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(elRef.current);
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
+    return () => { observer.disconnect(); map.remove(); mapRef.current = null; };
   }, []);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     let layer = L.layerGroup().addTo(map);
-    const clusterSize = 72;
+    // Pixel distance under which markers/clusters merge. Must exceed the cluster
+    // icon size (42px + ring/pulse) so two clusters can never visually overlap.
+    const clusterRadius = 64;
+
+    const buildClusters = () => {
+      const zoom = map.getZoom();
+      // Distance-based clustering: start with one cluster per marker and keep
+      // merging the closest pair until every pair is at least `clusterRadius`
+      // apart. Unlike a fixed grid, neighbours straddling a cell edge still merge.
+      type Cluster = { markers: MapMarker[]; x: number; y: number };
+      const clusters: Cluster[] = markers.map((marker) => {
+        const point = map.project([marker.lat, marker.lng], zoom);
+        return { markers: [marker], x: point.x, y: point.y };
+      });
+      for (;;) {
+        let best: [number, number] | null = null;
+        let bestDist = clusterRadius;
+        for (let i = 0; i < clusters.length; i += 1) {
+          for (let j = i + 1; j < clusters.length; j += 1) {
+            const dist = Math.hypot(clusters[i].x - clusters[j].x, clusters[i].y - clusters[j].y);
+            if (dist < bestDist) { bestDist = dist; best = [i, j]; }
+          }
+        }
+        if (!best) break;
+        const [i, j] = best;
+        const a = clusters[i], b = clusters[j];
+        const total = a.markers.length + b.markers.length;
+        clusters[i] = {
+          markers: [...a.markers, ...b.markers],
+          x: (a.x * a.markers.length + b.x * b.markers.length) / total,
+          y: (a.y * a.markers.length + b.y * b.markers.length) / total,
+        };
+        clusters.splice(j, 1);
+      }
+      return clusters.map((cluster) => ({ markers: cluster.markers, center: map.unproject([cluster.x, cluster.y], zoom) }));
+    };
 
     const render = () => {
       layer.remove();
       layer = L.layerGroup().addTo(map);
-      const groups = new Map<string, MapMarker[]>();
-      for (const marker of markers) {
-        const point = map.project([marker.lat, marker.lng], map.getZoom());
-        const key = `${Math.floor(point.x / clusterSize)}:${Math.floor(point.y / clusterSize)}`;
-        groups.set(key, [...(groups.get(key) || []), marker]);
-      }
 
-      for (const group of groups.values()) {
+      for (const { markers: group, center } of buildClusters()) {
         if (group.length > 1) {
-          const lat = group.reduce((sum, marker) => sum + marker.lat, 0) / group.length;
-          const lng = group.reduce((sum, marker) => sum + marker.lng, 0) / group.length;
           const status = worstStatus(group);
           const pulseClass = group.some((marker) => marker.unacknowledged) ? " unacknowledged" : "";
           const icon = L.divIcon({
@@ -101,7 +144,7 @@ export function LeafletMap({ markers, onMarkerClick, singleMarkerZoom = 14 }: {
             html: `<div class="map-cluster-ring${pulseClass}" style="background:${mixGradient(group)}"><div style="background:${STATUS_COLOR[status]}">${group.length}</div></div>`,
             iconSize: [42, 42], iconAnchor: [21, 21],
           });
-          const cluster = L.marker([lat, lng], { icon }).addTo(layer);
+          const cluster = L.marker(center, { icon }).addTo(layer);
           const mix = STATUS_ORDER.map((item) => ({ item, count: group.filter((marker) => marker.status === item).length })).filter(({ count }) => count);
           cluster.bindTooltip(`<div class="map-site-tooltip"><strong>${group.length} sites</strong><div class="map-tooltip-states">${mix.map(({ item, count }) => `${count} ${item}`).join(" · ")}</div><div class="map-tooltip-address">Click to zoom and split</div></div>`, { direction: "top" });
           cluster.on("click", () => map.fitBounds(group.map((marker) => [marker.lat, marker.lng] as L.LatLngTuple), { padding: [70, 70], maxZoom: Math.min(map.getZoom() + 3, 16) }));

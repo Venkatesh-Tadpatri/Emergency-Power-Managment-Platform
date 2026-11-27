@@ -46,6 +46,7 @@ export function useCompany(id: string | undefined) {
 export function useCreateCompany() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Customer created successfully.", error: "Could not create the customer." },
     mutationFn: async (data: Partial<Company>) =>
       (await api.post<Company>("/api/companies", data)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
@@ -55,6 +56,7 @@ export function useCreateCompany() {
 export function useUpdateCompany() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Customer details saved.", error: "Could not save the customer." },
     mutationFn: async ({ id, data }: { id: string; data: Partial<Company> }) =>
       (await api.patch<Company>(`/api/companies/${id}`, data)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
@@ -64,16 +66,45 @@ export function useUpdateCompany() {
 export function useArchiveCompany() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Customer archived.", error: "Could not archive the customer." },
     mutationFn: async (id: string) => (await api.delete<Company>(`/api/companies/${id}`)).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
+    onSuccess: (archived) => {
+      qc.setQueriesData<Company[]>({ queryKey: ["companies"] }, (current) =>
+        Array.isArray(current)
+          ? current.map((company) => company.id === archived.id ? archived : company)
+          : current,
+      );
+      qc.setQueryData(["companies", archived.id], archived);
+      void qc.invalidateQueries({ queryKey: ["companies"] });
+    },
   });
 }
 
 export function useUnarchiveCompany() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Customer restored to active customers.", error: "Could not unarchive the customer." },
     mutationFn: async (id: string) =>
       (await api.patch<Company>(`/api/companies/${id}`, { status: "active" })).data,
+    onSuccess: (restored) => {
+      qc.setQueriesData<Company[]>({ queryKey: ["companies"] }, (current) =>
+        Array.isArray(current)
+          ? current.map((company) => company.id === restored.id ? restored : company)
+          : current,
+      );
+      qc.setQueryData(["companies", restored.id], restored);
+      void qc.invalidateQueries({ queryKey: ["companies"] });
+    },
+  });
+}
+
+export function useDeleteCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { success: "Customer deleted permanently.", error: "Could not delete the customer." },
+    mutationFn: async (id: string) => {
+      await api.delete(`/api/companies/${id}/permanent`);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["companies"] }),
   });
 }
@@ -81,6 +112,7 @@ export function useUnarchiveCompany() {
 export function useUploadCompanyLogo() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Logo uploaded.", error: "Could not upload the logo." },
     mutationFn: async ({ id, file }: { id: string; file: File }) => {
       const form = new FormData();
       form.append("logo", file);

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../../auth/LocalAuth";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useCompany, useUploadCompanyLogo } from "../../queries/companies";
 import { useMe } from "../../queries/me";

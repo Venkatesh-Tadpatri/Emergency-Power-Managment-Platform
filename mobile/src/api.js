@@ -28,6 +28,9 @@ export const getSystems = (token, { companyId, siteId } = {}) => {
   return api(`/api/systems${query ? `?${query}` : ""}`, token);
 };
 export const getMe = (token) => api("/api/me", token);
+// Bucketed stored telemetry (InfluxDB) for the in-app analytics screen.
+export const getTelemetryHistory = (token, systemIds, range = "24h") =>
+  api(`/api/telemetry/history?system_ids=${encodeURIComponent(systemIds.join(","))}&range=${range}`, token);
 export const getResellers = (token) => api("/api/resellers", token);
 export const getCompanies = (token, resellerId) => api(`/api/companies${resellerId ? `?reseller_id=${resellerId}` : ""}`, token);
 export const getSites = (token, customerId) => api(`/api/sites${customerId ? `?customer_id=${customerId}` : ""}`, token);

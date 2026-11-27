@@ -1,4 +1,4 @@
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "./LocalAuth";
 
 import { setAuthToken } from "../api/client";
 

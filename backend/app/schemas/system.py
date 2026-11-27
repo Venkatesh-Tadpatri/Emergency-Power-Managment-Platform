@@ -51,6 +51,28 @@ class AlarmDisableStatus(BaseModel):
     can_control: bool = False
 
 
+class AssetAlarmDisableRequest(AlarmDisableRequest):
+    record_key: str = Field(min_length=1, max_length=255)
+    asset_name: str = Field(min_length=1, max_length=255)
+
+
+class AssetAlarmDisableStatus(BaseModel):
+    record_key: str
+    asset_name: str
+    disabled: bool = True
+    disabled_at: datetime | None = None
+    disabled_until: datetime | None = None
+    indefinite: bool = False
+    reason: str | None = None
+    disabled_by_name: str | None = None
+    disabled_by_email: str | None = None
+
+
+class AssetAlarmDisableList(BaseModel):
+    can_control: bool = False
+    disables: list[AssetAlarmDisableStatus] = []
+
+
 class SystemEventRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str

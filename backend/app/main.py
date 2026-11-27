@@ -4,6 +4,7 @@ import time
 import uuid
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,8 +17,10 @@ from app.services.telemetry import telemetry_bridge
 from app.services.alarm_disable import alarm_disable_worker
 from app.routers import (
     alarms,
+    auth,
     ats,
     companies,
+    equipment_notes,
     generators,
     me,
     meters,
@@ -25,6 +28,7 @@ from app.routers import (
     oncall,
     one_lines,
     panels,
+    platform_settings,
     reports,
     resellers,
     sites,
@@ -101,7 +105,14 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logger.warning("Validation error method=%s path=%s errors=%s", request.method, request.url.path, exc.errors())
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    # Errors raised by model validators carry the original exception object in `ctx`, which plain
+    # JSONResponse cannot serialize — that used to turn every such 422 into a 500. Encode exceptions
+    # as text and drop Pydantic's "Value error, " prefix so clients can show the message as-is.
+    errors = jsonable_encoder(exc.errors(), custom_encoder={Exception: str})
+    for error in errors:
+        if isinstance(error.get("msg"), str) and error["msg"].startswith("Value error, "):
+            error["msg"] = error["msg"][len("Value error, "):]
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(Exception)
@@ -130,6 +141,7 @@ def record_client_error(error: ClientError):
     )
 
 app.include_router(resellers.router)
+app.include_router(auth.router)
 app.include_router(companies.router)
 app.include_router(sites.router)
 app.include_router(systems.router)
@@ -144,7 +156,9 @@ app.include_router(reports.router)
 app.include_router(oncall.router)
 app.include_router(me.router)
 app.include_router(one_lines.router)
+app.include_router(equipment_notes.router)
 app.include_router(telemetry.router)
+app.include_router(platform_settings.router)
 
 
 @app.get("/health")

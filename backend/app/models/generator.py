@@ -1,4 +1,6 @@
-from sqlalchemy import Float, ForeignKey, String
+from datetime import date
+
+from sqlalchemy import Date, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPKMixin
@@ -14,6 +16,14 @@ class Generator(Base, UUIDPKMixin, TimestampMixin):
     rated_volts: Mapped[float | None] = mapped_column(Float)
     rated_amps: Mapped[float | None] = mapped_column(Float)
     rated_kw: Mapped[float | None] = mapped_column(Float)
+    rated_kva: Mapped[float | None] = mapped_column(Float)
+    description: Mapped[str | None] = mapped_column(String(500))
+    fuel_type: Mapped[str | None] = mapped_column(String(50))
+    engine: Mapped[str | None] = mapped_column(String(255))
+    controller: Mapped[str | None] = mapped_column(String(100))
+    install_date: Mapped[date | None] = mapped_column(Date)
+    location: Mapped[str | None] = mapped_column(String(255))
+    notes: Mapped[str | None] = mapped_column(Text)
     mqtt_topic: Mapped[str | None] = mapped_column(String(512), index=True)
     power_mqtt_topic: Mapped[str | None] = mapped_column(String(512), index=True)
     panel_id: Mapped[str] = mapped_column(ForeignKey("panels.id"), nullable=False)

@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings
 
-
 class Settings(BaseSettings):
     database_url: str = "mysql+pymysql://cpc:cpc_dev_pw@localhost:3306/cpc"
     # The `iss` claim inside tokens — must match what the browser used (external/host address).
@@ -16,6 +15,9 @@ class Settings(BaseSettings):
     zitadel_internal_url: str = "http://zitadel:8080"
     zitadel_client_id: str = ""
     cors_origins: str = "http://localhost:5173"
+    # Public address of the web app, used for links in account emails. Falls back to
+    # the first CORS origin when unset.
+    app_base_url: str = ""
     seed_on_start: bool = True
     superadmin_zitadel_sub: str = ""
     superadmin_email: str = "admin@cpc.local"
@@ -27,6 +29,9 @@ class Settings(BaseSettings):
     mqtt_topic_filter: str = "#"
     mqtt_tls: bool = False
     telemetry_sample_interval_seconds: int = 5
+    # A system counts as online only while one of its mapped devices has published within this
+    # window. Field panels currently report every ~5-6 minutes, so 30 minutes tolerates gaps.
+    telemetry_offline_after_minutes: int = 30
     influxdb_url: str = "http://influxdb:8086"
     influxdb_token: str = "cpc-development-token-change-me"
     influxdb_org: str = "cpc"
@@ -40,10 +45,26 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = "alerts@cpc.local"
     smtp_starttls: bool = True
+    # Local time shown in notification emails (the server itself runs in UTC). Default: India (IST).
+    notification_utc_offset_minutes: int = 330
+    notification_timezone_label: str = "IST"
+    local_auth_enabled: bool = True
+    local_auth_secret: str = "change-this-local-auth-secret-in-production"
+    access_token_minutes: int = 480
+    otp_expiry_minutes: int = 10
+    otp_resend_cooldown_seconds: int = 60
+    otp_max_attempts: int = 5
+    login_max_attempts: int = 5
+    login_lockout_minutes: int = 15
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def public_app_url(self) -> str:
+        origins = self.cors_origin_list
+        return (self.app_base_url or (origins[0] if origins else "http://localhost:5173")).rstrip("/")
 
     @property
     def zitadel_issuer_list(self) -> list[str]:

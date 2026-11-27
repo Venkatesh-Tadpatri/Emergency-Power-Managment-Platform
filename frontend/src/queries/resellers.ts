@@ -25,6 +25,7 @@ export function useReseller(id: string | undefined) {
 export function useCreateReseller() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Reseller created successfully.", error: "Could not create the reseller." },
     mutationFn: async (data: Partial<Reseller>) =>
       (await api.post<Reseller>("/api/resellers", data)).data,
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["resellers"] }); },
@@ -34,6 +35,7 @@ export function useCreateReseller() {
 export function useUpdateReseller() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Reseller details saved.", error: "Could not save the reseller." },
     mutationFn: async ({ id, data }: { id: string; data: Partial<Reseller> }) =>
       (await api.patch<Reseller>(`/api/resellers/${id}`, data)).data,
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["resellers"] }); },
@@ -53,6 +55,7 @@ export async function removeResellerLogo(id: string) {
 export function useArchiveReseller() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Reseller archived.", error: "Could not archive the reseller." },
     mutationFn: async (id: string) => (await api.delete<Reseller>(`/api/resellers/${id}`)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["resellers"] }),
   });
@@ -61,6 +64,7 @@ export function useArchiveReseller() {
 export function useUnarchiveReseller() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Reseller restored to active resellers.", error: "Could not unarchive the reseller." },
     mutationFn: async (id: string) =>
       (await api.post<Reseller>(`/api/resellers/${id}/unarchive`)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["resellers"] }),
@@ -70,6 +74,7 @@ export function useUnarchiveReseller() {
 export function useDeleteReseller() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { success: "Reseller deleted permanently.", error: "Could not delete the reseller." },
     mutationFn: async (id: string) => {
       await api.delete(`/api/resellers/${id}/permanent`);
     },

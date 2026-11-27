@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../../auth/LocalAuth";
 
 import { IconChevronsLeft } from "../common/Icons";
 import { useMe } from "../../queries/me";

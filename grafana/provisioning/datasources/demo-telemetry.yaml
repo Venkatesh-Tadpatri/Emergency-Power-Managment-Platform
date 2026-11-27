@@ -1,9 +1,0 @@
-apiVersion: 1
-
-datasources:
-  - name: CPC Demo Telemetry
-    # Keep the existing UID so provisioned dashboards continue to resolve it.
-    uid: empm-demo-telemetry
-    type: testdata
-    access: proxy
-    isDefault: true

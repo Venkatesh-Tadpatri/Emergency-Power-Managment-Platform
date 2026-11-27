@@ -7,6 +7,9 @@ export const oidcConfig: AuthProviderProps = {
   post_logout_redirect_uri: window.location.origin,
   response_type: "code",
   scope: "openid profile email",
+  automaticSilentRenew: true,
+  monitorSession: true,
+  validateSubOnSilentRenew: true,
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, "/");
   },

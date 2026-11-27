@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.site import Site
@@ -13,6 +14,16 @@ def list_sites(db: Session, customer_id: str | None = None) -> list[Site]:
 
 def get_site(db: Session, site_id: str) -> Site | None:
     return db.get(Site, site_id)
+
+
+def get_site_by_name(db: Session, customer_id: str, name: str, exclude_id: str | None = None) -> Site | None:
+    query = db.query(Site).filter(
+        Site.customer_id == customer_id,
+        func.lower(func.trim(Site.name)) == name.strip().lower(),
+    )
+    if exclude_id:
+        query = query.filter(Site.id != exclude_id)
+    return query.first()
 
 
 def create_site(db: Session, data: SiteCreate) -> Site:

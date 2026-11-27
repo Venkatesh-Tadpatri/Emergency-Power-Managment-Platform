@@ -1,5 +1,5 @@
 import { Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../auth/LocalAuth";
 import { IconAlert, IconBuilding, IconPanel, IconResellers, IconSettings, IconUsers } from "../components/common/Icons";
 import { InfoCard, StatsGrid } from "../components/common/StatCard";
 import { usePageHeader } from "../components/layout/HeaderContext";
@@ -22,18 +22,20 @@ export function Dashboard() {
     if (me.company_id) return <Navigate to={`/companies/${me.company_id}`} replace />;
     if (me.reseller_id) return <Navigate to={`/resellers/${me.reseller_id}`} replace />;
   }
-  if (me && !me.role) return <div className="center-screen">Your account has no role assigned yet.</div>;
+  if (me && !me.role) return <div className="center-screen" style={{ flexDirection: "column", gap: 8, textAlign: "center" }}><strong>Your account is active.</strong><span style={{ color: "var(--text-dim)" }}>Your administrator will now assign your access. Refresh this page once they have done so.</span></div>;
 
   const activeSites = (sites || []).filter((site) => site.status !== "archived");
   return <>
     <StatsGrid stats={[{ label: "Total Resellers", value: resellers?.length ?? 0, color: "var(--purple)", icon: IconResellers, onClick: () => navigate("/resellers") }, { label: "Total Customers", value: companies?.length ?? 0, color: "var(--blue)", icon: IconBuilding, onClick: () => navigate("/companies") }, { label: "Total Sites", value: activeSites.length, color: "var(--amber)", icon: IconPanel }, { label: "Total Systems", value: systems?.length ?? 0, color: "var(--cyan)", icon: IconPanel }]} />
     <div className="section-header" style={{ marginTop: 22 }}><div><div className="section-title">Reseller Overview</div><div className="section-sub">Rollup status by reseller</div></div></div>
-    <div className="card-grid dashboard-reseller-grid">{(resellers || []).map((reseller) => {
+    {/* Active resellers first, archived ones grouped at the end (stable sort keeps each group's order). */}
+    <div className="card-grid dashboard-reseller-grid">{[...(resellers || [])].sort((a, b) => Number(a.status === "archived") - Number(b.status === "archived")).map((reseller) => {
+      const isArchived = reseller.status === "archived";
       const resellerCompanies = (companies || []).filter((company) => company.reseller_id === reseller.id);
       const companyIds = new Set(resellerCompanies.map((company) => company.id));
       const resellerSystems = (systems || []).filter((system) => companyIds.has(system.company_id));
       const offlineDevices = resellerSystems.filter((system) => system.status === "offline").length;
-      return <InfoCard key={reseller.id} title={reseller.name} icon={IconResellers} stats={[{ label: "Customers", value: resellerCompanies.length, color: "var(--blue)" }, { label: "Sites", value: activeSites.filter((site) => companyIds.has(site.customer_id)).length, color: "var(--purple)" }, { label: "Total systems", value: resellerSystems.length, color: "var(--cyan)" }, { label: "Offline devices", value: offlineDevices, color: offlineDevices === 0 ? "var(--green)" : "var(--red)" }]} onClick={() => navigate(`/resellers/${reseller.id}`)} />;
+      return <InfoCard key={reseller.id} title={reseller.name} status={isArchived ? "archived" : undefined} statusLabel={isArchived ? "Archived" : undefined} disabled={isArchived} icon={IconResellers} stats={[{ label: "Customers", value: resellerCompanies.length, color: "var(--blue)" }, { label: "Sites", value: activeSites.filter((site) => companyIds.has(site.customer_id)).length, color: "var(--purple)" }, { label: "Total systems", value: resellerSystems.length, color: "var(--cyan)" }, { label: "Offline devices", value: offlineDevices, color: offlineDevices === 0 ? "var(--green)" : "var(--red)" }]} onClick={isArchived ? undefined : () => navigate(`/resellers/${reseller.id}/companies`)} />;
     })}</div>
     {me?.permissions.manage_resellers && <><div className="section-header" style={{ marginTop: 22 }}><div><div className="section-title">Quick Actions</div></div></div><div className="quick-actions-grid"><button className="quick-action-btn" style={{ "--qa-color": "#7c3aed" }} onClick={() => navigate("/resellers")}><IconResellers size={18} />Resellers</button><button className="quick-action-btn" style={{ "--qa-color": "#dc2626" }} onClick={() => navigate("/alarms")}><IconAlert size={18} />All Alarms</button><button className="quick-action-btn" style={{ "--qa-color": "#db2777" }} onClick={() => navigate("/users")}><IconUsers size={18} />Users</button><button className="quick-action-btn" style={{ "--qa-color": "#64748b" }} onClick={() => navigate("/settings")}><IconSettings size={18} />Settings</button></div></>}
   </>;

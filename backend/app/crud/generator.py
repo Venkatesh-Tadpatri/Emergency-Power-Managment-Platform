@@ -46,5 +46,7 @@ def update_generator(db: Session, generator: Generator, data: GeneratorUpdate) -
 
 def delete_generator(db: Session, generator: Generator) -> None:
     delete_device_topic(db, generator.id, "generator")
+    if generator.panel:
+        generator.panel.sync_status = "pending"
     db.delete(generator)
     db.commit()

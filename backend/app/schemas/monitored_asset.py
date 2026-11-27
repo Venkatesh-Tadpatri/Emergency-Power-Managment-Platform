@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class MonitoredAssetBase(BaseModel):
@@ -56,8 +56,20 @@ class MonitoredAssetBase(BaseModel):
     notes: str | None = None
     status: str = "pending"
 
-
-class MonitoredAssetCreate(MonitoredAssetBase): pass
+class MonitoredAssetCreate(MonitoredAssetBase):
+    # Input rule only. It used to live on the shared base class, so it also ran on every *response*
+    # (MonitoredAssetRead) — one older breaker saved without ratings then made GET /monitored-assets
+    # fail with a 500 for its whole system.
+    @model_validator(mode="after")
+    def validate_breaker_ratings(self):
+        if self.asset_type == "breaker":
+            if self.rating_amps is None or self.trip_amps is None:
+                raise ValueError("breaker frame size and trip rating are required")
+            if self.rating_amps <= 0 or self.trip_amps <= 0:
+                raise ValueError("breaker frame size and trip rating must be greater than zero")
+            if self.trip_amps >= self.rating_amps:
+                raise ValueError("trip rating must be less than frame size")
+        return self
 
 
 class MonitoredAssetUpdate(BaseModel):

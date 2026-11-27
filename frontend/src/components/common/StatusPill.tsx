@@ -10,6 +10,7 @@ const PILL_MAP: Record<string, string> = {
   critical: "pill-emergency",
   online: "pill-normal",
   offline: "pill-offline",
+  archived: "pill-archived",
 };
 
 const PILL_ICON: Record<string, typeof IconCheckCircle | null> = {
@@ -22,6 +23,7 @@ const PILL_ICON: Record<string, typeof IconCheckCircle | null> = {
   test: IconFlask,
   info: null,
   offline: null,
+  archived: null,
 };
 
 // "active" here is an entity's own on/off status (company, reseller, site — see InfoCard),

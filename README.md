@@ -1,6 +1,6 @@
 # CPC — Critical Power Command
 
-CPC (Critical Power Command) is a full-stack platform for monitoring emergency-power equipment. It includes a FastAPI API with role-based access control, a React web dashboard, an Expo mobile client, Zitadel authentication, MySQL, and Grafana demo dashboards.
+CPC (Critical Power Command) is a full-stack platform for monitoring emergency-power equipment. It includes a FastAPI API with role-based access control, a React web dashboard, an Expo mobile client, Zitadel authentication, MySQL, InfluxDB telemetry storage, and built-in React analytics.
 
 ## Components
 
@@ -9,7 +9,6 @@ CPC (Critical Power Command) is a full-stack platform for monitoring emergency-p
 | `backend/` | FastAPI, SQLAlchemy, Alembic migrations, MySQL integration, JWT/RBAC API |
 | `frontend/` | React, Vite, TypeScript web application |
 | `mobile/` | Expo React Native client for Android and iOS |
-| `grafana/` | Provisioned Grafana dashboards and datasource configuration |
 | `scripts/` | One-time Zitadel OIDC bootstrap utility |
 | `reference/` | Original static-demo reference |
 
@@ -88,7 +87,7 @@ Copy the printed `ZITADEL_CLIENT_ID` and `VITE_ZITADEL_CLIENT_ID` values into `.
 `localhost` only resolves on the machine running Docker. To reach the stack from any other device, every one of these values must point at the **same** LAN IP address (your computer's IP on the local network, e.g. `192.168.1.28`) — not a mix of `localhost` and the IP:
 
 - `.env`: `ZITADEL_EXTERNAL_DOMAIN`, `ZITADEL_ISSUER`, `CORS_ORIGINS`, `VITE_API_BASE`, `VITE_ZITADEL_AUTHORITY`
-- `mobile/.env`: `EXPO_PUBLIC_API_BASE`, `EXPO_PUBLIC_ZITADEL_AUTHORITY`, `EXPO_PUBLIC_GRAFANA_URL`
+- `mobile/.env`: `EXPO_PUBLIC_API_BASE`, `EXPO_PUBLIC_ZITADEL_AUTHORITY`
 
 `ZITADEL_EXTERNAL_DOMAIN` and `ZITADEL_ISSUER` in particular must match exactly — Zitadel bakes the domain into every token's issuer claim, and the backend rejects tokens whose issuer doesn't match `ZITADEL_ISSUER` character-for-character. After changing any of these, recreate the affected containers so they pick up the new values:
 
@@ -111,7 +110,6 @@ The backend waits for MySQL, applies Alembic migrations, and seeds demo data on 
 | Web dashboard | http://localhost:5173 |
 | API documentation | http://localhost:8000/docs |
 | Zitadel console | http://localhost:8080 |
-| Grafana | http://localhost:3000 |
 
 Stop the local stack with `docker compose down`. Add `-v` only when you intentionally want to remove the local MySQL and Zitadel data volumes.
 
@@ -160,7 +158,7 @@ npm run build
 
 ## Demo telemetry data
 
-Live equipment readings (voltage, current, oil pressure, etc.) are not backed by a real MQTT/historian pipeline yet — the web app, the mobile app, and the Grafana dashboards all fall back to static demo fixtures for the specific devices they cover:
+Live equipment readings (voltage, current, oil pressure, etc.) are not backed by a real MQTT/historian pipeline yet — the web app and the mobile app fall back to static demo fixtures for the specific devices they cover:
 
 - `frontend/public/data/telemetry.json` — the primary fixture, matched by device name (e.g. `ASTER-GEN-001`)
 - `frontend/src/data/mepstra-telemetry.json` — a secondary fallback matched by device ID, covering a wider range of Aster Prime's equipment (`GEN-0079`–`GEN-0099`, `ATS-0163`–`ATS-0186`)
@@ -202,11 +200,6 @@ docker compose logs backend --tail 100
 The backend log should show `Running migrations...` followed by the API startup message. If a clean demonstration database is required, `docker compose down -v` removes all database volumes; this is destructive and should not be used for an installation whose data must be retained.
 
 ## Troubleshooting
-
-**Grafana container stuck restarting / crash-looping.** Usually stale internal SQLite state left over from a previous run conflicting with datasource provisioning (`data source with the same uid already exists` in `docker compose logs grafana`). Since Grafana's data directory isn't a mounted volume, recreating the container gives it a clean state:
-```bash
-docker compose up -d --force-recreate grafana
-```
 
 **Backend/Zitadel unreachable after changing `.env`.** Config changes only take effect on container *recreation*, not `docker compose restart`:
 ```bash

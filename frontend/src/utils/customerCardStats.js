@@ -2,7 +2,8 @@ import { isOperationalEvent } from "./alarmClassification";
 
 export function getCustomerCardStats(companyId, { sites = [], systems = [], alarms = [], panels = [], generators = [] }) {
   const companySites = sites.filter((site) => site.status !== "archived" && site.customer_id === companyId);
-  const companySystems = systems.filter((system) => system.company_id === companyId);
+  const activeSiteIds = new Set(companySites.map((site) => site.id));
+  const companySystems = systems.filter((system) => system.company_id === companyId && activeSiteIds.has(system.site_id));
   const systemIds = new Set(companySystems.map((system) => system.id));
   const panelIds = new Set(panels.filter((panel) => systemIds.has(panel.system_id)).map((panel) => panel.id));
   const offlineDevices = companySystems.filter((system) => system.status === "offline").length;
@@ -20,13 +21,20 @@ export function getCustomerCardStats(companyId, { sites = [], systems = [], alar
 
 const STATUS_PRIORITY = { normal: 0, online: 0, test: 1, offline: 2, alarm: 3, emergency: 4 };
 
+// The API reports a system as "offline" unless one of its MQTT-mapped devices is reporting, so a
+// site/customer/reseller is online only when at least one of its systems is. Stored alarms on
+// systems that are not reporting describe no live state and must not mark the group as alarmed.
 export function getWorstStatus(systemRows = [], alarmRows = []) {
-  let worst = systemRows.length ? "normal" : "offline";
-  for (const system of systemRows) {
+  const liveSystems = systemRows.filter((system) => system.status !== "offline");
+  if (!liveSystems.length) return "offline";
+  const liveIds = new Set(liveSystems.map((system) => system.id));
+  let worst = "normal";
+  for (const system of liveSystems) {
     const status = STATUS_PRIORITY[system.status] == null ? "normal" : system.status;
     if (STATUS_PRIORITY[status] > STATUS_PRIORITY[worst]) worst = status;
   }
   for (const alarm of alarmRows) {
+    if (alarm.system_id && !liveIds.has(alarm.system_id)) continue;
     if (alarm.status !== "active" || isOperationalEvent(alarm)) continue;
     const status = alarm.severity === "critical" ? "emergency" : "alarm";
     if (STATUS_PRIORITY[status] > STATUS_PRIORITY[worst]) worst = status;

@@ -36,6 +36,8 @@ def create_company(
 ):
     if not can_create_company(user, data.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to create companies here")
+    if crud.get_company_by_name(db, data.reseller_id, data.name):
+        raise HTTPException(status.HTTP_409_CONFLICT, "a customer with the same name already exists for this reseller")
     return crud.create_company(db, data)
 
 
@@ -61,6 +63,9 @@ def update_company(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "company not found")
     if not can_write_company(user, db, company.id, company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this company")
+    target_reseller_id = data.reseller_id or company.reseller_id
+    if data.name is not None and crud.get_company_by_name(db, target_reseller_id, data.name, exclude_id=company.id):
+        raise HTTPException(status.HTTP_409_CONFLICT, "a customer with the same name already exists for this reseller")
     return crud.update_company(db, company, data)
 
 
@@ -92,3 +97,17 @@ def archive_company(
     if not can_write_company(user, db, company.id, company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to archive this company")
     return crud.archive_company(db, company)
+
+
+@router.delete("/{company_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+def delete_company_permanently(
+    company_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+):
+    company = crud.get_company(db, company_id)
+    if not company:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "company not found")
+    if company.status != "archived":
+        raise HTTPException(status.HTTP_409_CONFLICT, "customer must be archived before it can be deleted")
+    if not can_write_company(user, db, company.id, company.reseller_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to delete this customer")
+    crud.delete_company(db, company)

@@ -30,4 +30,7 @@ if [ "${SEED_ON_START:-true}" = "true" ]; then
 fi
 
 echo "Starting API server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+if [ "${UVICORN_RELOAD:-false}" = "true" ]; then
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+fi
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "${UVICORN_WORKERS:-1}"

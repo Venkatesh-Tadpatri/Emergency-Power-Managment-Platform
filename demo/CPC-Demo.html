@@ -1517,8 +1517,8 @@ function analyticsPage(){
   var totalKw=equipment.reduce(function(t,e){return t+(e.kw||0);},0);
   var avgLoad=equipment.length? Math.round(equipment.reduce(function(t,e){return t+(e.load||0);},0)/equipment.length) : 0;
 
-  var html='<div class="card an-intro"><div><h2>Grafana analytics and live telemetry</h2><p>Live readings refresh automatically. Click a device row for its trend, or open the full Grafana workspace.</p></div>' +
-    '<div class="an-actions"><button class="btn primary" onclick="openPlaceholder(\'Grafana Analytics\')">Open in Grafana &#8599;</button><span class="live-badge">&#9679; Live data</span></div></div>';
+  var html='<div class="card an-intro"><div><h2>Analytics &amp; performance</h2><p>Live readings refresh automatically. Click a device row for its full history and performance trends.</p></div>' +
+    '<div class="an-actions"><span class="live-badge">&#9679; Live data</span></div></div>';
 
   html+='<div class="kpi-grid">';
   html+=kpi('Monitored assets', equipment.length, 'Generators + ATS');

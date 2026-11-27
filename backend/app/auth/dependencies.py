@@ -4,6 +4,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.auth.jwks import TokenValidationError, fetch_userinfo, verify_token
+from app.auth.local import decode_local_token
 from app.database import get_db
 from app.models.user import User
 
@@ -14,6 +15,14 @@ def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+    local_user_id = decode_local_token(creds.credentials)
+    if local_user_id:
+        user = db.get(User, local_user_id)
+        if not user:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user no longer exists")
+        if not user.is_active or user.account_state == "suspended":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "user is deactivated")
+        return user
     try:
         claims = verify_token(creds.credentials)
     except TokenValidationError as exc:

@@ -8,6 +8,7 @@ from app.crud import panel as panel_crud
 from app.database import get_db
 from app.models.user import User
 from app.schemas.ats import ATSCreate, ATSRead, ATSUpdate
+from app.services.panel_limits import enforce_panel_limit
 
 router = APIRouter(prefix="/api/ats", tags=["ats"])
 
@@ -34,6 +35,7 @@ def create_ats(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "panel not found")
     if not can_write_system(user, db, panel.system.company_id, panel.system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to add ATS devices here")
+    enforce_panel_limit(db, data.panel_id, "ats")
     try:
         return crud.create_ats(db, data)
     except ValueError as exc:
@@ -62,6 +64,8 @@ def update_ats(
     system = ats.panel.system
     if not can_write_system(user, db, system.company_id, system.company.reseller_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed to edit this ATS")
+    if data.panel_id and data.panel_id != ats.panel_id:
+        enforce_panel_limit(db, data.panel_id, "ats", exclude_id=ats.id)
     try:
         return crud.update_ats(db, ats, data)
     except ValueError as exc:

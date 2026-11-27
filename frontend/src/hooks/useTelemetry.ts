@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 
 export type GeneratorTelemetry = {
@@ -106,17 +105,17 @@ export function useTelemetry(systemId?: string) {
   const query = useQuery({
     queryKey: ["telemetry", systemId],
     queryFn: async () =>
-      (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`, { timeout: 15_000 })).data,
+      (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`, { timeout: 5_000 })).data,
     enabled: !!systemId,
     // Preserve the last successful snapshot across navigation and refresh it in the background.
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: 24 * 60 * 60_000,
-    refetchInterval: (state) => state.state.data?.refresh_interval_ms || 5000,
-    refetchIntervalInBackground: true,
+    refetchInterval: (state) => Math.max(state.state.data?.refresh_interval_ms || 10_000, 10_000),
+    refetchIntervalInBackground: false,
     refetchOnMount: "always",
     refetchOnReconnect: "always",
-    retry: 5,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
+    retry: 1,
+    retryDelay: 1_000,
   });
 
   return {
@@ -131,44 +130,84 @@ export function useTelemetrySnapshot(systemId?: string) {
   return useTelemetry(systemId).telemetry;
 }
 
+/** Poll telemetry for overview screens that render more than one system. */
+export function useTelemetrySnapshots(systemIds: string[]) {
+  const ids = [...new Set(systemIds.filter(Boolean))];
+  const queries = useQueries({
+    queries: ids.map((systemId) => ({
+      queryKey: ["telemetry", systemId],
+      queryFn: async () =>
+        (await api.get<TelemetrySnapshot>(`/api/telemetry/systems/${systemId}/latest`, { timeout: 5_000 })).data,
+      staleTime: Number.POSITIVE_INFINITY,
+      gcTime: 24 * 60 * 60_000,
+      refetchInterval: (state: { state: { data?: TelemetrySnapshot } }) => Math.max(state.state.data?.refresh_interval_ms || 30_000, 30_000),
+      refetchIntervalInBackground: false,
+      refetchOnMount: "always" as const,
+      refetchOnReconnect: "always" as const,
+      retry: 0,
+    })),
+  });
+
+  return new Map(ids.map((id, index) => [id, queries[index]?.data ?? null]));
+}
+
 export function telemetryFor<T extends { equipment_id: string; equipment_name: string }>(items: T[] | undefined, id: string, name: string) {
   const key = (value: string) => value.trim().toLowerCase();
   return items?.find((item) => item.equipment_id === id || key(item.equipment_name) === key(name));
 }
 
-const HISTORY_FIELDS = [
-  "load_percentage", "active_power_kw", "voltage_ab", "voltage_bc", "voltage_ca",
-  "voltage_an", "voltage_bn", "voltage_cn",
-  "current_a", "current_b", "current_c", "frequency", "power_factor",
-  "fuel_level_percent", "coolant_temperature_c", "oil_pressure_psi",
+// ---------------------------------------------------------------------------
+// Stored history (InfluxDB, bucketed by the backend) for the in-app analytics.
+// ---------------------------------------------------------------------------
+
+export const HISTORY_RANGES = [
+  { key: "1h", label: "1H", ms: 60 * 60_000 },
+  { key: "6h", label: "6H", ms: 6 * 60 * 60_000 },
+  { key: "24h", label: "24H", ms: 24 * 60 * 60_000 },
+  { key: "7d", label: "7D", ms: 7 * 24 * 60 * 60_000 },
+  { key: "30d", label: "30D", ms: 30 * 24 * 60 * 60_000 },
 ] as const;
-type HistoryField = (typeof HISTORY_FIELDS)[number];
-export type TelemetryHistoryPoint = { t: number } & Partial<Record<HistoryField, number>>;
-export type TelemetryHistory = Map<string, TelemetryHistoryPoint[]>;
+export type HistoryRange = (typeof HISTORY_RANGES)[number]["key"];
 
-export const historyKey = (type: "generator" | "ats", equipmentId: string) => `${type}:${equipmentId}`;
+export type HistoryPoint = {
+  t: number;
+  voltage_ab?: number; voltage_bc?: number; voltage_ca?: number;
+  voltage_an?: number; voltage_bn?: number; voltage_cn?: number;
+  current_a?: number; current_b?: number; current_c?: number;
+  active_power_kw?: number; apparent_power_kva?: number; reactive_power_kvar?: number;
+  frequency?: number; power_factor?: number; load_percentage?: number;
+  fuel_level_percent?: number; coolant_temperature_c?: number; oil_pressure_psi?: number;
+  battery_voltage?: number; engine_hours?: number; transfer_time_seconds?: number;
+  running?: 0 | 1; fault?: 0 | 1; on_emergency?: 0 | 1; utility_available?: 0 | 1;
+};
 
-/** Wraps useTelemetry and accumulates a bounded in-memory trend buffer per equipment, sampled as snapshots arrive. */
-export function useTelemetryHistory(systemId?: string, maxPoints = 60) {
-  const { telemetry, error } = useTelemetry(systemId);
-  const historyRef = useRef<TelemetryHistory>(new Map());
-  const [, setTick] = useState(0);
+export type DeviceHistory = {
+  equipment_id: string;
+  equipment_type: "generator" | "ats";
+  equipment_name: string;
+  system_id: string;
+  rated_kw?: number | null;
+  points: HistoryPoint[];
+};
 
-  useEffect(() => {
-    if (!telemetry) return;
-    const sample = (key: string, item: Record<string, unknown>) => {
-      const point: TelemetryHistoryPoint = { t: Date.now() };
-      for (const field of HISTORY_FIELDS) {
-        const value = item[field];
-        if (typeof value === "number") point[field] = value;
-      }
-      const list = historyRef.current.get(key) || [];
-      historyRef.current.set(key, [...list, point].slice(-maxPoints));
-    };
-    telemetry.generators.forEach((item) => sample(historyKey("generator", item.equipment_id), item));
-    telemetry.ats.forEach((item) => sample(historyKey("ats", item.equipment_id), item));
-    setTick((n) => n + 1);
-  }, [telemetry, maxPoints]);
+export type HistoryResponse = { range: HistoryRange; window_seconds: number; devices: DeviceHistory[] };
 
-  return { telemetry, error, history: historyRef.current };
+const MAX_HISTORY_SYSTEMS = 50;
+
+/** Bucketed history for every monitored device in `systemIds` (or just `deviceId`). */
+export function useDeviceHistory(systemIds: string[], range: HistoryRange, deviceId?: string) {
+  const ids = [...new Set(systemIds.filter(Boolean))].sort().slice(0, MAX_HISTORY_SYSTEMS);
+  const windowMs = HISTORY_RANGES.find((item) => item.key === range)!.ms;
+  return useQuery({
+    queryKey: ["telemetry-history", ids, range, deviceId ?? null],
+    queryFn: async () => (await api.get<HistoryResponse>("/api/telemetry/history", {
+      params: { system_ids: ids.join(","), range, ...(deviceId ? { device_id: deviceId } : {}) },
+      timeout: 45_000,
+    })).data,
+    enabled: ids.length > 0,
+    // Short ranges move quickly; long ranges barely change between refreshes.
+    refetchInterval: windowMs <= 6 * 60 * 60_000 ? 60_000 : 5 * 60_000,
+    staleTime: 30_000,
+    retry: 1,
+  });
 }

@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { usePageHeader } from "../../components/layout/HeaderContext";
+import { DateInput } from "../../components/common/DateInput";
 import { StatusPill } from "../../components/common/StatusPill";
+import { useToast } from "../../components/common/Toast";
 import { useCompany } from "../../queries/companies";
 import { useCompanyAtsRoster } from "../../queries/compliance";
-import { useReports } from "../../queries/reports";
+import { downloadAnalyticalReportPdf, useReports } from "../../queries/reports";
 import { useSystems } from "../../queries/systems";
 
 const TYPE_STATUS = { "gen-run": "alarm", "ats-emergency": "emergency", test: "test" };
@@ -14,7 +16,7 @@ const TABS = [
   { key: "calendar", label: "Calendar" },
   { key: "list", label: "All Reports" },
   { key: "initiating", label: "Initiating ATS Report" },
-  { key: "time-to-buss", label: "Time to Re-Xfer Report" },
+  { key: "time-to-buss", label: "Average Time to Buss Report" },
   { key: "compliance", label: "ATS Compliance" },
 ];
 // No dedicated "load served" field exists on an ATS today — approximated from its branch, same
@@ -61,8 +63,8 @@ export function CompanyReports() {
           </tbody>
         </table>
       )}
-      {tab === "initiating" && <InitiatingAtsReportTab reports={reports || []} systemName={systemName} />}
-      {tab === "time-to-buss" && <TimeToBussReportTab reports={reports || []} systemName={systemName} />}
+      {tab === "initiating" && <InitiatingAtsReportTab companyId={companyId} reports={reports || []} systemName={systemName} />}
+      {tab === "time-to-buss" && <TimeToBussReportTab companyId={companyId} reports={reports || []} systemName={systemName} />}
       {tab === "compliance" && <ComplianceTab companyId={companyId} reports={reports || []} />}
     </>
   );
@@ -169,11 +171,28 @@ function CalendarTab({ reports, systemName, companyId, navigate }) {
   );
 }
 
-/** ─── Shared date-range filter bar for the two analytical reports below — "Generate Report" applies
- * the pending range rather than recomputing on every keystroke, matching the reference's explicit CTA. ─── */
-function DateRangeFilter({ range, onGenerate }) {
+/** ─── Shared date-range filter bar for the two analytical reports below. Presets apply the range to
+ * the on-screen report immediately. "Generate Report" applies the chosen range AND downloads the
+ * report as a PDF (built by the backend with the same range and filters). ─── */
+function DateRangeFilter({ range, onGenerate, onDownload }) {
+  const toast = useToast();
   const [start, setStart] = useState(range.start);
   const [end, setEnd] = useState(range.end);
+  const [generating, setGenerating] = useState(false);
+  const generate = async () => {
+    if (!start || !end || start > end) { toast.error("Choose a start date on or before the end date."); return; }
+    onGenerate(start, end);
+    if (!onDownload) return;
+    setGenerating(true);
+    try {
+      await onDownload(start, end);
+      toast.success("Report generated and downloaded.");
+    } catch {
+      toast.error("Could not generate the report. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  };
   const preset = (days) => {
     const endD = new Date();
     const startD = days ? new Date(Date.now() - days * 86400000) : null;
@@ -183,12 +202,12 @@ function DateRangeFilter({ range, onGenerate }) {
   };
   return (
     <div className="report-filter-bar">
-      <div className="report-filter-field"><label>Start Date</label><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-      <div className="report-filter-field"><label>End Date</label><input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+      <div className="report-filter-field"><label>Start Date</label><DateInput value={start} onChange={setStart} max={end || undefined} ariaLabel="Start date" /></div>
+      <div className="report-filter-field"><label>End Date</label><DateInput value={end} onChange={setEnd} min={start || undefined} ariaLabel="End date" /></div>
       <button className="report-filter-preset" onClick={() => preset(30)}>Last 30 Days</button>
       <button className="report-filter-preset" onClick={() => preset(90)}>Last 90 Days</button>
       <button className="report-filter-preset" onClick={() => preset(0)}>All Data</button>
-      <button className="report-generate-btn" onClick={() => onGenerate(start, end)}>Generate Report</button>
+      <button type="button" className="report-generate-btn" disabled={generating} onClick={generate}>{generating ? "Generating…" : "Generate Report"}</button>
     </div>
   );
 }
@@ -198,7 +217,7 @@ function inRange(isoDate, range) {
 }
 
 /** ─── Initiating ATS Report: every report in range, grouped by which ATS/generator initiated it. ─── */
-function InitiatingAtsReportTab({ reports, systemName }) {
+function InitiatingAtsReportTab({ companyId, reports, systemName }) {
   const [range, setRange] = useState({ start: "2000-01-01", end: fmtDate(new Date()) });
   const rows = useMemo(() => reports.filter((r) => r.initiating_ats && inRange(r.report_date, range)).sort((a, b) => a.report_date.localeCompare(b.report_date)), [reports, range]);
   const stats = useMemo(() => {
@@ -215,7 +234,7 @@ function InitiatingAtsReportTab({ reports, systemName }) {
 
   return (
     <div className="report-doc analytical">
-      <DateRangeFilter range={range} onGenerate={(start, end) => setRange({ start, end })} />
+      <DateRangeFilter range={range} onGenerate={(start, end) => setRange({ start, end })} onDownload={(start, end) => downloadAnalyticalReportPdf("initiating-ats", { companyId, start, end })} />
       <div className="report-doc-tiles">
         <div className="report-doc-tile dark"><div className="report-doc-tile-value">{stats.total}</div><div className="report-doc-tile-label">TOTAL EVENTS</div></div>
         <div className="report-doc-tile light"><div className="report-doc-tile-value dark-text" style={{ fontSize: 15 }}>{stats.top}</div><div className="report-doc-tile-label light-label">MOST FREQUENT INITIATOR</div></div>
@@ -254,49 +273,79 @@ function InitiatingAtsReportTab({ reports, systemName }) {
   );
 }
 
-/** ─── Time to Re-Xfer Report: every ATS transfer reading (one row per ATS per event) in range, flagged
- * against the NFPA 110 Type 10 10-second transfer requirement. ─── */
-function TimeToBussReportTab({ reports }) {
+/** ─── Average Time to Buss Report: every ATS transfer reading (one row per ATS per event) in range.
+ * Only Life Safety and Critical branches are held to the NFPA 110 Type 10 10-second requirement, so
+ * only they are flagged EXCEEDED and counted in "Readings above 10.0 sec"; Equipment never is. ─── */
+const NFPA_LIMIT_SEC = 10;
+const NFPA_LIMITED_BRANCHES = new Set(["life-safety", "critical"]);
+const BUSS_BRANCH_FILTERS = [
+  { key: "all", label: "All Branches" },
+  { key: "life-safety", label: "Life Safety" },
+  { key: "critical", label: "Critical" },
+  { key: "equipment", label: "Equipment" },
+];
+const isExceeded = (d) => NFPA_LIMITED_BRANCHES.has(d.branch) && d.time_to_bus_sec != null && d.time_to_bus_sec > NFPA_LIMIT_SEC;
+
+function TimeToBussReportTab({ companyId, reports }) {
   const [range, setRange] = useState({ start: "2000-01-01", end: fmtDate(new Date()) });
+  const [branchFilter, setBranchFilter] = useState("all");
+  const [omitOverLimit, setOmitOverLimit] = useState(false);
   const rows = useMemo(() => {
     const out = [];
     reports.filter((r) => inRange(r.report_date, range)).forEach((r) => {
       (r.ats_details || []).forEach((d) => {
+        if (branchFilter !== "all" && (d.branch || "equipment") !== branchFilter) return;
+        // Omits every reading above 10.0 sec, whatever its branch — e.g. to see the average without outliers.
+        if (omitOverLimit && d.time_to_bus_sec != null && d.time_to_bus_sec > NFPA_LIMIT_SEC) return;
         out.push({ report: r, detail: d });
       });
     });
     return out.sort((a, b) => a.report.report_date.localeCompare(b.report.report_date));
-  }, [reports, range]);
+  }, [reports, range, branchFilter, omitOverLimit]);
   const stats = useMemo(() => {
     const times = rows.map((r) => r.detail.time_to_bus_sec).filter((v) => v != null);
     return {
       total: rows.length,
       avg: times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—",
       fastest: times.length ? Math.min(...times).toFixed(1) : "—",
-      exceeded: times.filter((v) => v > 10).length,
+      exceeded: rows.filter((r) => isExceeded(r.detail)).length,
     };
   }, [rows]);
 
   return (
     <div className="report-doc analytical">
-      <DateRangeFilter range={range} onGenerate={(start, end) => setRange({ start, end })} />
+      <DateRangeFilter range={range} onGenerate={(start, end) => setRange({ start, end })} onDownload={(start, end) => downloadAnalyticalReportPdf("time-to-buss", { companyId, start, end, branch: branchFilter, omitOverLimit: omitOverLimit })} />
+      <div className="report-filter-bar report-filter-options" role="group" aria-label="Reading filters">
+        <div className="report-filter-field">
+          <label>Branch</label>
+          <div className="report-filter-segment">
+            {BUSS_BRANCH_FILTERS.map((option) => (
+              <button type="button" key={option.key} className={`report-filter-preset${branchFilter === option.key ? " active" : ""}`} aria-pressed={branchFilter === option.key} onClick={() => setBranchFilter(option.key)}>{option.label}</button>
+            ))}
+          </div>
+        </div>
+        <label className="report-filter-check">
+          <input type="checkbox" checked={omitOverLimit} onChange={(event) => setOmitOverLimit(event.target.checked)} />
+          Omit readings above 10.0 sec
+        </label>
+      </div>
       <div className="report-doc-tiles">
         <div className="report-doc-tile dark"><div className="report-doc-tile-value">{stats.total}</div><div className="report-doc-tile-label">TOTAL READINGS</div></div>
-        <div className="report-doc-tile light"><div className="report-doc-tile-value dark-text">{stats.avg} sec</div><div className="report-doc-tile-label light-label">AVERAGE TIME TO RE-XFER</div></div>
+        <div className="report-doc-tile light"><div className="report-doc-tile-value dark-text">{stats.avg} sec</div><div className="report-doc-tile-label light-label">AVERAGE TIME TO BUSS</div></div>
         <div className="report-doc-tile light"><div className="report-doc-tile-value blue-text">{stats.fastest} sec</div><div className="report-doc-tile-label light-label">FASTEST READING</div></div>
         <div className="report-doc-tile red"><div className="report-doc-tile-value">{stats.exceeded}</div><div className="report-doc-tile-label">READINGS ABOVE 10.0 SEC</div></div>
       </div>
-      <p className="report-doc-caption">Readings above 10.0 sec are flagged for review against NFPA 110 Type 10 transfer requirements.</p>
+      <p className="report-doc-caption">Life Safety and Critical readings above 10.0 sec are flagged for review against NFPA 110 Type 10 transfer requirements. The Equipment branch is not held to the 10-sec requirement and is never flagged.</p>
       <div className="report-doc-section-title report-doc-section-row">
-        <span>ATS TRANSFER READINGS — TIME TO RE-XFER</span>
+        <span>ATS TRANSFER READINGS — TIME TO BUSS</span>
         <span className="report-doc-section-range">{displayDate(range.start)} - {displayDate(range.end)}</span>
       </div>
       <div className="report-doc-table-wrap">
         <table className="report-doc-table left">
-          <thead><tr><th>Date</th><th>Time</th><th>ATS</th><th>Load Served</th><th>Branch</th><th>Event Type</th><th>Time to Re-Xfer</th><th>Time to Available</th></tr></thead>
+          <thead><tr><th>Date</th><th>Time</th><th>ATS</th><th>Load Served</th><th>Branch</th><th>Event Type</th><th>Time to Buss</th><th>Time to Available</th></tr></thead>
           <tbody>
             {rows.map(({ report: r, detail: d }, i) => {
-              const exceeded = (d.time_to_bus_sec ?? 0) > 10;
+              const exceeded = isExceeded(d);
               return (
                 <tr key={`${r.id}-${d.ats_name}-${i}`}>
                   <td className="mono">{displayDate(r.report_date)}</td>
@@ -310,7 +359,7 @@ function TimeToBussReportTab({ reports }) {
                 </tr>
               );
             })}
-            {!rows.length && <tr><td colSpan={8} className="report-doc-empty">No ATS transfer readings in this date range.</td></tr>}
+            {!rows.length && <tr><td colSpan={8} className="report-doc-empty">No ATS transfer readings match this date range and filters.</td></tr>}
           </tbody>
         </table>
       </div>

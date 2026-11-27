@@ -23,6 +23,9 @@ def get_me(db: Session = Depends(get_db), user: User = Depends(get_current_user)
             "reseller_id": user.reseller_id,
             "company_id": user.company_id,
             "is_active": user.is_active,
+            "account_state": user.account_state,
+            "contact_number": user.contact_number,
+            "requested_company_name": user.requested_company_name,
             "permissions": permissions_summary(user),
         }
     )

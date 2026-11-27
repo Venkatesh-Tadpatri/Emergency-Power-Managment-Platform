@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 import { StatusPill } from "./StatusPill";
 import type { IconDashboard } from "./Icons";
@@ -76,7 +76,9 @@ export function InfoCard({
   stats,
   statusLabel,
   onClick,
+  disabled = false,
   icon: Icon,
+  footer,
 }: {
   title: string;
   status?: string;
@@ -84,10 +86,23 @@ export function InfoCard({
   stats: InfoCardStat[];
   statusLabel?: string;
   onClick?: () => void;
+  disabled?: boolean;
   icon?: typeof IconDashboard;
+  /** Extra content below the stats, e.g. record details and action buttons on archived cards. */
+  footer?: ReactNode;
 }) {
+  const interactive = Boolean(onClick) && !disabled;
   return (
-    <div className="info-card" onClick={onClick}>
+    <div
+      className={`info-card${disabled ? " info-card-disabled" : ""}`}
+      onClick={interactive ? onClick : undefined}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-disabled={disabled || undefined}
+      onKeyDown={(event) => {
+        if (interactive && (event.key === "Enter" || event.key === " ")) onClick?.();
+      }}
+    >
       <div className="info-card-header">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {Icon && (
@@ -107,7 +122,7 @@ export function InfoCard({
               <Icon size={14} />
             </div>
           )}
-          <div className="info-card-title">{title}</div>
+          <div className="info-card-title" title={typeof title === "string" ? title : undefined}>{title}</div>
         </div>
         {status && <StatusPill status={status} label={statusLabel} />}
       </div>
@@ -122,6 +137,7 @@ export function InfoCard({
           </div>
         ))}
       </div>
+      {footer && <div className="info-card-footer">{footer}</div>}
     </div>
   );
 }

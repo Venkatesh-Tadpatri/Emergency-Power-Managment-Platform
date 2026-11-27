@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { DateInput } from "../../components/common/DateInput";
 import { StatusPill } from "../../components/common/StatusPill";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useAcknowledgeAlarm, useAlarms } from "../../queries/alarms";
@@ -104,8 +105,8 @@ export function AlarmWorkspace({ title = "Alarms", crumbs = [], resellerId, comp
       <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
         <option value="">All statuses</option><option value="active">Active</option><option value="cleared">Cleared</option>
       </select>
-      <label className="alarm-date-filter">From <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
-      <label className="alarm-date-filter">To <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
+      <label className="alarm-date-filter">From <DateInput value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} ariaLabel="From date" /></label>
+      <label className="alarm-date-filter">To <DateInput value={dateTo} onChange={setDateTo} min={dateFrom || undefined} ariaLabel="To date" /></label>
       {(search || customerFilter || siteFilter || systemFilter || severity || statusFilter || dateFrom || dateTo) && <button className="header-btn" onClick={() => { setSearch(""); setCustomerFilter(""); setSiteFilter(""); setSystemFilter(""); setSeverity(""); setStatusFilter(""); setDateFrom(""); setDateTo(""); }}>Clear filters</button>}
     </div>
 

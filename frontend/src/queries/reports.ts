@@ -38,3 +38,25 @@ export async function downloadReportPdf(id: string, filename: string) {
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+/** PDF of the Reports page's Initiating ATS / Average Time to Buss tab, built by the backend from the
+ * stored reports with the same date range and filters the page is showing. */
+export async function downloadAnalyticalReportPdf(
+  kind: "initiating-ats" | "time-to-buss",
+  params: { companyId: string; start: string; end: string; branch?: string; omitOverLimit?: boolean },
+) {
+  const response = await api.get(`/api/reports/analytical/${kind}/pdf`, {
+    responseType: "blob",
+    params: { company_id: params.companyId, start: params.start, end: params.end, branch: params.branch ?? "all", omit_over_limit: params.omitOverLimit ?? false },
+  });
+  const disposition = String(response.headers["content-disposition"] || "");
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `${kind}-report.pdf`;
+  const url = URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

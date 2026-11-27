@@ -1,4 +1,4 @@
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../../auth/LocalAuth";
 
 import { useMe } from "../../queries/me";
 import { AlarmWorkspace } from "./AlarmWorkspace";

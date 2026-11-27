@@ -35,6 +35,8 @@ def create_reseller(
 ):
     if not can_manage_resellers(user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "only superadmin can manage resellers")
+    if crud.get_reseller_by_name(db, data.name):
+        raise HTTPException(status.HTTP_409_CONFLICT, "a reseller with the same name already exists")
     return crud.create_reseller(db, data)
 
 
@@ -64,6 +66,8 @@ def update_reseller(
     reseller = crud.get_reseller(db, reseller_id)
     if not reseller:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "reseller not found")
+    if data.name is not None and crud.get_reseller_by_name(db, data.name, exclude_id=reseller_id):
+        raise HTTPException(status.HTTP_409_CONFLICT, "a reseller with the same name already exists")
     return crud.update_reseller(db, reseller, data)
 
 

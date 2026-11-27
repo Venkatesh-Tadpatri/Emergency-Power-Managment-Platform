@@ -1,0 +1,76 @@
+.auth-field.has-error input {
+  border-color: #ff7c91;
+  background: rgba(120, 15, 42, 0.24);
+}
+
+.auth-field.has-error input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 91, 119, 0.16);
+}
+
+.field-error {
+  color: #ff9baa;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+/* Field label (was a <span> inside a wrapping <label>) */
+.auth-field-label { color: #f1f7ff; font-size: 11.5px; font-weight: 800; }
+.auth-required { margin-left: 3px; color: #ff7c91; font-weight: 800; }
+.auth-field-hint { color: #a9bfdc; font-size: 11px; }
+
+/* Password show/hide toggle */
+.auth-password-wrap { position: relative; }
+.auth-password-wrap input { padding-right: 48px; }
+.auth-eye {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  width: 34px; height: 34px; display: grid; place-items: center;
+  padding: 0; border: 0; border-radius: 8px; background: transparent;
+  color: #a9bfdc; cursor: pointer;
+}
+.auth-eye:hover { color: #fff; background: rgba(125, 201, 255, 0.12); }
+.auth-eye:focus-visible { outline: 2px solid #32b9ff; outline-offset: 1px; }
+.auth-eye svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Country code + number */
+.auth-phone { display: flex; gap: 8px; }
+.auth-phone input { flex: 1; min-width: 0; }
+.auth-phone-code {
+  position: relative; flex: 0 0 104px; height: 50px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
+  border: 1px solid rgba(145, 198, 255, 0.53); border-radius: 12px;
+  background: rgba(3, 27, 66, 0.54); color: #fff; font-size: 13px; font-weight: 600;
+}
+.auth-field .auth-phone-code span { color: #fff; font-size: 13px; font-weight: 600; }
+.auth-phone-code::after { content: ""; width: 7px; height: 7px; margin-top: -4px; border-right: 2px solid #a9bfdc; border-bottom: 2px solid #a9bfdc; transform: rotate(45deg); }
+.auth-phone-code:hover { border-color: #7dc9ff; background: rgba(4, 34, 78, 0.7); }
+.auth-phone-code:focus-within { border-color: #32b9ff; box-shadow: 0 0 0 3px rgba(0, 171, 255, 0.16); }
+/* The native select sits invisibly on top so the full country list + keyboard search still work. */
+.auth-phone-code select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 14px; }
+.auth-phone-code select option { color: #0f172a; background: #fff; }
+.auth-field.has-error .auth-phone-code { border-color: #ff7c91; }
+
+/* Searchable country-code dropdown */
+.auth-country { position: relative; flex: 0 0 108px; }
+.auth-country .auth-phone-code { width: 100%; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; }
+.auth-country .auth-phone-code[aria-expanded="true"] { border-color: #32b9ff; box-shadow: 0 0 0 3px rgba(0, 171, 255, 0.16); }
+.auth-country .auth-phone-code[aria-expanded="true"]::after { margin-top: 3px; transform: rotate(-135deg); }
+.auth-country-panel {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: 300px; max-width: calc(100vw - 40px);
+  padding: 8px; border: 1px solid rgba(125, 201, 255, 0.55); border-radius: 12px;
+  background: #06193a; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 22px rgba(0, 153, 255, 0.12);
+}
+.auth-country-search {
+  box-sizing: border-box; width: 100%; height: 38px; padding: 0 12px; margin-bottom: 6px;
+  border: 1px solid rgba(145, 198, 255, 0.45); border-radius: 9px; outline: none;
+  color: #fff; background: rgba(3, 27, 66, 0.8); font: inherit; font-size: 12.5px;
+}
+.auth-country-search::placeholder { color: #a9bfdc; }
+.auth-country-search:focus { border-color: #32b9ff; box-shadow: 0 0 0 3px rgba(0, 171, 255, 0.16); }
+.auth-country-list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+.auth-country-list li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #dbe8f6; font-size: 12.5px; cursor: pointer; }
+.auth-country-list li b { flex: 0 0 24px; color: #7ab6ff; font-size: 11px; letter-spacing: 0.04em; }
+.auth-country-list li .auth-country-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; font-size: 12.5px; font-weight: 500; }
+.auth-country-list li .auth-country-dial { color: #a9bfdc; font-size: 12px; font-weight: 600; }
+.auth-country-list li.active { background: rgba(50, 185, 255, 0.16); color: #fff; }
+.auth-country-list li.selected .auth-country-name { color: #4dd2ff; font-weight: 700; }
+.auth-country-list .auth-country-empty { color: #a9bfdc; cursor: default; }

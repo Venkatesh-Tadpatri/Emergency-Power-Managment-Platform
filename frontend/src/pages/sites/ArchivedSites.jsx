@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
+import { useToast } from "../../components/common/Toast";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { useCompany } from "../../queries/companies";
 import { useReseller } from "../../queries/resellers";
@@ -9,12 +10,14 @@ import { useDeleteSite, useSites, useUnarchiveSite } from "../../queries/systems
 export function ArchivedSites() {
   const { companyId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const { data: customer } = useCompany(companyId);
   const { data: reseller } = useReseller(customer?.reseller_id);
   const { data: sites } = useSites(companyId);
   const unarchiveSite = useUnarchiveSite();
   const deleteSite = useDeleteSite();
   const [deleting, setDeleting] = useState(null);
+  const [restoring, setRestoring] = useState(null);
   const archivedSites = (sites || []).filter((site) => site.status === "archived");
 
   usePageHeader("Archived Sites", [
@@ -27,8 +30,9 @@ export function ArchivedSites() {
     <div className="directory-filter-count">{archivedSites.length} archived site{archivedSites.length === 1 ? "" : "s"}</div>
     {archivedSites.length === 0 ? <p style={{ color: "var(--text-dim)", fontSize: 13 }}>No archived sites.</p> : <table className="data-table">
       <thead><tr><th>Site</th><th>Location</th><th>Status</th><th /></tr></thead>
-      <tbody>{archivedSites.map((site) => <tr key={site.id}><td style={{ fontWeight: 600 }}>{site.name}</td><td>{site.address || "—"}</td><td>Archived</td><td><div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}><button className="header-btn" onClick={() => unarchiveSite.mutate(site.id)}>Unarchive</button><button className="header-btn danger" onClick={() => setDeleting(site)}>Delete</button></div></td></tr>)}</tbody>
+      <tbody>{archivedSites.map((site) => <tr key={site.id}><td style={{ fontWeight: 600 }}>{site.name}</td><td>{site.address || "—"}</td><td>Archived</td><td><div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}><button className="header-btn" disabled={unarchiveSite.isPending} onClick={() => setRestoring(site)}>Unarchive</button><button className="header-btn danger" onClick={() => setDeleting(site)}>Delete</button></div></td></tr>)}</tbody>
     </table>}
     {deleting && <ConfirmDialog title="Delete site permanently" message={`Permanently delete "${deleting.name}" and its systems? This cannot be undone.`} confirmLabel="Delete" onCancel={() => setDeleting(null)} onConfirm={() => { deleteSite.mutate(deleting.id); setDeleting(null); }} />}
+    {restoring && <ConfirmDialog title="Unarchive site" message={`Restore "${restoring.name}" to Active Sites?`} confirmLabel="Unarchive" danger={false} onCancel={() => setRestoring(null)} onConfirm={() => { const target = restoring; setRestoring(null); unarchiveSite.mutate(target.id, { onSuccess: () => toast.success(`Site "${target.name}" unarchived successfully.`), onError: (error) => toast.error(error?.response?.data?.detail || `Could not unarchive "${target.name}".`) }); }} />}
   </>;
 }

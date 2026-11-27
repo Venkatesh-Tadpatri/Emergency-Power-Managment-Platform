@@ -16,8 +16,7 @@
       "env": {
         "EXPO_PUBLIC_API_BASE": "http://192.168.1.34:8000",
         "EXPO_PUBLIC_ZITADEL_AUTHORITY": "http://192.168.1.34:8080",
-        "EXPO_PUBLIC_ZITADEL_CLIENT_ID": "383901213776740354",
-        "EXPO_PUBLIC_GRAFANA_URL": "http://192.168.1.34:3000"
+        "EXPO_PUBLIC_ZITADEL_CLIENT_ID": "383901213776740354"
       }
     },
     "production": {

@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { IconAlert, IconCheckCircle, IconMap, IconPanel } from "../../components/common/Icons";
+import { IconMap } from "../../components/common/Icons";
 import { Modal } from "../../components/common/Modal";
-import { StatsGrid } from "../../components/common/StatCard";
 import { StatusPill } from "../../components/common/StatusPill";
 import { QueryState } from "../../components/common/QueryState";
+import { useToast } from "../../components/common/Toast";
 import { usePageHeader } from "../../components/layout/HeaderContext";
-import { resolveAtsTelemetry, resolveGeneratorTelemetry, ResultTab } from "../../components/systems/SystemOperationsOverview";
-import { TestWizard } from "../../components/systems/TestWizard";
-import { useTelemetrySnapshot } from "../../hooks/useTelemetry";
+import { resolveAtsTelemetry, resolveGeneratorTelemetry, ResultTab, shareAtsLoadSide } from "../../components/systems/SystemOperationsOverview";
+import { useTelemetrySnapshots } from "../../hooks/useTelemetry";
 import { useAlarms } from "../../queries/alarms";
 import { useCompany } from "../../queries/companies";
 import { useMe } from "../../queries/me";
+import { useMeters } from "../../queries/meters";
+import { useMonitoredAssets } from "../../queries/monitoredAssets";
+import { useReseller } from "../../queries/resellers";
 import { useAllAts, useAllGenerators, useAllPanels, useArchiveSystem, useCreateSystem, useOneLine, useSite, useSystems, useUpdateSystem } from "../../queries/systems";
 import { activeAlarmOnly } from "../../utils/alarmClassification";
 
-function SystemCardMenu({ system, canManage, onEdit, onDelete }) {
+function SystemCardMenu({ system, canManage, onEdit, onArchive }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -39,7 +41,7 @@ function SystemCardMenu({ system, canManage, onEdit, onDelete }) {
       {open && (
         <div className="site-system-card-menu-panel" onClick={(e) => e.stopPropagation()}>
           <button type="button" onClick={() => { setOpen(false); onEdit(); }}>Edit</button>
-          <button type="button" className="danger" onClick={() => { setOpen(false); onDelete(); }}>Delete</button>
+          <button type="button" className="danger" onClick={() => { setOpen(false); onArchive(); }}>Archive</button>
         </div>
       )}
     </div>
@@ -49,10 +51,12 @@ function SystemCardMenu({ system, canManage, onEdit, onDelete }) {
 export function SiteSystems() {
   const { companyId, siteId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const customerQuery = useCompany(companyId);
   const siteQuery = useSite(siteId);
   const systemsQuery = useSystems(companyId, siteId);
   const { data: customer } = customerQuery;
+  const { data: reseller } = useReseller(customer?.reseller_id);
   const { data: site } = siteQuery;
   const { data: systems } = systemsQuery;
   const { data: alarms } = useAlarms({ companyId });
@@ -60,20 +64,22 @@ export function SiteSystems() {
   const { data: ats } = useAllAts();
   const { data: generators } = useAllGenerators();
   const { data: me } = useMe(true);
-  const telemetry = useTelemetrySnapshot();
   const createSystem = useCreateSystem();
   const updateSystem = useUpdateSystem();
   const archiveSystem = useArchiveSystem();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [systemSaveError, setSystemSaveError] = useState("");
   const [sldSystemId, setSldSystemId] = useState(null);
-  const [testSystemId, setTestSystemId] = useState(null);
   const [editingSystem, setEditingSystem] = useState(null);
   const [editName, setEditName] = useState("");
-  const [deleteConfirmSystem, setDeleteConfirmSystem] = useState(null);
+  const [archiveConfirmSystem, setArchiveConfirmSystem] = useState(null);
+  const [systemSearch, setSystemSearch] = useState("");
   const { data: savedOneLine } = useOneLine(sldSystemId || undefined);
+  const { data: sldMonitoredAssets = [] } = useMonitoredAssets(sldSystemId || undefined);
 
   const siteSystems = systems || [];
+  const telemetryBySystem = useTelemetrySnapshots(siteSystems.map((system) => system.id));
   const siteSystemIds = useMemo(() => new Set(siteSystems.map((system) => system.id)), [siteSystems]);
   const activeAlarms = activeAlarmOnly(alarms).filter((alarm) => siteSystemIds.has(alarm.system_id));
   const panelBySystem = useMemo(() => {
@@ -88,6 +94,11 @@ export function SiteSystems() {
     (ats || []).forEach((item) => map.set(item.panel_id, [...(map.get(item.panel_id) || []), item]));
     return map;
   }, [ats]);
+  const siteAtsIds = useMemo(
+    () => (ats || []).filter((item) => (panels || []).some((panel) => siteSystemIds.has(panel.system_id) && panel.id === item.panel_id)).map((item) => item.id),
+    [ats, panels, siteSystemIds],
+  );
+  const siteMeters = useMeters(siteAtsIds);
   const generatorsByPanel = useMemo(() => {
     const map = new Map();
     (generators || []).forEach((item) => map.set(item.panel_id, [...(map.get(item.panel_id) || []), item]));
@@ -95,32 +106,53 @@ export function SiteSystems() {
   }, [generators]);
   const canManage = me?.role === "superadmin";
 
-  usePageHeader(site?.name || "Site");
+  const canViewReseller = me?.role === "superadmin" || me?.role === "reseller_admin";
+  usePageHeader(site?.name || "Site", [
+    ...(canViewReseller ? [
+      { label: "Active Resellers", onClick: () => navigate("/resellers") },
+      { label: reseller?.name || "", onClick: () => navigate(`/resellers/${customer?.reseller_id}`) },
+    ] : []),
+    { label: customer?.name || "", onClick: () => navigate(`/companies/${companyId}`) },
+  ]);
 
   function submit(event) {
     event.preventDefault();
-    if (!name.trim() || !companyId || !siteId) return;
-    createSystem.mutate({ name: name.trim(), company_id: companyId, site_id: siteId, address: site?.address });
-    setName("");
-    setOpen(false);
+    if (createSystem.isPending || !name.trim() || !companyId || !siteId) return;
+    setSystemSaveError("");
+    const duplicate = siteSystems.find(system => system.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (duplicate) { const message = `A system named "${duplicate.name}" already exists.`; setSystemSaveError(message); toast.error(message); return; }
+    createSystem.mutate({ name: name.trim(), company_id: companyId, site_id: siteId, address: site?.address }, {
+      onSuccess: (saved) => { setName(""); setOpen(false); toast.success(`System "${saved.name}" created successfully.`); },
+      onError: (error) => { const detail = error?.response?.data?.detail; const message = typeof detail === "string" ? detail : "Unable to save the system. Please try again."; setSystemSaveError(message); toast.error(message); },
+    });
   }
 
   function openEditSystem(system) {
+    setSystemSaveError("");
     setEditName(system.name);
     setEditingSystem(system);
   }
 
   function submitEditSystem(event) {
     event.preventDefault();
-    if (!editName.trim() || !editingSystem) return;
-    updateSystem.mutate({ id: editingSystem.id, data: { name: editName.trim() } });
-    setEditingSystem(null);
+    if (updateSystem.isPending || !editName.trim() || !editingSystem) return;
+    setSystemSaveError("");
+    const duplicate = siteSystems.find(system => system.id !== editingSystem.id && system.name.trim().toLowerCase() === editName.trim().toLowerCase());
+    if (duplicate) { const message = `A system named "${duplicate.name}" already exists.`; setSystemSaveError(message); toast.error(message); return; }
+    updateSystem.mutate({ id: editingSystem.id, data: { name: editName.trim() } }, {
+      onSuccess: (saved) => { setEditingSystem(null); toast.success(`System "${saved.name}" updated successfully.`); },
+      onError: (error) => { const detail = error?.response?.data?.detail; const message = typeof detail === "string" ? detail : "Unable to save the system. Please try again."; setSystemSaveError(message); toast.error(message); },
+    });
   }
 
-  function confirmDeleteSystem() {
-    if (!deleteConfirmSystem) return;
-    archiveSystem.mutate(deleteConfirmSystem.id);
-    setDeleteConfirmSystem(null);
+  function confirmArchiveSystem() {
+    if (!archiveConfirmSystem) return;
+    const target = archiveConfirmSystem;
+    archiveSystem.mutate(target.id, {
+      onSuccess: () => toast.success(`System "${target.name}" archived successfully.`),
+      onError: (error) => toast.error(error?.response?.data?.detail || `Could not archive "${target.name}".`),
+    });
+    setArchiveConfirmSystem(null);
   }
 
   function assetsFor(systemId) {
@@ -132,7 +164,7 @@ export function SiteSystems() {
     };
   }
 
-  function generatorReadiness(item) {
+  function generatorReadiness(item, telemetry) {
     const data = resolveGeneratorTelemetry(telemetry?.generators, item.id, item.name);
     if (!data || data.communication_healthy === false || data.status === "OFFLINE") return "Offline";
     if (data.fault_active || data.status === "FAULT" || data.low_oil_pressure_alarm || data.high_temperature_alarm || data.overload_alarm) return "Fault";
@@ -144,7 +176,7 @@ export function SiteSystems() {
     return "Ready";
   }
 
-  function atsReadiness(item) {
+  function atsReadiness(item, telemetry) {
     const data = resolveAtsTelemetry(telemetry?.ats, item.id, item.name);
     if (!data || data.communication_healthy === false || data.status === "OFFLINE") return "Offline";
     if (data.fault_active || data.status === "FAULT") return "Fault";
@@ -164,20 +196,40 @@ export function SiteSystems() {
   }
 
   function statsFor(system, assets) {
-    const generatorStates = assets.generators.map(generatorReadiness);
-    const atsStates = assets.ats.map(atsReadiness);
+    const telemetry = telemetryBySystem.get(system.id);
+    const generatorStates = assets.generators.map((item) => generatorReadiness(item, telemetry));
+    const atsStates = assets.ats.map((item) => atsReadiness(item, telemetry));
     const generatorsReady = generatorStates.filter((state) => state === "Ready").length;
     const atsNormal = atsStates.filter((state) => state === "Normal").length;
-    const utilityAvailable = assets.ats.length
+    const hasLiveTelemetry = Boolean(telemetry?.storage?.has_data && telemetry?.storage?.mqtt_connected);
+    const utilityAvailable = hasLiveTelemetry && assets.ats.length
       ? assets.ats.every((item) => {
           const data = resolveAtsTelemetry(telemetry?.ats, item.id, item.name);
-          return data?.communication_healthy !== false && data?.utility_available === true;
+          return data?.communication_healthy === true && data?.utility_available === true;
         })
-      : system.status !== "offline";
-    const onEmergency = assets.ats.some((item) => resolveAtsTelemetry(telemetry?.ats, item.id, item.name)?.connected_source === "GENERATOR");
-    // Source availability is part of operational health. Never show Online when
-    // utility is unavailable; generator operation takes precedence as Emergency.
-    const effectiveStatus = onEmergency ? "emergency" : !utilityAvailable ? "offline" : system.status;
+      : false;
+    const onEmergency = hasLiveTelemetry && assets.ats.some((item) => resolveAtsTelemetry(telemetry?.ats, item.id, item.name)?.connected_source === "GENERATOR");
+    const hasMappedEquipment = assets.generators.length + assets.ats.length > 0;
+    const generatorsHealthy = assets.generators.length === 0 || generatorStates.every((state) => state === "Ready");
+    const atsHealthy = assets.ats.length === 0 || (atsStates.every((state) => state === "Normal") && utilityAvailable);
+    const realtimeOnline = hasLiveTelemetry && hasMappedEquipment && generatorsHealthy && atsHealthy && !onEmergency;
+    const inTest = generatorStates.some((state) => state === "Test");
+    const activeTestGenerators = assets.generators.filter((item) => {
+      const data = resolveGeneratorTelemetry(telemetry?.generators, item.id, item.name);
+      return data?.test_mode || data?.status === "TEST";
+    });
+    // Operational state is derived only from the current MQTT snapshot. The
+    // persisted system.status value is descriptive and must never create a
+    // false Online state when the broker or mapped devices are unavailable.
+    const effectiveStatus = !hasLiveTelemetry
+      ? "offline"
+      : onEmergency
+        ? "emergency"
+        : inTest
+          ? "test"
+          : realtimeOnline
+            ? "normal"
+            : "offline";
     return {
       generatorsReady,
       atsNormal,
@@ -186,6 +238,9 @@ export function SiteSystems() {
       generatorSummary: readinessSummary(generatorStates, "Ready"),
       atsSummary: readinessSummary(atsStates, "Normal"),
       utilityAvailable,
+      hasLiveTelemetry,
+      realtimeOnline,
+      activeTestGenerators,
       effectiveStatus,
     };
   }
@@ -193,47 +248,67 @@ export function SiteSystems() {
   const systemCards = useMemo(
     () => siteSystems.map((system) => { const assets = assetsFor(system.id); return { system, assets, stats: statsFor(system, assets) }; }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [siteSystems, panelBySystem, atsByPanel, generatorsByPanel, telemetry]
+    [siteSystems, panelBySystem, atsByPanel, generatorsByPanel, telemetryBySystem]
   );
-  const normal = systemCards.filter((card) => ["normal", "online"].includes(card.stats.effectiveStatus)).length;
   const attentionSystems = systemCards.filter((card) => !["normal", "online"].includes(card.stats.effectiveStatus));
   const emergencyPowerSystems = systemCards.filter((card) => card.stats.effectiveStatus === "emergency");
   const utilityUnavailableSystems = systemCards.filter((card) => !card.stats.utilityAvailable && card.stats.effectiveStatus !== "emergency");
-  const allNormal = siteSystems.length > 0 && !attentionSystems.length && !activeAlarms.length;
-  const activeTests = systemCards.flatMap(({ system, assets }) =>
-    assets.generators
-      .map((generator) => ({ system, generator, data: resolveGeneratorTelemetry(telemetry?.generators, generator.id, generator.name) }))
-      .filter(({ data }) => data?.test_mode || data?.status === "TEST")
-  );
+  const systemsAwaitingTelemetry = systemCards.filter((card) => !card.stats.hasLiveTelemetry);
+  const allNormal = systemCards.length > 0 && systemCards.every((card) => card.stats.realtimeOnline) && !activeAlarms.length;
   const atsCount = siteSystems.reduce((total, system) => total + (panelBySystem.get(system.id) || []).reduce((count, panel) => count + (atsByPanel.get(panel.id) || []).length, 0), 0);
   const generatorCount = siteSystems.reduce((total, system) => total + (panelBySystem.get(system.id) || []).reduce((count, panel) => count + (generatorsByPanel.get(panel.id) || []).length, 0), 0);
+  const systemQuery = systemSearch.trim().toLowerCase();
+  const visibleSystemCards = systemQuery
+    ? systemCards.filter(({ system, assets }) => [system.name, ...assets.ats.map((item) => item.name), ...assets.generators.map((item) => item.name)]
+        .some((value) => value?.toLowerCase().includes(systemQuery)))
+    : systemCards;
+  const onlineSystemCount =systemCards.filter((card) => card.stats.realtimeOnline).length;
+  const offlineDeviceCount = systemCards.reduce(
+    (total, card) => total + [...card.stats.generatorStates, ...card.stats.atsStates].filter((state) => state === "Offline").length,
+    0,
+  );
 
   const sldSystem = sldSystemId ? siteSystems.find((system) => system.id === sldSystemId) : null;
   const sldAssets = sldSystemId ? assetsFor(sldSystemId) : null;
+  const sldTelemetry = sldSystemId ? telemetryBySystem.get(sldSystemId) : undefined;
   const savedOneLineData = savedOneLine?.data || {};
-  const savedPieceDownstream = Object.fromEntries(
-    Object.entries(savedOneLineData.pieceDownstream || {}).map(([name, value]) => [name, Array.isArray(value) ? value : [value]])
+  const legacySourceLinks = savedOneLineData.sourceLinks || {};
+  const emergencySourceLinks = savedOneLineData.lines?.emergency?.sourceLinks
+    || Object.fromEntries(Object.entries(legacySourceLinks).filter(([id]) => id !== "utility"));
+  const normalSourceLinks = savedOneLineData.lines?.normal?.sourceLinks
+    || (legacySourceLinks.utility ? { utility: legacySourceLinks.utility } : {});
+  // ATS load-side wiring is shared by both source views — merge it the same way the system page does.
+  const { emergency: savedPieceDownstream, normal: savedNormalPieceDownstream } = shareAtsLoadSide(
+    savedOneLineData.atsDownstream || {},
+    Object.fromEntries(
+      Object.entries(savedOneLineData.sharedPieceDownstream || savedOneLineData.pieceDownstream || {}).map(([name, value]) => [name, Array.isArray(value) ? value : [value]])
+    ),
+    Object.fromEntries(
+      Object.entries(savedOneLineData.lines?.normal?.pieceDownstream || {}).map(([name, value]) => [name, Array.isArray(value) ? value : [value]])
+    ),
   );
-  const testSystem = testSystemId ? siteSystems.find((system) => system.id === testSystemId) : null;
-  const testAssets = testSystemId ? assetsFor(testSystemId) : null;
-
-  if (customerQuery.isPending || siteQuery.isPending || systemsQuery.isPending) return <QueryState loading title="Loading site systems…" />;
-  if (customerQuery.isError || siteQuery.isError || systemsQuery.isError) return <QueryState title="Site systems unavailable" message="We couldn't retrieve the systems for this site." onRetry={() => { void customerQuery.refetch(); void siteQuery.refetch(); void systemsQuery.refetch(); }} />;
+  // Company data is only needed for branding inside the optional one-line modal. Do not hold the
+  // entire site page behind that independent request; cached site/systems data can paint immediately
+  // while company branding and operational datasets refresh in the background.
+  if (siteQuery.isPending || systemsQuery.isPending) return <QueryState loading title="Loading site systems…" />;
+  if (siteQuery.isError || systemsQuery.isError) return <QueryState title="Site systems unavailable" message="We couldn't retrieve the systems for this site." onRetry={() => { void siteQuery.refetch(); void systemsQuery.refetch(); }} />;
 
   return <>
     <div className="reseller-page-heading">
       <div className="reseller-page-heading-icon" style={{ color: activeAlarms.length ? "#dc2626" : "#0ea5e9", background: activeAlarms.length ? "rgba(220,38,38,.14)" : "rgba(14,165,233,.14)" }}><IconMap size={19} /></div>
       <div className="reseller-page-heading-copy">
         <h2>{site?.name || "Site"}</h2>
+        <div className="site-inventory-summary">
+          {siteSystems.length} {siteSystems.length === 1 ? "system" : "systems"} · {atsCount} ATS · {generatorCount} {generatorCount === 1 ? "generator" : "generators"} · {siteMeters.length} {siteMeters.length === 1 ? "meter" : "meters"}
+        </div>
       </div>
     </div>
-    <StatsGrid stats={[
-      { label: "Systems", value: siteSystems.length, color: "var(--cyan)", icon: IconPanel },
-      { label: "Online", value: normal, color: "var(--green)", icon: IconCheckCircle },
-      { label: "ATS", value: atsCount, color: "var(--purple)", icon: IconPanel },
-      { label: "Generators", value: generatorCount, color: "var(--amber)", icon: IconPanel },
-      { label: "Active alarms", value: activeAlarms.length, color: activeAlarms.length ? "var(--red)" : "var(--green)", icon: IconAlert },
-    ]} />
+    <div className="reseller-total-strip">
+      <div className="reseller-total-item cyan"><span>Total Systems</span><strong>{siteSystems.length}</strong></div>
+      <div className={`reseller-total-item ${onlineSystemCount === siteSystems.length && siteSystems.length ? "green" : "blue"}`}><span>Online Systems</span><strong>{onlineSystemCount}</strong></div>
+      <div className={`reseller-total-item ${offlineDeviceCount ? "red" : "green"}`}><span>Offline Devices</span><strong>{offlineDeviceCount}</strong></div>
+      <div className="reseller-total-item amber"><span>Events</span><strong>{activeAlarms.length}</strong></div>
+    </div>
     {siteSystems.length > 0 && (
       <div className={`site-status-banner ${allNormal ? "normal" : "emergency"}`}>
         {allNormal ? (
@@ -243,7 +318,9 @@ export function SiteSystems() {
           </>
         ) : (
           <>
-            <h2>{emergencyPowerSystems.length
+            <h2>{systemsAwaitingTelemetry.length
+              ? `${systemsAwaitingTelemetry.length} System${systemsAwaitingTelemetry.length > 1 ? "s" : ""} Awaiting MQTT Data`
+              : emergencyPowerSystems.length
               ? `${emergencyPowerSystems.length} System${emergencyPowerSystems.length > 1 ? "s" : ""} On Emergency Power`
               : utilityUnavailableSystems.length
                 ? `${utilityUnavailableSystems.length} System${utilityUnavailableSystems.length > 1 ? "s" : ""} With Utility Unavailable`
@@ -251,6 +328,7 @@ export function SiteSystems() {
                   ? `${attentionSystems.length} System${attentionSystems.length > 1 ? "s" : ""} Need Attention`
                   : "Active Alarms"}</h2>
             <p>
+              {systemsAwaitingTelemetry.length ? `${systemsAwaitingTelemetry.map((card) => card.system.name).join(", ")} ${systemsAwaitingTelemetry.length > 1 ? "do" : "does"} not have a current MQTT connection. ` : ""}
               {emergencyPowerSystems.length ? `${emergencyPowerSystems.map((card) => card.system.name).join(", ")} running on emergency power. ` : ""}
               {utilityUnavailableSystems.length ? `${utilityUnavailableSystems.map((card) => card.system.name).join(", ")} ${utilityUnavailableSystems.length > 1 ? "have" : "has"} no available utility source. ` : ""}
               {attentionSystems.filter((card) => !emergencyPowerSystems.includes(card) && !utilityUnavailableSystems.includes(card)).length ? `${attentionSystems.filter((card) => !emergencyPowerSystems.includes(card) && !utilityUnavailableSystems.includes(card)).map((card) => card.system.name).join(", ")} reporting a non-normal state. ` : ""}
@@ -260,16 +338,24 @@ export function SiteSystems() {
         )}
       </div>
     )}
-    <div className="section-header"><div><div className="section-title">Systems</div><div className="section-sub">{siteSystems.length} systems at {site?.name}</div></div>{canManage && <button className="header-btn primary" onClick={() => setOpen(true)}>+ New System</button>}</div>
+    <div className="section-header"><div><div className="section-title">Active Systems</div><div className="section-sub">{siteSystems.length} active {siteSystems.length === 1 ? "system" : "systems"} at {site?.name}</div></div>{canManage && <button className="header-btn primary" onClick={() => { setSystemSaveError(""); setName(""); setOpen(true); }}>+ New System</button>}</div>
+    {siteSystems.length > 0 && <>
+      <div className="directory-toolbar">
+        <div className="directory-filters reseller-search-bar">
+          <input type="search" value={systemSearch} onChange={(event) => setSystemSearch(event.target.value)} placeholder="Search systems, ATS or generators..." aria-label="Search systems at this site" />
+        </div>
+      </div>
+    </>}
     <div className="readiness-definition"><b>Generator Ready</b>: communicating, Auto, stopped, not testing, no fault/shutdown, fuel and battery OK. <b>ATS Normal</b>: communicating, utility available, connected to utility, no fault or transfer in progress.</div>
-    <div className="site-systems-grid">{systemCards.map(({ system, assets, stats }) => {
+    {systemQuery && !visibleSystemCards.length && <div className="operations-empty">No systems match “{systemSearch.trim()}”.</div>}
+    <div className="site-systems-grid">{visibleSystemCards.map(({ system, assets, stats }) => {
       return (
         <div className={`site-system-card status-${stats.effectiveStatus}`} key={system.id}>
           <div className="site-system-card-head">
             <h3>{system.name}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <StatusPill status={stats.effectiveStatus} />
-              <SystemCardMenu system={system} canManage={canManage} onEdit={() => openEditSystem(system)} onDelete={() => setDeleteConfirmSystem(system)} />
+              <SystemCardMenu system={system} canManage={canManage} onEdit={() => openEditSystem(system)} onArchive={() => setArchiveConfirmSystem(system)} />
             </div>
           </div>
           <div className="site-system-stats">
@@ -277,38 +363,30 @@ export function SiteSystems() {
             <div className="site-system-stat" title="Ready = communicating, in Auto, stopped, not testing, no shutdown/fault, and no low fuel or battery condition."><span>Generators</span><b className={stats.generatorsReady === assets.generators.length ? "stat-good" : "stat-bad"}>{stats.generatorSummary}</b></div>
             <div className="site-system-stat" title="Normal = communicating, utility available, connected to utility, no fault, and no transfer in progress."><span>ATS</span><b className={stats.atsNormal === assets.ats.length ? "stat-good" : "stat-bad"}>{stats.atsSummary}</b></div>
           </div>
+          {stats.activeTestGenerators.length > 0 && (
+            <div className="site-system-test-indicator">
+              <StatusPill status="test" label="Test Active" />
+              <span>{stats.activeTestGenerators.map((generator) => generator.name).join(", ")}</span>
+            </div>
+          )}
           <div className="site-system-card-actions">
             <button type="button" onClick={() => navigate(`/systems/${system.id}`)}>Detail</button>
             <button type="button" onClick={() => setSldSystemId(system.id)}>One-Line</button>
-            <button type="button" onClick={() => setTestSystemId(system.id)}>Test</button>
           </div>
         </div>
       );
     })}</div>
     {!siteSystems.length && <div className="operations-empty">No systems registered at this site yet.</div>}
-    <div className="section-header site-alarms-heading"><div><div className="section-title">Active Alarms</div><div className="section-sub">{activeAlarms.length} active {activeAlarms.length === 1 ? "alarm" : "alarms"} at this site</div></div></div>
-    {activeAlarms.length ? <div className="site-alarms-table-wrap"><table className="data-table site-alarms-table"><thead><tr><th>Date</th><th>Time</th><th>System</th><th>Device</th><th>Alarm</th><th>Severity</th><th>Acknowledged</th></tr></thead><tbody>{activeAlarms.map((alarm) => { const system = siteSystems.find((item) => item.id === alarm.system_id); const occurred = new Date(alarm.occurred_at); return <tr key={alarm.id}><td className="mono">{occurred.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</td><td className="mono">{occurred.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</td><td>{system?.name || "—"}</td><td>{alarm.device_label || "—"}</td><td>{alarm.message}</td><td><StatusPill status={alarm.severity} /></td><td>{alarm.ack_by ? <span className="ack-badge acked">Acked</span> : <span className="ack-badge unacked">Unacked</span>}</td></tr>; })}</tbody></table></div> : <div className="site-alarms-empty">No active alarms at this site.</div>}
-    <div className="section-header site-alarms-heading"><div><div className="section-title">Active Tests</div><div className="section-sub">{activeTests.length} active {activeTests.length === 1 ? "test" : "tests"} at this site</div></div></div>
-    {activeTests.length ? (
-      <div className="site-alarms-table-wrap">
-        <table className="data-table site-alarms-table">
-          <thead><tr><th>System</th><th>Generator</th><th>Status</th></tr></thead>
-          <tbody>{activeTests.map(({ system, generator, data }) => (
-            <tr key={generator.id}><td>{system.name}</td><td>{generator.name}</td><td><StatusPill status="test" label={data?.status === "TEST" ? "Test Mode" : "Testing"} /></td></tr>
-          ))}</tbody>
-        </table>
-      </div>
-    ) : <div className="site-alarms-empty">No active tests in progress.</div>}
-    {open && <Modal title="New System" onClose={() => setOpen(false)}><form onSubmit={submit}><div className="form-row"><label>System Name *</label><input required value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Main Emergency Power System" autoFocus /></div><div className="modal-actions"><button type="button" className="header-btn" onClick={() => setOpen(false)}>Cancel</button><button type="submit" className="header-btn primary">Save</button></div></form></Modal>}
-    {editingSystem && <Modal title="Edit System" onClose={() => setEditingSystem(null)}><form onSubmit={submitEditSystem}><div className="form-row"><label>System Name *</label><input required minLength={2} maxLength={120} value={editName} onChange={(event) => setEditName(event.target.value)} autoFocus /></div><div className="modal-actions"><button type="button" className="header-btn" onClick={() => setEditingSystem(null)}>Cancel</button><button type="submit" className="header-btn primary">Save</button></div></form></Modal>}
-    {deleteConfirmSystem && (
-      <Modal title="Delete System" onClose={() => setDeleteConfirmSystem(null)}>
+    {open && <Modal title="New System" onClose={() => !createSystem.isPending && setOpen(false)}><form onSubmit={submit}><div className="form-row"><label>System Name *</label><input required value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Main Emergency Power System" autoFocus /></div>{systemSaveError && <div className="reseller-save-error" role="alert">{systemSaveError}</div>}<div className="modal-actions"><button type="button" className="header-btn" disabled={createSystem.isPending} onClick={() => setOpen(false)}>Cancel</button><button type="submit" className="header-btn primary" disabled={createSystem.isPending}>{createSystem.isPending ? "Saving..." : "Save"}</button></div></form></Modal>}
+    {editingSystem && <Modal title="Edit System" onClose={() => !updateSystem.isPending && setEditingSystem(null)}><form onSubmit={submitEditSystem}><div className="form-row"><label>System Name *</label><input required minLength={2} maxLength={120} value={editName} onChange={(event) => setEditName(event.target.value)} autoFocus /></div>{systemSaveError && <div className="reseller-save-error" role="alert">{systemSaveError}</div>}<div className="modal-actions"><button type="button" className="header-btn" disabled={updateSystem.isPending} onClick={() => setEditingSystem(null)}>Cancel</button><button type="submit" className="header-btn primary" disabled={updateSystem.isPending}>{updateSystem.isPending ? "Saving..." : "Save"}</button></div></form></Modal>}
+    {archiveConfirmSystem && (
+      <Modal title="Archive System" onClose={() => setArchiveConfirmSystem(null)}>
         <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--text-dim)" }}>
-          Delete <b style={{ color: "var(--text)" }}>{deleteConfirmSystem.name}</b>? This marks the system offline and removes it from active monitoring.
+          Archive <b style={{ color: "var(--text)" }}>{archiveConfirmSystem.name}</b>? It will move to Archived Systems and be removed from active monitoring.
         </p>
         <div className="modal-actions">
-          <button type="button" className="header-btn" onClick={() => setDeleteConfirmSystem(null)}>Cancel</button>
-          <button type="button" className="header-btn danger" onClick={confirmDeleteSystem}>Delete</button>
+          <button type="button" className="header-btn" onClick={() => setArchiveConfirmSystem(null)}>Cancel</button>
+          <button type="button" className="header-btn danger" onClick={confirmArchiveSystem}>Archive</button>
         </div>
       </Modal>
     )}
@@ -319,24 +397,25 @@ export function SiteSystems() {
           <div className="operations-empty">Loading generated one-line...</div>
         ) : (
           <ResultTab
+            systemId={sldSystem.id}
             systemName={sldSystem.name}
             customerLogo={customer?.logo_data}
             customerName={customer?.name}
             ats={sldAssets.ats}
             generators={sldAssets.generators}
-            atsTelemetry={telemetry?.ats}
-            generatorTelemetry={telemetry?.generators}
+            monitoredAssets={sldMonitoredAssets}
+            atsTelemetry={sldTelemetry?.ats}
+            generatorTelemetry={sldTelemetry?.generators}
             pieces={savedOneLineData.pieces || []}
-            sourceLinks={savedOneLineData.sourceLinks || {}}
+            emergencySourceLinks={emergencySourceLinks}
+            normalSourceLinks={normalSourceLinks}
             atsDownstream={savedOneLineData.atsDownstream || {}}
             pieceDownstream={savedPieceDownstream}
-            generated={Boolean(savedOneLineData.generated)}
+            normalPieceDownstream={savedNormalPieceDownstream}
+            generated={Boolean(savedOneLineData.generated || savedOneLineData.lines?.emergency?.generated || savedOneLineData.lines?.normal?.generated)}
           />
         )}
       </Modal>
-    )}
-    {testSystem && testAssets && (
-      <TestWizard systemName={testSystem.name} ats={testAssets.ats} generators={testAssets.generators} onClose={() => setTestSystemId(null)} />
     )}
   </>;
 }

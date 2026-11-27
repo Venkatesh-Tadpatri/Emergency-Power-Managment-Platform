@@ -71,7 +71,7 @@ function AppInner() {
         {screen === "systems" && <Systems systems={systems} onOpen={(s) => push("systemDetail", s)} refresh={refresh} refreshing={refreshing} isSuperAdmin={isSuperAdmin} token={token} />}
         {screen === "alarms" && <Alarms alarms={alarms} refresh={refresh} refreshing={refreshing} />}
         {screen === "reports" && <Reports reports={reports} onCall={onCall} refresh={refresh} refreshing={refreshing} />}
-        {screen === "analytics" && <Analytics />}
+        {screen === "analytics" && <Analytics token={token} systems={systems} />}
         {screen === "resellers" && <Resellers token={token} onOpen={(r) => push("resellerDetail", r)} />}
         {screen === "customers" && <Customers token={token} onOpen={(c) => push("customerDetail", c)} />}
         {screen === "users" && <PlatformUsers token={token} isSuperAdmin={isSuperAdmin} onOpen={(u) => push("userDetail", u)} />}

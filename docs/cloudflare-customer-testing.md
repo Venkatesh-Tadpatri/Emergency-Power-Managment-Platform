@@ -48,11 +48,18 @@ To push your current local changes out to the customer:
 
 ```powershell
 cd "C:\Users\Venkatesh\Desktop\Emergency Power Management Platform"
-robocopy frontend frontend-release /E /XD node_modules dist /NFL /NDL /NJH /NJS
-docker compose -f docker-compose.cloudflare.yml up -d --force-recreate frontend-cloudflare
+robocopy frontend frontend-release /MIR /XD node_modules dist /XF tsconfig.tsbuildinfo "vite.config.ts.timestamp-*" /NFL /NDL /NJH /NJS
+docker compose -f docker-compose.cloudflare.yml up -d --build --force-recreate frontend-cloudflare
 ```
 
-(Robocopy's exit code `1` means "files copied successfully" — not an error.)
+`/MIR` (not `/E`) also deletes files that were removed from `frontend/`, so the release copy
+never keeps stale modules. Robocopy exit codes `0`–`7` all mean success.
+
+The customer service is a **production build** (`frontend-release/Dockerfile.customer`: Vite
+build served by nginx on 5174), not a dev server — so `--build` is required; recreating the
+container without it keeps serving the previous bundle. The build reads
+`VITE_ZITADEL_AUTHORITY`/`VITE_ZITADEL_CLIENT_ID` from `frontend-release/.env` and
+`VITE_API_BASE` from the compose build arg (`https://api-test.mepstrait.in`).
 
 Then confirm it actually deployed before telling the customer:
 
@@ -315,7 +322,7 @@ every time the frontend hostname changes.
 docker compose -f docker-compose.cloudflare.yml down
 ```
 
-Leaves the main `docker compose` project (backend/zitadel/mysql/grafana/the
+Leaves the main `docker compose` project (backend/zitadel/mysql/the
 5173 frontend) running untouched. Then Ctrl+C the three `cloudflared`
 windows.
 

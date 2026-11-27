@@ -411,6 +411,18 @@ class TelemetryBridge:
                 if device_id in device_ids
             }
 
+    def live_device_ids(self, max_age_seconds: float) -> set[str]:
+        """Devices whose latest packet arrived within ``max_age_seconds`` while the broker is up."""
+        if not self.connected:
+            return set()
+        cutoff = datetime.now(timezone.utc).timestamp() - max_age_seconds
+        with self._latest_lock:
+            return {
+                key[1]
+                for key, received_at in self._latest_received_at.items()
+                if key in self._latest and received_at.timestamp() >= cutoff
+            }
+
     def invalidate_fields(self, device_type: str, device_id: str, fields: set[str] | frozenset[str]) -> None:
         """Stop sampling values that came from a mapping which has just changed."""
         key = (device_type, device_id)

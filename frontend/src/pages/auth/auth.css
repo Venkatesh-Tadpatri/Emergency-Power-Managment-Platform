@@ -1,0 +1,102 @@
+.auth-page{--blue:#0798ff;width:100vw;width:100dvw;min-width:0;max-width:none;min-height:100vh;min-height:100dvh;flex:0 0 100vw;display:grid;grid-template-columns:minmax(0,51%) minmax(0,49%);position:relative;overflow:hidden;color:#f7fbff;background:#020d22 url("/images/power-continuity-hero.png") center/cover no-repeat;isolation:isolate;box-sizing:border-box}
+.auth-page:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(0,9,29,.2),rgba(0,11,35,.6) 54%,rgba(0,8,27,.88))}.auth-page:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 82% 45%,rgba(21,133,255,.22),transparent 32%)}
+.auth-back{position:absolute;z-index:4;top:34px;right:42px;display:flex;align-items:center;gap:9px;color:#d9ebff;font-size:12px;font-weight:750;text-decoration:none}.auth-back span{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;color:#4cc7ff;background:rgba(0,140,255,.18);font-size:18px}.auth-back:hover{color:#56d5ff}
+.auth-visual{min-height:100vh;box-sizing:border-box;padding:40px clamp(38px,5vw,78px) 34px;display:flex;flex-direction:column;position:relative;z-index:1}.auth-brand{display:inline-flex;width:fit-content;align-items:center;gap:17px;color:#fff;text-decoration:none;font-size:clamp(18px,1.55vw,26px);font-weight:850;line-height:.96;letter-spacing:-.035em}.auth-brand img{width:112px;height:66px;object-fit:contain;filter:drop-shadow(0 5px 16px rgba(0,0,0,.32))}
+.auth-hero-copy{margin-top:auto;margin-bottom:clamp(96px,14vh,165px);text-shadow:0 3px 18px rgba(0,0,0,.45)}.auth-kicker{display:inline-block;padding:5px 12px;border-radius:999px;color:#20bdff;background:rgba(0,112,211,.2);font-size:11px;font-weight:900;letter-spacing:.28em}.auth-visual h1{margin:15px 0 17px;font-size:clamp(44px,4.4vw,72px);line-height:1.02;letter-spacing:-.055em}.auth-visual h1 em{color:#0aa5ff;font-style:normal}.auth-visual p{margin:0;color:#e1edfb;font-size:clamp(15px,1.25vw,20px);line-height:1.35;font-weight:500}
+.auth-benefits{display:flex;gap:18px;position:absolute;left:clamp(38px,5vw,78px);bottom:32px}.auth-benefits span{min-width:76px;padding:10px 8px;border:1px solid rgba(26,146,255,.24);border-radius:12px;text-align:center;color:#dceeff;background:rgba(0,35,82,.5);font-size:10px;line-height:1.25;backdrop-filter:blur(8px)}.auth-benefits b{display:block;margin-bottom:5px;color:#19b9ff;font-size:25px;line-height:1}
+.auth-panel{min-width:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:82px clamp(35px,5vw,82px) 32px;position:relative;z-index:2}.auth-card{width:min(100%,510px);box-sizing:border-box;padding:36px 34px 30px;border:1px solid rgba(77,179,255,.78);border-radius:26px;color:#f8fbff;background:linear-gradient(145deg,rgba(37,86,151,.76),rgba(3,30,75,.9) 45%,rgba(2,23,59,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 0 28px rgba(0,159,255,.25),0 30px 70px rgba(0,0,0,.42);backdrop-filter:blur(18px)}.auth-card-icon{display:grid;place-items:center;width:68px;height:68px;margin:-5px auto 15px;border:2px solid #20aaff;border-radius:50%;color:#d8f4ff;background:radial-gradient(circle,rgba(22,152,255,.5),rgba(1,40,91,.85));box-shadow:0 0 22px rgba(0,168,255,.75),inset 0 0 18px rgba(63,190,255,.28)}.auth-card-icon svg{width:43px;height:43px;overflow:visible;fill:none;stroke:#dff7ff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 5px rgba(72,196,255,.9))}.auth-card-icon .auth-shield{fill:url(#none);stroke:#eafaff;stroke-width:2.8}.auth-card-icon .auth-bolt{fill:#63c9ff;stroke:#fff;stroke-width:1.5}.auth-card-icon .auth-icon-accent{stroke:#32bdff;stroke-width:3}.auth-card h2{margin:0 0 7px;color:#fff;text-align:center;font-size:clamp(27px,2.2vw,36px);letter-spacing:-.04em}.auth-subtitle{margin:0 0 25px;color:#d7e7fb;text-align:center;font-size:14px}.auth-mobile-brand{display:none;text-align:center;margin-bottom:18px}.auth-mobile-brand img{width:92px;height:58px;object-fit:contain}
+.auth-form{display:flex;flex-direction:column;gap:15px}.auth-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.auth-field{min-width:0;display:flex;flex-direction:column;gap:7px}.auth-field span{color:#f1f7ff;font-size:11.5px;font-weight:800}.auth-field input,.otp-input{box-sizing:border-box;width:100%;height:50px;padding:0 15px;border:1px solid rgba(145,198,255,.53);border-radius:12px;outline:none;color:#fff;background:rgba(3,27,66,.54);font:inherit;font-size:13px;transition:.18s}.auth-field input::placeholder{color:#a9bfdc}.auth-field input:hover,.otp-input:hover{border-color:#7dc9ff;background:rgba(4,34,78,.7)}.auth-field input:focus,.otp-input:focus{border-color:#32b9ff;box-shadow:0 0 0 3px rgba(0,171,255,.16),0 0 18px rgba(0,153,255,.13);background:rgba(5,38,85,.76)}
+.auth-row{display:flex;justify-content:space-between;align-items:center;gap:15px;font-size:12px}.auth-row a,.auth-switch a,.auth-link-button{color:#20c5ff;font-weight:800;text-decoration:none}.auth-row a:hover,.auth-switch a:hover,.auth-link-button:hover{text-decoration:underline}.auth-check{display:inline-flex;align-items:center;gap:8px;color:#f2f7ff;cursor:pointer}.auth-check input{width:17px;height:17px;margin:0;accent-color:#28bfff}.auth-submit{height:54px;border:0;border-radius:14px;color:#fff;background:linear-gradient(100deg,#087dff,#18aaff 58%,#6ce3ff);box-shadow:0 0 24px rgba(0,163,255,.38);font-size:14px;font-weight:850;cursor:pointer;transition:.18s}.auth-submit:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 0 32px rgba(0,183,255,.55)}.auth-submit:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}.auth-switch{margin:5px 0 0;color:#d6e3f4;text-align:center;font-size:12px}
+.auth-error,.auth-info{padding:11px 13px;border-radius:10px;font-size:11.5px;line-height:1.45}.auth-error{color:#ffd7dd;background:rgba(153,20,48,.36);border:1px solid rgba(255,111,134,.45)}.auth-info{color:#ccecff;background:rgba(0,108,184,.28);border:1px solid rgba(72,185,255,.4)}.auth-valid,.auth-invalid{margin-top:-9px;font-size:11px}.auth-valid{color:#69f0ae}.auth-invalid,.field-error{color:#ff9baa}.auth-hint{margin-top:-8px;color:#b7cde5;font-size:10.5px;line-height:1.4}.otp-input{font-size:26px;text-align:center;letter-spacing:.5em;padding-left:calc(15px + .5em);font-weight:800}.auth-link-button{align-self:center;padding:7px 12px;background:none;border:0;cursor:pointer}.auth-page input:invalid:not(:placeholder-shown){border-color:#ff7c91}
+.auth-register-page .auth-card{width:min(100%,590px);padding:24px 30px 23px}.auth-register-page .auth-card-icon{width:56px;height:56px;margin:-3px auto 9px;font-size:25px}.auth-register-page .auth-card h2{font-size:28px}.auth-register-page .auth-subtitle{margin-bottom:17px}.auth-register-page .auth-form{gap:10px}.auth-register-page .auth-field input{height:45px}.auth-register-page .auth-submit{height:48px}
+@media(max-width:1250px){.auth-page{grid-template-columns:minmax(0,45%) minmax(0,55%)}.auth-visual{padding-inline:34px}.auth-benefits{left:34px}.auth-brand img{width:88px}.auth-panel{padding-inline:30px}.auth-visual h1{font-size:clamp(40px,5vw,58px)}.auth-card{padding-inline:28px}}
+@media(max-width:820px){.auth-page{display:block;padding:70px 20px 24px;background:linear-gradient(rgba(0,10,31,.72),rgba(0,10,31,.8)),url("/images/power-continuity-hero.png") 65% center/cover;overflow-y:auto}.auth-visual{display:none}.auth-panel{min-height:calc(100dvh - 94px);padding:0}.auth-back{top:22px;right:24px}.auth-mobile-brand{display:block}.auth-card{width:min(100%,570px)}}
+@media(max-width:560px){.auth-page{padding:63px 12px 16px;background-color:#020d22}.auth-card,.auth-register-page .auth-card{min-height:0;padding:24px 18px;border:1px solid rgba(77,179,255,.65);border-radius:20px;box-shadow:0 0 25px rgba(0,159,255,.2)}.auth-grid{grid-template-columns:1fr;gap:12px}.auth-card-icon{width:56px;height:56px;font-size:26px}.auth-field input,.otp-input{height:48px}}
+@media(max-height:760px) and (min-width:821px){.auth-panel{padding-top:60px}.auth-card{padding-block:22px}.auth-card-icon{width:54px;height:54px;font-size:26px;margin-bottom:9px}.auth-subtitle{margin-bottom:16px}.auth-form{gap:10px}.auth-register-page .auth-card-icon{display:none}}
+
+/* ───────── Layout fixes: scrolling, Back to Home, benefit tiles ───────── */
+
+/* The page scrolls itself, so tall cards (Create account) are never cut off. */
+.auth-page { height: 100vh; height: 100dvh; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+
+/* Left hero stays pinned while the form scrolls. */
+.auth-visual { position: sticky; top: 0; height: 100vh; height: 100dvh; min-height: 0; padding-bottom: 32px; }
+.auth-hero-copy { margin-top: auto; margin-bottom: 26px; }
+
+/* Benefit tiles flow under the hero text instead of being pinned over it. */
+.auth-benefits { position: static; display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.auth-benefits li {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  width: 112px; min-height: 96px; box-sizing: border-box; padding: 12px 8px;
+  border: 1px solid rgba(26, 146, 255, 0.32); border-radius: 14px; text-align: center;
+  background: linear-gradient(160deg, rgba(0, 52, 118, 0.55), rgba(0, 24, 60, 0.6));
+  backdrop-filter: blur(8px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.auth-benefit-icon {
+  display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
+  color: #3fc4ff; background: rgba(0, 150, 255, 0.16); box-shadow: 0 0 14px rgba(0, 160, 255, 0.25);
+}
+.auth-benefit-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.auth-benefit-label { color: #dceeff; font-size: 11px; font-weight: 700; line-height: 1.3; }
+
+/* Back to Home sits above the card in the panel's own flow, so it can never overlap it. */
+.auth-panel {
+  min-height: 100%; box-sizing: border-box; flex-direction: column; justify-content: center;
+  padding: 24px clamp(20px, 4vw, 72px);
+}
+.auth-back { position: static; align-self: flex-end; margin: 0 0 14px; width: fit-content; }
+.auth-card { flex-shrink: 0; }
+
+/* Shorter laptop screens: tighten the register card so it usually fits without scrolling. */
+@media (max-height: 820px) and (min-width: 821px) {
+  .auth-panel { padding-block: 16px; }
+  .auth-back { margin-bottom: 10px; }
+  .auth-register-page .auth-card-icon { display: none; }
+  .auth-register-page .auth-card { padding: 20px 28px 18px; }
+  .auth-register-page .auth-card h2 { font-size: 26px; margin-bottom: 4px; }
+  .auth-register-page .auth-subtitle { margin-bottom: 12px; font-size: 13px; }
+  .auth-register-page .auth-form { gap: 8px; }
+  .auth-register-page .auth-field { gap: 5px; }
+  .auth-register-page .auth-field input,
+  .auth-register-page .auth-phone-code { height: 42px; }
+  .auth-register-page .auth-submit { height: 44px; }
+  .auth-visual h1 { font-size: clamp(38px, 3.8vw, 60px); margin: 10px 0 12px; }
+  .auth-benefits li { width: 100px; min-height: 84px; padding: 9px 6px; }
+}
+@media (max-height: 680px) and (min-width: 821px) {
+  .auth-benefits { display: none; }
+}
+
+/* Tablet / phone: single column; the page scrolls normally. */
+@media (max-width: 820px) {
+  /* body has overflow:hidden app-wide, so the auth page stays its own scroll container. */
+  .auth-page { height: 100vh; height: 100dvh; overflow-y: auto; padding-top: 20px; box-sizing: border-box; }
+  .auth-panel { min-height: 0; padding: 0; justify-content: flex-start; }
+  .auth-back { position: static; align-self: flex-start; margin-bottom: 14px; }
+}
+@media (max-width: 560px) {
+  .auth-page { padding-top: 14px; }
+  .auth-grid { grid-template-columns: minmax(0, 1fr); }
+  .auth-phone-code, .auth-country { flex-basis: 96px; }
+  .auth-country-panel { width: min(300px, calc(100vw - 48px)); }
+}
+
+/* Sign in / First-time login tabs */
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:4px 0 18px;padding:4px;border:1px solid rgba(145,198,255,.35);border-radius:14px;background:rgba(3,27,66,.45)}
+.auth-tabs button{height:40px;border:0;border-radius:10px;background:transparent;color:#b9d3ef;font:inherit;font-size:13px;font-weight:800;cursor:pointer;transition:.18s}
+.auth-tabs button:hover{color:#fff}
+.auth-tabs button.active{color:#fff;background:linear-gradient(100deg,#087dff,#18aaff);box-shadow:0 0 16px rgba(0,163,255,.35)}
+.auth-inline-link{padding:0;border:0;background:none;color:#20c5ff;font:inherit;font-weight:800;cursor:pointer;text-decoration:none}
+.auth-inline-link:hover{text-decoration:underline}
+.auth-inline-link:disabled{opacity:.5;cursor:not-allowed}
+/* First-time login progress: Email → Verify → Set password */
+.auth-steps{display:flex;gap:8px;margin:0 0 4px;padding:0;list-style:none}
+.auth-steps li{flex:1;display:flex;align-items:center;gap:7px;color:#8fb0d3;font-size:11.5px;font-weight:700}
+.auth-steps li b{display:grid;place-items:center;flex:0 0 24px;height:24px;border:1px solid rgba(145,198,255,.45);border-radius:50%;font-size:11px}
+.auth-steps li.current{color:#fff}
+.auth-steps li.current b{border-color:#20c5ff;background:#0a6fd6;color:#fff;box-shadow:0 0 12px rgba(32,197,255,.45)}
+.auth-steps li.done{color:#7fe0b4}
+.auth-steps li.done b{border-color:#3ccf8e;background:rgba(60,207,142,.2);color:#7fe0b4}
+.auth-step-email{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 13px;border:1px solid rgba(145,198,255,.35);border-radius:10px;background:rgba(3,27,66,.45);font-size:12.5px}
+.auth-step-email span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e6f2ff;font-weight:700}
+.auth-step-email em{font-style:normal;color:#7fe0b4;font-weight:800;font-size:11px;text-transform:uppercase}

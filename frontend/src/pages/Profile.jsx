@@ -1,4 +1,4 @@
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../auth/LocalAuth";
 
 import { IconBuilding, IconResellers } from "../components/common/Icons";
 import { usePageHeader } from "../components/layout/HeaderContext";
@@ -22,7 +22,7 @@ export function Profile() {
     <div className="card" style={{ marginTop: 0, display: "flex", gap: 16, alignItems: "center" }}><div className="header-user-avatar" style={{ width: 56, height: 56, fontSize: 18 }}>{initials}</div><div><div style={{ fontSize: 17, fontWeight: 700 }}>{me.display_name || me.email}</div><div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>{me.email}</div></div></div>
     <div className="card"><div className="section-title" style={{ marginBottom: 12 }}>Account</div><ProfileRow label="Email" value={me.email} /><ProfileRow label="Role" value={me.role ? ROLE_LABEL[me.role] : "Unassigned — ask an admin to assign one"} />{me.role && <ProfileRow label="What this role can do" value={ROLE_DESCRIPTION[me.role]} />}{me.scope_type && <ProfileRow label="System scope" value={me.scope_type === "assigned" ? "Assigned systems only" : "All company systems"} />}<ProfileRow label="Account status" value={me.is_active ? "Active" : "Deactivated"} /></div>
     {(reseller || company || me.role === "superadmin") && <div className="card"><div className="section-title" style={{ marginBottom: 12 }}>Organization</div>{me.role === "superadmin" && <div style={{ display: "flex", alignItems: "center", gap: 10 }}><IconResellers size={16} /><span style={{ fontSize: 13, fontWeight: 600 }}>Platform-wide — all resellers and companies</span></div>}{reseller && <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: company ? 10 : 0 }}><IconResellers size={16} /><div><div style={{ fontSize: 13, fontWeight: 600 }}>{reseller.name}</div><div style={{ fontSize: 11, color: "var(--text-dim)" }}>Reseller</div></div></div>}{company && <div style={{ display: "flex", alignItems: "center", gap: 10 }}><IconBuilding size={16} /><div><div style={{ fontSize: 13, fontWeight: 600 }}>{company.name}</div><div style={{ fontSize: 11, color: "var(--text-dim)" }}>{company.address || "Company"}</div></div></div>}</div>}
-    <div className="card"><div className="section-title" style={{ marginBottom: 8 }}>Password & security</div><p style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 }}>Your login identity (email, password, MFA) is managed by Zitadel, not by CPC directly. Use the account/profile settings on Zitadel's sign-in page to change your password.</p></div>
+    <div className="card"><div className="section-title" style={{ marginBottom: 8 }}>Password & security</div><p style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 }}>Your CPC credentials are protected with secure password hashing and email verification. If you need a new password, sign out and use “Forgot password” on the sign-in page.</p></div>
   </div>;
 }
 

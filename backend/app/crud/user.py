@@ -1,28 +1,28 @@
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.models.company import Company
-from app.models.system import System
+from app.models.system import System, SystemEvent
 from app.models.site import Site
-from app.models.user import User, UserAssignedSite, UserAssignedSystem
+from app.models.user import AuthOtp, User, UserAssignedSite, UserAssignedSystem
 from app.schemas.user import UserAssignSystems, UserRoleAssign
 
 
 def list_users(
     db: Session, company_id: str | None = None, reseller_id: str | None = None
 ) -> list[User]:
-    # Pending (role IS NULL) accounts have no tenant of their own yet, so they're
-    # included in every scoped listing too — that's what lets a reseller/company
-    # admin see and assign a just-signed-up person without already knowing their
-    # exact email.
-    q = db.query(User)
+    # Listed: activated accounts plus admin-created accounts still awaiting their
+    # first login. Self-registrations that never verified their email stay hidden.
+    q = db.query(User).filter(or_(User.email_verified_at.is_not(None), User.account_state == "invited"))
+    # Legacy self-registered accounts with no role and no tenant can be claimed by any admin.
+    unclaimed = and_(
+        User.role.is_(None), User.company_id.is_(None), User.reseller_id.is_(None), User.email_verified_at.is_not(None)
+    )
     if company_id:
-        q = q.filter(or_(User.company_id == company_id, User.role.is_(None)))
+        q = q.filter(or_(User.company_id == company_id, unclaimed))
     elif reseller_id:
         company_ids = [c.id for c in db.query(Company.id).filter(Company.reseller_id == reseller_id)]
-        q = q.filter(
-            or_(User.reseller_id == reseller_id, User.company_id.in_(company_ids), User.role.is_(None))
-        )
+        q = q.filter(or_(User.reseller_id == reseller_id, User.company_id.in_(company_ids), unclaimed))
     return q.order_by(User.role.is_(None).desc(), User.email).all()
 
 
@@ -32,6 +32,19 @@ def get_user(db: Session, user_id: str) -> User | None:
 
 def get_user_by_email(db: Session, email: str) -> User | None:
     return db.query(User).filter(User.email == email).one_or_none()
+
+
+def delete_user(db: Session, user: User) -> None:
+    """Remove the account and its access grants. History is retained: audit rows that point at the
+    user keep the actor's name/email snapshot and only lose the link to the deleted account."""
+    db.query(AuthOtp).filter(AuthOtp.user_id == user.id).delete(synchronize_session=False)
+    db.query(UserAssignedSystem).filter(UserAssignedSystem.user_id == user.id).delete(synchronize_session=False)
+    db.query(UserAssignedSite).filter(UserAssignedSite.user_id == user.id).delete(synchronize_session=False)
+    db.query(SystemEvent).filter(SystemEvent.actor_user_id == user.id).update({SystemEvent.actor_user_id: None}, synchronize_session=False)
+    db.query(System).filter(System.alarms_disabled_by_user_id == user.id).update({System.alarms_disabled_by_user_id: None}, synchronize_session=False)
+    db.expire(user)
+    db.delete(user)
+    db.commit()
 
 
 def assign_role(db: Session, user: User, data: UserRoleAssign) -> User:

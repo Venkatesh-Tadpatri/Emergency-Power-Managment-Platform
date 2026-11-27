@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { useAuth } from "react-oidc-context";
+import { useAuth } from "../../auth/LocalAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageHeader } from "../../components/layout/HeaderContext";
 import { QueryState } from "../../components/common/QueryState";
@@ -53,7 +53,7 @@ export function ResellerBranding() {
       <div className="form-row">
         <label>Current company logo</label>
         <div className="branding-logo-stage">
-          <img src={reseller.logo_data || "/images/cpc-logo.png"} alt={reseller.logo_data ? `${reseller.name} logo` : "CPC logo"} />
+          <img className={reseller.logo_data ? undefined : "cpc-default-logo"} src={reseller.logo_data || "/images/cpc-logo.png"} alt={reseller.logo_data ? `${reseller.name} logo` : "CPC logo"} />
           <div><strong>{reseller.logo_data ? reseller.name : "CPC default branding"}</strong><small>{reseller.logo_data ? "Displayed as your primary portal logo with Powered by CPC." : "Upload a logo to replace CPC as the primary portal logo."}</small></div>
         </div>
       </div>

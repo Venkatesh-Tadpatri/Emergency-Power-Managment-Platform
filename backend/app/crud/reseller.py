@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.reseller import Reseller
@@ -10,6 +11,13 @@ def list_resellers(db: Session) -> list[Reseller]:
 
 def get_reseller(db: Session, reseller_id: str) -> Reseller | None:
     return db.get(Reseller, reseller_id)
+
+
+def get_reseller_by_name(db: Session, name: str, exclude_id: str | None = None) -> Reseller | None:
+    query = db.query(Reseller).filter(func.lower(func.trim(Reseller.name)) == name.strip().lower())
+    if exclude_id:
+        query = query.filter(Reseller.id != exclude_id)
+    return query.first()
 
 
 def create_reseller(db: Session, data: ResellerCreate) -> Reseller:

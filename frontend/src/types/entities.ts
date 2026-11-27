@@ -19,8 +19,12 @@ export interface Company {
   lat?: number | null;
   lng?: number | null;
   reseller_id: string;
+  reseller_name?: string | null;
   status: string;
   logo_data?: string | null;
+  /** CUSTCODE — assigned once on creation, read-only; prefixes every PNUMBER (e.g. ASTEP01). */
+  customer_code?: string | null;
+  notes?: string | null;
 }
 
 export interface Site {
@@ -43,6 +47,7 @@ export interface System {
   site_id: string;
   site_name?: string | null;
   status: "normal" | "emergency" | "alarm" | "test" | "offline" | string;
+  archived: boolean;
 }
 
 export interface Panel {
@@ -96,6 +101,14 @@ export interface Generator {
   rated_volts?: number | null;
   rated_amps?: number | null;
   rated_kw?: number | null;
+  rated_kva?: number | null;
+  description?: string | null;
+  fuel_type?: string | null;
+  engine?: string | null;
+  controller?: string | null;
+  install_date?: string | null;
+  location?: string | null;
+  notes?: string | null;
   mqtt_topic?: string | null;
   power_mqtt_topic?: string | null;
   panel_id: string;
@@ -110,6 +123,24 @@ export interface AlarmDisableStatus {
   disabled_by_name?: string | null;
   disabled_by_email?: string | null;
   can_control: boolean;
+}
+
+/** An active alarm suppression on one asset; record_key matches the asset popup's Notes key. */
+export interface AssetAlarmDisableStatus {
+  record_key: string;
+  asset_name: string;
+  disabled: boolean;
+  disabled_at?: string | null;
+  disabled_until?: string | null;
+  indefinite: boolean;
+  reason?: string | null;
+  disabled_by_name?: string | null;
+  disabled_by_email?: string | null;
+}
+
+export interface AssetAlarmDisableList {
+  can_control: boolean;
+  disables: AssetAlarmDisableStatus[];
 }
 
 export interface SystemEvent {
@@ -205,7 +236,7 @@ export interface OnCallShift {
 
 export interface Me {
   id: string;
-  zitadel_sub: string;
+  zitadel_sub?: string | null;
   email: string;
   display_name?: string | null;
   role: string | null;
@@ -213,6 +244,9 @@ export interface Me {
   reseller_id: string | null;
   company_id: string | null;
   is_active: boolean;
+  account_state: "pending" | "active" | "suspended" | "locked";
+  contact_number?: string | null;
+  requested_company_name?: string | null;
   permissions: {
     manage_resellers: boolean;
     create_company: boolean;
@@ -226,7 +260,7 @@ export interface Me {
 
 export interface AppUser {
   id: string;
-  zitadel_sub: string;
+  zitadel_sub?: string | null;
   email: string;
   display_name?: string | null;
   role: string | null;
@@ -234,6 +268,14 @@ export interface AppUser {
   reseller_id: string | null;
   company_id: string | null;
   is_active: boolean;
+  /** "invited" = created by an admin, waiting for the user's First-time login. */
+  account_state: "invited" | "pending" | "active" | "suspended" | "locked";
+  contact_number?: string | null;
+  requested_company_name?: string | null;
   assigned_system_ids: string[];
   assigned_site_ids: string[];
+  first_name?: string | null;
+  last_name?: string | null;
+  invited_at?: string | null;
+  invited_by?: string | null;
 }

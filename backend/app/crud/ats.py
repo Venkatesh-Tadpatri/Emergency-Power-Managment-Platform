@@ -46,5 +46,7 @@ def update_ats(db: Session, ats: ATS, data: ATSUpdate) -> ATS:
 
 def delete_ats(db: Session, ats: ATS) -> None:
     delete_device_topic(db, ats.id, "ats")
+    if ats.panel:
+        ats.panel.sync_status = "pending"
     db.delete(ats)
     db.commit()
